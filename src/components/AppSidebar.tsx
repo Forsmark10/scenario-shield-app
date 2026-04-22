@@ -1,4 +1,4 @@
-import { LayoutDashboard, Table2, Sliders, GitCompare, Info, Wrench } from "lucide-react";
+import { LayoutDashboard, Table2, Sliders, GitCompare, Info, Wrench, History as HistoryIcon } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -21,6 +21,7 @@ const navItems = [
 ];
 
 const adminItems = [
+  { title: "Historikk", url: "/history", icon: HistoryIcon },
   { title: "Health & Import", url: "/admin", icon: Wrench },
 ];
 
