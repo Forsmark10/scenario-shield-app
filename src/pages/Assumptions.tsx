@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
+import { InfoTip } from "@/components/InfoTip";
 import { cn } from "@/lib/utils";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
@@ -154,11 +156,13 @@ function Section({
   description,
   children,
   defaultOpen = true,
+  tooltip,
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  tooltip?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -167,7 +171,14 @@ function Section({
         <CollapsibleTrigger asChild>
           <button className="w-full flex items-center justify-between px-5 py-4 text-left">
             <div>
-              <h2 className="text-sm font-semibold">{title}</h2>
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-sm font-semibold">{title}</h2>
+                {tooltip && (
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <InfoTip text={tooltip} />
+                  </span>
+                )}
+              </div>
               {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
             </div>
             <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
@@ -212,7 +223,14 @@ function NumCell({
       const num = Number(raw.replace(",", "."));
       if (isNaN(num)) return;
       setSaving(true);
-      Promise.resolve(onCommit(num)).finally(() => setSaving(false));
+      Promise.resolve(onCommit(num))
+        .then(() => {
+          sonnerToast.success("Lagret", { duration: 1500, position: "bottom-right" });
+        })
+        .catch((err: any) => {
+          sonnerToast.error("Lagring feilet", { description: err?.message ?? String(err) });
+        })
+        .finally(() => setSaving(false));
     },
     [onCommit],
   );
