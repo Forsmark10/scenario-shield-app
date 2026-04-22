@@ -36,6 +36,27 @@ interface AllData {
   categories: string[];
 }
 
+type TableKey =
+  | "global"
+  | "central"
+  | "intRates"
+  | "extRates"
+  | "intChanges"
+  | "extChanges"
+  | "conversions"
+  | "nearshoringBase"
+  | "nearshoringAdds"
+  | "catAdj"
+  | "capexPlan";
+
+type PatchAction =
+  | { type: "upsert"; table: TableKey; row: any; matchBy?: (r: any) => boolean }
+  | { type: "update"; table: TableKey; id: string; changes: Record<string, any> }
+  | { type: "delete"; table: TableKey; id: string }
+  | { type: "setSingleton"; table: "nearshoringBase"; row: any };
+
+export type Patch = (action: PatchAction) => void;
+
 export default function Assumptions() {
   const [data, setData] = useState<AllData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,6 +113,35 @@ export default function Assumptions() {
     };
   }, [reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const patch = useCallback<Patch>((action) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev } as AllData;
+      if (action.type === "setSingleton") {
+        (next as any)[action.table] = action.row;
+        return next;
+      }
+      const tbl = action.table;
+      const arr = [...((prev as any)[tbl] as any[])];
+      if (action.type === "upsert") {
+        const matchFn = action.matchBy;
+        const idx = matchFn
+          ? arr.findIndex(matchFn)
+          : arr.findIndex((r) => r.id === action.row.id);
+        if (idx >= 0) arr[idx] = { ...arr[idx], ...action.row };
+        else arr.push(action.row);
+      } else if (action.type === "update") {
+        const idx = arr.findIndex((r) => r.id === action.id);
+        if (idx >= 0) arr[idx] = { ...arr[idx], ...action.changes };
+      } else if (action.type === "delete") {
+        const idx = arr.findIndex((r) => r.id === action.id);
+        if (idx >= 0) arr.splice(idx, 1);
+      }
+      (next as any)[tbl] = arr;
+      return next;
+    });
+  }, []);
+
   const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
 
   if (loading || !data) {
@@ -123,14 +173,14 @@ export default function Assumptions() {
 
         {data.scenarios.map((s) => (
           <TabsContent key={s.id} value={s.id} className="mt-4 space-y-4">
-            <SectionGlobal data={data} scenario={s} onChange={refresh} />
-            <SectionCentral data={data} scenario={s} onChange={refresh} />
-            <SectionInternalFte data={data} scenario={s} onChange={refresh} />
-            <SectionExternalFte data={data} scenario={s} onChange={refresh} />
-            <SectionConversions data={data} scenario={s} onChange={refresh} />
-            <SectionNearshoring data={data} scenario={s} onChange={refresh} />
-            <SectionCategoryAdj data={data} scenario={s} onChange={refresh} />
-            <SectionCapex data={data} scenario={s} onChange={refresh} />
+            <SectionGlobal data={data} scenario={s} patch={patch} />
+            <SectionCentral data={data} scenario={s} patch={patch} />
+            <SectionInternalFte data={data} scenario={s} patch={patch} />
+            <SectionExternalFte data={data} scenario={s} patch={patch} />
+            <SectionConversions data={data} scenario={s} patch={patch} />
+            <SectionNearshoring data={data} scenario={s} patch={patch} />
+            <SectionCategoryAdj data={data} scenario={s} patch={patch} />
+            <SectionCapex data={data} scenario={s} patch={patch} />
 
             <div className="flex items-center justify-between pt-2">
               <p className="text-xs text-muted-foreground">Endringer lagres automatisk (debounce 500 ms).</p>
@@ -213,8 +263,13 @@ function NumCell({
   const [local, setLocal] = useState(String(value ?? 0));
   const [saving, setSaving] = useState(false);
   const timer = useRef<NodeJS.Timeout>();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isFocusedRef = useRef(false);
+  const isDirtyRef = useRef(false);
 
   useEffect(() => {
+    // Don't clobber user input while they're editing this cell.
+    if (isFocusedRef.current || isDirtyRef.current) return;
     setLocal(String(value ?? 0));
   }, [value]);
 
@@ -225,6 +280,7 @@ function NumCell({
       setSaving(true);
       Promise.resolve(onCommit(num))
         .then(() => {
+          isDirtyRef.current = false;
           sonnerToast.success("Lagret", { duration: 1500, position: "bottom-right" });
         })
         .catch((err: any) => {
@@ -238,19 +294,25 @@ function NumCell({
   return (
     <div className={cn("relative", className)}>
       <Input
+        ref={inputRef}
         type="number"
         step={step}
         min={min}
         max={max}
         value={local}
+        onFocus={() => {
+          isFocusedRef.current = true;
+        }}
         onChange={(e) => {
+          isDirtyRef.current = true;
           setLocal(e.target.value);
           if (timer.current) clearTimeout(timer.current);
           timer.current = setTimeout(() => commit(e.target.value), 500);
         }}
         onBlur={() => {
+          isFocusedRef.current = false;
           if (timer.current) clearTimeout(timer.current);
-          commit(local);
+          if (isDirtyRef.current) commit(local);
         }}
         className={cn("h-8 text-xs text-right tabular-nums font-mono", suffix && "pr-6", saving && "ring-1 ring-primary/30")}
       />
@@ -264,25 +326,36 @@ function NumCell({
 }
 
 // ---------------------- 1. Global drivers ----------------------
-function SectionGlobal({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const get = (year: number) =>
     data.global.find((g) => g.scenario_id === scenario.id && g.year === year) ?? null;
 
   const upsert = async (year: number, field: string, value: number) => {
     const existing = get(year);
     if (existing) {
-      await supabase.from("global_assumptions").update({ [field]: value } as any).eq("id", existing.id);
+      patch({ type: "update", table: "global", id: existing.id, changes: { [field]: value } });
+      const { error } = await supabase
+        .from("global_assumptions")
+        .update({ [field]: value } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
     } else {
-      await supabase.from("global_assumptions").insert({
+      const insertRow = {
         scenario_id: scenario.id,
         year,
         salary_increase_pct: 0.04,
         price_increase_pct: 0.05,
         eur_nok_rate: 11.5,
         [field]: value,
-      } as any);
+      };
+      const { data: inserted, error } = await supabase
+        .from("global_assumptions")
+        .insert(insertRow as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "global", row: inserted });
     }
-    onChange();
   };
 
   const drivers = [
@@ -328,25 +401,32 @@ function SectionGlobal({ data, scenario, onChange }: { data: AllData; scenario: 
 }
 
 // ---------------------- 2. Central drivers ----------------------
-function SectionCentral({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const get = (year: number) =>
     data.central.find((g) => g.scenario_id === scenario.id && g.year === year) ?? null;
 
   const upsert = async (year: number, field: string, value: number) => {
     const existing = get(year);
     if (existing) {
-      await supabase.from("central_assumptions").update({ [field]: value } as any).eq("id", existing.id);
+      patch({ type: "update", table: "central", id: existing.id, changes: { [field]: value } });
+      const { error } = await supabase.from("central_assumptions").update({ [field]: value } as any).eq("id", existing.id);
+      if (error) throw error;
     } else {
-      await supabase.from("central_assumptions").insert({
-        scenario_id: scenario.id,
-        year,
-        central_price_increase_pct: 0.03,
-        central_volume_increase_pct: 0.02,
-        central_reduction_pct: 0,
-        [field]: value,
-      } as any);
+      const { data: inserted, error } = await supabase
+        .from("central_assumptions")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          central_price_increase_pct: 0.03,
+          central_volume_increase_pct: 0.02,
+          central_reduction_pct: 0,
+          [field]: value,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "central", row: inserted });
     }
-    onChange();
   };
 
   const drivers = [
@@ -396,14 +476,24 @@ function SectionCentral({ data, scenario, onChange }: { data: AllData; scenario:
 }
 
 // ---------------------- 3. Internal FTE ----------------------
-function SectionInternalFte({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const rateFor = (level: Level) => data.intRates.find((r) => r.level === level);
 
   const updateRate = async (level: Level, value: number) => {
     const r = rateFor(level);
-    if (r) await supabase.from("internal_fte_base_rates").update({ base_annual_cost: value }).eq("id", r.id);
-    else await supabase.from("internal_fte_base_rates").insert({ level, base_annual_cost: value });
-    onChange();
+    if (r) {
+      patch({ type: "update", table: "intRates", id: r.id, changes: { base_annual_cost: value } });
+      const { error } = await supabase.from("internal_fte_base_rates").update({ base_annual_cost: value }).eq("id", r.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("internal_fte_base_rates")
+        .insert({ level, base_annual_cost: value })
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "intRates", row: inserted });
+    }
   };
 
   const getChange = (year: number, level: Level) =>
@@ -412,18 +502,18 @@ function SectionInternalFte({ data, scenario, onChange }: { data: AllData; scena
   const upsertChange = async (year: number, level: Level, field: "increase" | "decrease", value: number) => {
     const existing = getChange(year, level);
     if (existing) {
-      await supabase.from("internal_fte_changes").update({ [field]: value } as any).eq("id", existing.id);
+      patch({ type: "update", table: "intChanges", id: existing.id, changes: { [field]: value } });
+      const { error } = await supabase.from("internal_fte_changes").update({ [field]: value } as any).eq("id", existing.id);
+      if (error) throw error;
     } else {
-      await supabase.from("internal_fte_changes").insert({
-        scenario_id: scenario.id,
-        year,
-        level,
-        increase: 0,
-        decrease: 0,
-        [field]: value,
-      } as any);
+      const { data: inserted, error } = await supabase
+        .from("internal_fte_changes")
+        .insert({ scenario_id: scenario.id, year, level, increase: 0, decrease: 0, [field]: value } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "intChanges", row: inserted });
     }
-    onChange();
   };
 
   return (
@@ -504,14 +594,24 @@ function SectionInternalFte({ data, scenario, onChange }: { data: AllData; scena
 }
 
 // ---------------------- 4. External FTE ----------------------
-function SectionExternalFte({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const rateFor = (level: Level) => data.extRates.find((r) => r.level === level);
 
   const updateRate = async (level: Level, value: number) => {
     const r = rateFor(level);
-    if (r) await supabase.from("external_fte_base_rates").update({ base_monthly_cost: value }).eq("id", r.id);
-    else await supabase.from("external_fte_base_rates").insert({ level, base_monthly_cost: value, working_months: 11 });
-    onChange();
+    if (r) {
+      patch({ type: "update", table: "extRates", id: r.id, changes: { base_monthly_cost: value } });
+      const { error } = await supabase.from("external_fte_base_rates").update({ base_monthly_cost: value }).eq("id", r.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("external_fte_base_rates")
+        .insert({ level, base_monthly_cost: value, working_months: 11 })
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "extRates", row: inserted });
+    }
   };
 
   const getChange = (year: number, level: Level) =>
@@ -520,18 +620,18 @@ function SectionExternalFte({ data, scenario, onChange }: { data: AllData; scena
   const upsertChange = async (year: number, level: Level, field: "increase" | "decrease", value: number) => {
     const existing = getChange(year, level);
     if (existing) {
-      await supabase.from("external_fte_changes").update({ [field]: value } as any).eq("id", existing.id);
+      patch({ type: "update", table: "extChanges", id: existing.id, changes: { [field]: value } });
+      const { error } = await supabase.from("external_fte_changes").update({ [field]: value } as any).eq("id", existing.id);
+      if (error) throw error;
     } else {
-      await supabase.from("external_fte_changes").insert({
-        scenario_id: scenario.id,
-        year,
-        level,
-        increase: 0,
-        decrease: 0,
-        [field]: value,
-      } as any);
+      const { data: inserted, error } = await supabase
+        .from("external_fte_changes")
+        .insert({ scenario_id: scenario.id, year, level, increase: 0, decrease: 0, [field]: value } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "extChanges", row: inserted });
     }
-    onChange();
   };
 
   return (
@@ -608,29 +708,36 @@ function SectionExternalFte({ data, scenario, onChange }: { data: AllData; scena
 }
 
 // ---------------------- 5. Conversions ----------------------
-function SectionConversions({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionConversions({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const rows = data.conversions.filter((c) => c.scenario_id === scenario.id);
 
   const addRow = async () => {
-    await supabase.from("conversions").insert({
-      scenario_id: scenario.id,
-      year: 2027,
-      external_level: "Low",
-      internal_level: "Low",
-      count: 0,
-      overlap_months: 3,
-    });
-    onChange();
+    const { data: inserted, error } = await supabase
+      .from("conversions")
+      .insert({
+        scenario_id: scenario.id,
+        year: 2027,
+        external_level: "Low",
+        internal_level: "Low",
+        count: 0,
+        overlap_months: 3,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    patch({ type: "upsert", table: "conversions", row: inserted });
   };
 
   const updateField = async (id: string, field: string, value: any) => {
-    await supabase.from("conversions").update({ [field]: value } as any).eq("id", id);
-    onChange();
+    patch({ type: "update", table: "conversions", id, changes: { [field]: value } });
+    const { error } = await supabase.from("conversions").update({ [field]: value } as any).eq("id", id);
+    if (error) throw error;
   };
 
   const remove = async (id: string) => {
-    await supabase.from("conversions").delete().eq("id", id);
-    onChange();
+    patch({ type: "delete", table: "conversions", id });
+    const { error } = await supabase.from("conversions").delete().eq("id", id);
+    if (error) throw error;
   };
 
   return (
@@ -695,38 +802,52 @@ function SectionConversions({ data, scenario, onChange }: { data: AllData; scena
 }
 
 // ---------------------- 6. Nearshoring ----------------------
-function SectionNearshoring({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const base = data.nearshoringBase;
   const adds = data.nearshoringAdds.filter((n) => n.scenario_id === scenario.id);
 
   const updateBase = async (field: string, value: number) => {
     if (base) {
-      await supabase.from("nearshoring_base").update({ [field]: value } as any).eq("id", base.id);
+      patch({ type: "setSingleton", table: "nearshoringBase", row: { ...base, [field]: value } });
+      const { error } = await supabase.from("nearshoring_base").update({ [field]: value } as any).eq("id", base.id);
+      if (error) throw error;
     } else {
-      await supabase.from("nearshoring_base").insert({ base_annual_cost_eur: 75000, working_months: 12, [field]: value } as any);
+      const { data: inserted, error } = await supabase
+        .from("nearshoring_base")
+        .insert({ base_annual_cost_eur: 75000, working_months: 12, [field]: value } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "setSingleton", table: "nearshoringBase", row: inserted });
     }
-    onChange();
   };
 
   const addRow = async () => {
-    await supabase.from("nearshoring_additions").insert({
-      scenario_id: scenario.id,
-      year: 2027,
-      replaces_external_level: "Low",
-      count: 0,
-      overlap_months: 3,
-    });
-    onChange();
+    const { data: inserted, error } = await supabase
+      .from("nearshoring_additions")
+      .insert({
+        scenario_id: scenario.id,
+        year: 2027,
+        replaces_external_level: "Low",
+        count: 0,
+        overlap_months: 3,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    patch({ type: "upsert", table: "nearshoringAdds", row: inserted });
   };
 
   const updateField = async (id: string, field: string, value: any) => {
-    await supabase.from("nearshoring_additions").update({ [field]: value } as any).eq("id", id);
-    onChange();
+    patch({ type: "update", table: "nearshoringAdds", id, changes: { [field]: value } });
+    const { error } = await supabase.from("nearshoring_additions").update({ [field]: value } as any).eq("id", id);
+    if (error) throw error;
   };
 
   const remove = async (id: string) => {
-    await supabase.from("nearshoring_additions").delete().eq("id", id);
-    onChange();
+    patch({ type: "delete", table: "nearshoringAdds", id });
+    const { error } = await supabase.from("nearshoring_additions").delete().eq("id", id);
+    if (error) throw error;
   };
 
   return (
@@ -815,15 +936,25 @@ function SectionNearshoring({ data, scenario, onChange }: { data: AllData; scena
 }
 
 // ---------------------- 7. Category adjustments ----------------------
-function SectionCategoryAdj({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const get = (cat: string, year: number) =>
     data.catAdj.find((a) => a.scenario_id === scenario.id && a.category === cat && a.year === year);
 
   const upsert = async (cat: string, year: number, value: number) => {
     const r = get(cat, year);
-    if (r) await supabase.from("category_adjustments").update({ adjustment_pct: value }).eq("id", r.id);
-    else await supabase.from("category_adjustments").insert({ scenario_id: scenario.id, category: cat, year, adjustment_pct: value });
-    onChange();
+    if (r) {
+      patch({ type: "update", table: "catAdj", id: r.id, changes: { adjustment_pct: value } });
+      const { error } = await supabase.from("category_adjustments").update({ adjustment_pct: value }).eq("id", r.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("category_adjustments")
+        .insert({ scenario_id: scenario.id, category: cat, year, adjustment_pct: value })
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "catAdj", row: inserted });
+    }
   };
 
   return (
@@ -871,7 +1002,7 @@ function SectionCategoryAdj({ data, scenario, onChange }: { data: AllData; scena
 }
 
 // ---------------------- 8. Capex plan ----------------------
-function SectionCapex({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const types = ["Hardware", "Software", "Prosjekt"] as const;
   const rows = data.capexPlan.filter((c) => c.scenario_id === scenario.id);
 
@@ -897,41 +1028,57 @@ function SectionCapex({ data, scenario, onChange }: { data: AllData; scenario: S
     const existing = aggregatedLine.get(`${type}-${year}`);
     if (existing) {
       if (value === 0) {
-        await supabase.from("capex_plan").delete().eq("id", existing.id);
+        patch({ type: "delete", table: "capexPlan", id: existing.id });
+        const { error } = await supabase.from("capex_plan").delete().eq("id", existing.id);
+        if (error) throw error;
       } else {
-        await supabase.from("capex_plan").update({ amount: value }).eq("id", existing.id);
+        patch({ type: "update", table: "capexPlan", id: existing.id, changes: { amount: value } });
+        const { error } = await supabase.from("capex_plan").update({ amount: value }).eq("id", existing.id);
+        if (error) throw error;
       }
     } else if (value !== 0) {
-      await supabase.from("capex_plan").insert({
-        scenario_id: scenario.id,
-        capex_type: type,
-        year,
-        amount: value,
-        description: null,
-      });
+      const { data: inserted, error } = await supabase
+        .from("capex_plan")
+        .insert({
+          scenario_id: scenario.id,
+          capex_type: type,
+          year,
+          amount: value,
+          description: null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "capexPlan", row: inserted });
     }
-    onChange();
   };
 
   const updateDetailField = async (id: string, field: string, value: any) => {
-    await supabase.from("capex_plan").update({ [field]: value } as any).eq("id", id);
-    onChange();
+    patch({ type: "update", table: "capexPlan", id, changes: { [field]: value } });
+    const { error } = await supabase.from("capex_plan").update({ [field]: value } as any).eq("id", id);
+    if (error) throw error;
   };
 
   const addDetail = async () => {
-    await supabase.from("capex_plan").insert({
-      scenario_id: scenario.id,
-      capex_type: "Hardware",
-      year: 2027,
-      amount: 0,
-      description: "Ny investering",
-    });
-    onChange();
+    const { data: inserted, error } = await supabase
+      .from("capex_plan")
+      .insert({
+        scenario_id: scenario.id,
+        capex_type: "Hardware",
+        year: 2027,
+        amount: 0,
+        description: "Ny investering",
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    patch({ type: "upsert", table: "capexPlan", row: inserted });
   };
 
   const removeDetail = async (id: string) => {
-    await supabase.from("capex_plan").delete().eq("id", id);
-    onChange();
+    patch({ type: "delete", table: "capexPlan", id });
+    const { error } = await supabase.from("capex_plan").delete().eq("id", id);
+    if (error) throw error;
   };
 
   const detailedRows = rows.filter((r) => r.description);
