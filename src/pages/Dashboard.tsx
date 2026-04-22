@@ -454,10 +454,30 @@ function ScenarioSection({
         <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-4">
           {/* Bars */}
           <div className="h-[280px] relative">
-            <div className="absolute top-0 left-0 right-0 flex justify-around text-[11px] font-bold text-foreground uppercase tracking-wide pointer-events-none z-10">
-              <span className="ml-4">Historisk</span>
-              <span>Baseline</span>
-              <span className="mr-4">Forecast</span>
+            {/* Section labels overlay — aligned to bar slots (8 equal columns) */}
+            <div
+              className="absolute top-0 left-0 right-0 grid pointer-events-none z-10 text-[11px] font-bold text-foreground uppercase tracking-wide"
+              style={{ gridTemplateColumns: "repeat(8, 1fr)", paddingLeft: 5, paddingRight: 17 }}
+            >
+              <div className="text-center">Historisk</div>
+              <div className="col-span-2 text-center">Baseline</div>
+              <div className="col-span-5 text-center">Forecast</div>
+            </div>
+            {/* Dashed dividers — between bars 1|2 and 3|4 */}
+            <div
+              className="absolute inset-0 grid pointer-events-none z-[5]"
+              style={{
+                gridTemplateColumns: "repeat(8, 1fr)",
+                paddingLeft: 5,
+                paddingRight: 17,
+                paddingTop: 22,
+                paddingBottom: 22,
+              }}
+            >
+              <div className="border-r-2 border-dashed" style={{ borderColor: DIVIDER_COLOR }} />
+              <div />
+              <div className="border-r-2 border-dashed" style={{ borderColor: DIVIDER_COLOR }} />
+              <div /><div /><div /><div /><div />
             </div>
             <ResponsiveContainer width="100%" height="100%">
               {breakdown === "Total" ? (
@@ -465,8 +485,6 @@ function ScenarioSection({
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip content={renderTooltip} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
-                  <ReferenceLine x="BU 2026" stroke={DIVIDER_COLOR} strokeWidth={2} strokeDasharray="5 4" />
-                  <ReferenceLine x="FC 2027" stroke={DIVIDER_COLOR} strokeWidth={2} strokeDasharray="5 4" />
                   <Bar dataKey="value" radius={[3, 3, 0, 0]}>
                     {barData.map((d) => (
                       <Cell key={d.year} fill={YEAR_COLOR[d.year]} />
@@ -484,11 +502,18 @@ function ScenarioSection({
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip content={renderTooltip} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
-                  <ReferenceLine x="BU 2026" stroke={DIVIDER_COLOR} strokeWidth={2} strokeDasharray="5 4" />
-                  <ReferenceLine x="FC 2027" stroke={DIVIDER_COLOR} strokeWidth={2} strokeDasharray="5 4" />
                   <Legend wrapperStyle={{ fontSize: 10 }} iconSize={8} />
                   {stackedCats.map((cat) => (
-                    <Bar key={cat} dataKey={cat} stackId="a" fill={colorForCategory(cat)} />
+                    <Bar key={cat} dataKey={cat} stackId="a" fill={colorForCategory(cat)}>
+                      {cat === lastStackCat && (
+                        <LabelList
+                          dataKey="__total"
+                          position="top"
+                          formatter={(v: number) => formatNumberNO(v, 0)}
+                          style={{ fontSize: 10, fontWeight: 500, fill: "hsl(var(--foreground))" }}
+                        />
+                      )}
+                    </Bar>
                   ))}
                 </BarChart>
               )}
