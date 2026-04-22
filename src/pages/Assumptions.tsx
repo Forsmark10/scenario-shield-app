@@ -113,6 +113,35 @@ export default function Assumptions() {
     };
   }, [reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const patch = useCallback<Patch>((action) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev } as AllData;
+      if (action.type === "setSingleton") {
+        (next as any)[action.table] = action.row;
+        return next;
+      }
+      const tbl = action.table;
+      const arr = [...((prev as any)[tbl] as any[])];
+      if (action.type === "upsert") {
+        const matchFn = action.matchBy;
+        const idx = matchFn
+          ? arr.findIndex(matchFn)
+          : arr.findIndex((r) => r.id === action.row.id);
+        if (idx >= 0) arr[idx] = { ...arr[idx], ...action.row };
+        else arr.push(action.row);
+      } else if (action.type === "update") {
+        const idx = arr.findIndex((r) => r.id === action.id);
+        if (idx >= 0) arr[idx] = { ...arr[idx], ...action.changes };
+      } else if (action.type === "delete") {
+        const idx = arr.findIndex((r) => r.id === action.id);
+        if (idx >= 0) arr.splice(idx, 1);
+      }
+      (next as any)[tbl] = arr;
+      return next;
+    });
+  }, []);
+
   const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
 
   if (loading || !data) {
