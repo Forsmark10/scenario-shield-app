@@ -263,8 +263,13 @@ function NumCell({
   const [local, setLocal] = useState(String(value ?? 0));
   const [saving, setSaving] = useState(false);
   const timer = useRef<NodeJS.Timeout>();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isFocusedRef = useRef(false);
+  const isDirtyRef = useRef(false);
 
   useEffect(() => {
+    // Don't clobber user input while they're editing this cell.
+    if (isFocusedRef.current || isDirtyRef.current) return;
     setLocal(String(value ?? 0));
   }, [value]);
 
