@@ -377,7 +377,8 @@ function ScenarioSection({
     [bundle, view, typeFilter, excludedCats, stackedCats],
   );
 
-  // YoY data — exclude BU 2026 (same year as FC 2026, no growth point)
+  // YoY data — exclude BU 2026 entirely (same year as FC 2026, no growth point)
+  // Final x-axis: FC 2026 | FC 2027 | ... | FC 2031 (6 points, first = AC2025 → FC2026 growth)
   const yoySeq = [
     { year: "AC 2025", value: toM(totals.ac) },
     { year: "FC 2026", value: toM(totals.fc26) },
@@ -387,14 +388,9 @@ function ScenarioSection({
     { year: "FC 2030", value: toM(totals.fc[2030] ?? 0) },
     { year: "FC 2031", value: toM(totals.fc[2031] ?? 0) },
   ];
-  // Align YoY x-axis with bar chart (8 labels), but only place dots at the 6 valid points
-  const yoyData = barData.map((b, idx) => {
-    if (idx === 0 || b.year === "BU 2026") return { year: b.year, value: null as number | null };
-    const seqIdx = yoySeq.findIndex((s) => s.year === b.year);
-    if (seqIdx <= 0) return { year: b.year, value: null };
-    const prev = yoySeq[seqIdx - 1].value;
-    const cur = yoySeq[seqIdx].value;
-    return { year: b.year, value: prev !== 0 ? ((cur - prev) / prev) * 100 : 0 };
+  const yoyData = yoySeq.slice(1).map((s, i) => {
+    const prev = yoySeq[i].value;
+    return { year: s.year, value: prev !== 0 ? ((s.value - prev) / prev) * 100 : 0 };
   });
 
   // Custom tooltip handles both Total and Stacked
