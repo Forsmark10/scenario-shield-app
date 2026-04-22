@@ -802,38 +802,52 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
 }
 
 // ---------------------- 6. Nearshoring ----------------------
-function SectionNearshoring({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const base = data.nearshoringBase;
   const adds = data.nearshoringAdds.filter((n) => n.scenario_id === scenario.id);
 
   const updateBase = async (field: string, value: number) => {
     if (base) {
-      await supabase.from("nearshoring_base").update({ [field]: value } as any).eq("id", base.id);
+      patch({ type: "setSingleton", table: "nearshoringBase", row: { ...base, [field]: value } });
+      const { error } = await supabase.from("nearshoring_base").update({ [field]: value } as any).eq("id", base.id);
+      if (error) throw error;
     } else {
-      await supabase.from("nearshoring_base").insert({ base_annual_cost_eur: 75000, working_months: 12, [field]: value } as any);
+      const { data: inserted, error } = await supabase
+        .from("nearshoring_base")
+        .insert({ base_annual_cost_eur: 75000, working_months: 12, [field]: value } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "setSingleton", table: "nearshoringBase", row: inserted });
     }
-    onChange();
   };
 
   const addRow = async () => {
-    await supabase.from("nearshoring_additions").insert({
-      scenario_id: scenario.id,
-      year: 2027,
-      replaces_external_level: "Low",
-      count: 0,
-      overlap_months: 3,
-    });
-    onChange();
+    const { data: inserted, error } = await supabase
+      .from("nearshoring_additions")
+      .insert({
+        scenario_id: scenario.id,
+        year: 2027,
+        replaces_external_level: "Low",
+        count: 0,
+        overlap_months: 3,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    patch({ type: "upsert", table: "nearshoringAdds", row: inserted });
   };
 
   const updateField = async (id: string, field: string, value: any) => {
-    await supabase.from("nearshoring_additions").update({ [field]: value } as any).eq("id", id);
-    onChange();
+    patch({ type: "update", table: "nearshoringAdds", id, changes: { [field]: value } });
+    const { error } = await supabase.from("nearshoring_additions").update({ [field]: value } as any).eq("id", id);
+    if (error) throw error;
   };
 
   const remove = async (id: string) => {
-    await supabase.from("nearshoring_additions").delete().eq("id", id);
-    onChange();
+    patch({ type: "delete", table: "nearshoringAdds", id });
+    const { error } = await supabase.from("nearshoring_additions").delete().eq("id", id);
+    if (error) throw error;
   };
 
   return (
