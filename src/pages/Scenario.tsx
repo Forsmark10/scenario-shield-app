@@ -38,6 +38,7 @@ const MONTHS_NO = ["Jan", "Feb", "Mar", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep"
 
 export default function Scenario() {
   const settings = useAppSettings();
+  const allScenarios = useAllScenarios();
   const [unit, setUnit] = useState<Unit>("tNOK");
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
@@ -46,6 +47,29 @@ export default function Scenario() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!allScenarios.scenarios.length || !scenarioId) {
+      toast.error("Eksport ikke tilgjengelig");
+      return;
+    }
+    setExporting(true);
+    try {
+      await new Promise((r) => setTimeout(r, 30));
+      exportWorkbook({
+        scenarios: allScenarios.scenarios,
+        costCenterName: settings?.cost_center_name ?? "Kostnadssenter",
+        focusedScenarioId: scenarioId,
+      });
+      toast.success("Excel-fil lastet ned");
+    } catch (e: any) {
+      toast.error("Eksport feilet", { description: e?.message ?? String(e) });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     if (settings) setUnit(settings.default_unit);
