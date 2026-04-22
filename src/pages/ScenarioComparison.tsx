@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useAllScenarios, type ScenarioBundle } from "@/hooks/useAllScenarios";
 import { formatNumberNO } from "@/lib/format";
