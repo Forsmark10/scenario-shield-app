@@ -507,10 +507,22 @@ function ScenarioSection({
                     <Bar key={cat} dataKey={cat} stackId="a" fill={colorForCategory(cat)}>
                       {cat === lastStackCat && (
                         <LabelList
-                          dataKey="__total"
-                          position="top"
-                          formatter={(v: number) => formatNumberNO(v, 0)}
-                          style={{ fontSize: 10, fontWeight: 500, fill: "hsl(var(--foreground))" }}
+                          dataKey={cat}
+                          content={(props: any) => {
+                            const { x, y, width, index } = props;
+                            const total = Number(stackedData[index]?.__total ?? 0);
+                            if (!total) return null;
+                            return (
+                              <text
+                                x={Number(x) + Number(width) / 2}
+                                y={Number(y) - 6}
+                                textAnchor="middle"
+                                style={{ fontSize: 10, fontWeight: 500, fill: "hsl(var(--foreground))" }}
+                              >
+                                {formatNumberNO(total, 0)}
+                              </text>
+                            );
+                          }}
                         />
                       )}
                     </Bar>
