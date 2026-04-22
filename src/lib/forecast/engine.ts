@@ -157,16 +157,15 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   const masterByYear: Record<number, number> = {};
   const masterBreakdown: Record<number, string> = {};
   for (const N of YEARS) {
-    const g = getGlobal(global_assumptions, scenario_id, N);
-    const yearOffset = N - 2026;
-    const salaryFactor = Math.pow(1 + g.salary_increase_pct, yearOffset);
+    const salaryRate = (Y: number) =>
+      getGlobal(global_assumptions, scenario_id, Y).salary_increase_pct;
+    const salaryFactor = cumulativeFactor(scenario_id, 2027, N, salaryRate);
     let amount = masterBase * salaryFactor;
     const parts: string[] = [
-      `base=${round2(masterBase)} × (1+${g.salary_increase_pct})^${yearOffset}=${round2(salaryFactor)} → ${round2(masterBase * salaryFactor)}`,
+      `base=${round2(masterBase)} × cum_salary(2027..${N})=${round2(salaryFactor)} → ${round2(masterBase * salaryFactor)}`,
     ];
     for (let Y = 2027; Y <= N; Y++) {
-      const gY = getGlobal(global_assumptions, scenario_id, Y);
-      const yearsGrowth = N - Y + 1;
+      const grown = cumulativeFactor(scenario_id, Y, N, salaryRate);
       for (const lvl of LEVELS) {
         const ch = scenarioIntChanges.find(
           (c) => c.year === Y && c.level === lvl
@@ -174,20 +173,16 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
         const net = (ch?.increase ?? 0) - (ch?.decrease ?? 0);
         if (net === 0) continue;
         const rate = intRate(lvl);
-        const grown = Math.pow(1 + gY.salary_increase_pct, yearsGrowth);
         const delta = net * rate * grown;
         amount += delta;
         parts.push(
-          `+ Y${Y} ${lvl} net=${net} × rate=${rate} × (1+${gY.salary_increase_pct})^${yearsGrowth}=${round2(grown)} → ${round2(delta)}`
+          `+ Y${Y} ${lvl} net=${net} × rate=${rate} × cum_salary(${Y}..${N})=${round2(grown)} → ${round2(delta)}`
         );
       }
     }
-    // Konverteringer øker intern FTE: i konv-året får intern overlap_months utenfor full 12 mnd
-    // -> Internt FTE-bidrag fra konvertering: full årseffekt fra konv-året (12 mnd intern)
+    // Konverteringer øker intern FTE
     for (let Y = 2027; Y <= N; Y++) {
-      const gY = getGlobal(global_assumptions, scenario_id, Y);
-      const yearsGrowth = N - Y + 1;
-      const grown = Math.pow(1 + gY.salary_increase_pct, yearsGrowth);
+      const grown = cumulativeFactor(scenario_id, Y, N, salaryRate);
       for (const conv of scenarioConversions.filter((c) => c.year === Y)) {
         const rate = intRate(conv.internal_level);
         const delta = conv.count * rate * grown;
