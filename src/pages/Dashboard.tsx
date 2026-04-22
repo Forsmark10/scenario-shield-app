@@ -371,11 +371,18 @@ function ScenarioSection({
     () =>
       computeStackedYearly(bundle, view, typeFilter, excludedCats, stackedCats).map((r) => {
         const out: Record<string, number | string> = { year: r.year };
-        stackedCats.forEach((c) => (out[c] = toM(Number(r[c] || 0))));
+        let total = 0;
+        stackedCats.forEach((c) => {
+          const v = toM(Number(r[c] || 0));
+          out[c] = v;
+          total += v;
+        });
+        out.__total = total;
         return out;
       }),
     [bundle, view, typeFilter, excludedCats, stackedCats],
   );
+  const lastStackCat = stackedCats[stackedCats.length - 1];
 
   // YoY data — exclude BU 2026 entirely (same year as FC 2026, no growth point)
   // Final x-axis: FC 2026 | FC 2027 | ... | FC 2031 (6 points, first = AC2025 → FC2026 growth)
