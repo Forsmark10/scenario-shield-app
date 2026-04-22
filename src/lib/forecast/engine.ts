@@ -208,13 +208,23 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       let amount = 0;
       let bd = "";
 
+      const salaryRate = (Y: number) =>
+        getGlobal(global_assumptions, scenario_id, Y).salary_increase_pct;
+      const priceRate = (Y: number) =>
+        getGlobal(global_assumptions, scenario_id, Y).price_increase_pct;
+      const cPriceRate = (Y: number) =>
+        getCentral(central_assumptions, scenario_id, Y).central_price_increase_pct;
+      const cVolRate = (Y: number) =>
+        getCentral(central_assumptions, scenario_id, Y).central_volume_increase_pct;
+
       // ===== CENTRAL =====
       if (cl.cost_type === "Central") {
-        const priceFactor = Math.pow(1 + c.central_price_increase_pct, yearOffset);
-        const volumeFactor = Math.pow(1 + c.central_volume_increase_pct, yearOffset);
+        const priceFactor = cumulativeFactor(scenario_id, 2027, N, cPriceRate);
+        const volumeFactor = cumulativeFactor(scenario_id, 2027, N, cVolRate);
+        // central_reduction_pct er IKKE kumulativ - kun engangseffekt det året
         const reductionFactor = 1 - c.central_reduction_pct;
         amount = base * priceFactor * volumeFactor * reductionFactor;
-        bd = `Central: base=${round2(base)} × price=${round2(priceFactor)} × vol=${round2(volumeFactor)} × red=${round2(reductionFactor)} = ${round2(amount)}`;
+        bd = `Central: base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cum_vol=${round2(volumeFactor)} × red(${N})=${round2(reductionFactor)} = ${round2(amount)}`;
       } else if (cl.category === "Internal FTE") {
         // ===== INTERNAL FTE =====
         if (cl.is_fte_master) {
@@ -224,23 +234,21 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           amount = masterByYear[N] * cl.fte_driver_pct;
           bd = `Driver ${cl.fte_driver_pct} × master(${round2(masterByYear[N])}) = ${round2(amount)}`;
         } else {
-          const salaryFactor = Math.pow(1 + g.salary_increase_pct, yearOffset);
+          const salaryFactor = cumulativeFactor(scenario_id, 2027, N, salaryRate);
           amount = base * salaryFactor;
-          bd = `Øvrig Internal FTE: ${round2(base)} × (1+${g.salary_increase_pct})^${yearOffset}=${round2(salaryFactor)} = ${round2(amount)}`;
+          bd = `Øvrig Internal FTE: ${round2(base)} × cum_salary(2027..${N})=${round2(salaryFactor)} = ${round2(amount)}`;
         }
       } else if (cl.category === "External FTE") {
         // ===== EXTERNAL FTE =====
-        const priceFactor = Math.pow(1 + g.price_increase_pct, yearOffset);
+        const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
         let amt = base * priceFactor;
         const parts = [
-          `base=${round2(base)} × price=${round2(priceFactor)} → ${round2(amt)}`,
+          `base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} → ${round2(amt)}`,
         ];
 
         // FTE-endringer ekstern
         for (let Y = 2027; Y <= N; Y++) {
-          const gY = getGlobal(global_assumptions, scenario_id, Y);
-          const yearsGrowth = N - Y + 1;
-          const grown = Math.pow(1 + gY.price_increase_pct, yearsGrowth);
+          const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
           for (const lvl of LEVELS) {
             const ch = scenarioExtChanges.find(
               (c) => c.year === Y && c.level === lvl
@@ -252,16 +260,14 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
             const delta = net * annual * grown;
             amt += delta;
             parts.push(
-              `+ Y${Y} ${lvl} net=${net} × annual=${annual} × ${round2(grown)} = ${round2(delta)}`
+              `+ Y${Y} ${lvl} net=${net} × annual=${annual} × cum(${Y}..${N})=${round2(grown)} = ${round2(delta)}`
             );
           }
         }
 
         // Konverteringer reduserer ekstern
         for (let Y = 2027; Y <= N; Y++) {
-          const gY = getGlobal(global_assumptions, scenario_id, Y);
-          const yearsGrowth = N - Y + 1;
-          const grown = Math.pow(1 + gY.price_increase_pct, yearsGrowth);
+          const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
           for (const conv of scenarioConversions.filter((c) => c.year === Y)) {
             const r = extRate(conv.external_level);
             const annual = r.base_monthly_cost * r.working_months;
@@ -286,9 +292,7 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
 
         // Nearshoring erstatter eksterne
         for (let Y = 2027; Y <= N; Y++) {
-          const gY = getGlobal(global_assumptions, scenario_id, Y);
-          const yearsGrowth = N - Y + 1;
-          const grown = Math.pow(1 + gY.price_increase_pct, yearsGrowth);
+          const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
           for (const ns of scenarioNearshoring.filter((n) => n.year === Y)) {
             const r = extRate(ns.replaces_external_level);
             const annual = r.base_monthly_cost * r.working_months;
@@ -335,17 +339,15 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           bd = `Eksisterende avskrivning (flat) = ${round2(base)}`;
         }
       } else if (cl.category === "Capex") {
-        // Capex-rader fra cost_lines beholder bare 2026-baseline (vises i Spend-view)
-        // Faktisk planlagt capex per år hentes fra capex_plan og legges som virtuelle rader
         amount = 0;
         bd = `Capex baseline-rad — faktisk per år vises i 'Capex - <type>' virtuelle linjer.`;
       } else {
         // ===== ØVRIGE LOKALE (Operations, IT Costs, Consultancy, Other operating income) =====
-        const priceFactor = Math.pow(1 + g.price_increase_pct, yearOffset);
+        const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
         const adj = getCatAdj(category_adjustments, scenario_id, cl.category, N);
         const catFactor = 1 + adj;
         amount = base * priceFactor * catFactor;
-        bd = `${cl.category}: ${round2(base)} × price=${round2(priceFactor)} × cat(1+${adj})=${round2(catFactor)} = ${round2(amount)}`;
+        bd = `${cl.category}: ${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cat(1+${adj})=${round2(catFactor)} = ${round2(amount)}`;
       }
 
       line.amounts[N] = amount;
