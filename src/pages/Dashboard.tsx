@@ -536,8 +536,8 @@ function ScenarioSection({
           <div className="h-[280px]">
             <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">YoY-vekst %</div>
             <ResponsiveContainer width="100%" height="92%">
-              <LineChart data={yoyData} margin={{ top: 16, right: 16, bottom: 4, left: 0 }}>
-                <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+              <LineChart data={yoyData} margin={{ top: 16, right: 24, bottom: 4, left: 16 }}>
+                <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} padding={{ left: 12, right: 12 }} />
                 <YAxis hide />
                 <Tooltip
                   formatter={(v: number | null) => (v == null ? "" : `${formatPercentNO(v, 1)} %`)}
