@@ -161,7 +161,7 @@ export default function ScenarioComparison() {
                 {tree.map((g) => {
                   const open = expanded.has(g.category);
                   return (
-                    <FragmentNoFC key={g.category}>
+                    <Fragment key={g.category}>
                       <tr
                         className="border-b bg-secondary/40 hover:bg-secondary/70 cursor-pointer font-medium"
                         onClick={() => {
@@ -195,7 +195,7 @@ export default function ScenarioComparison() {
                             )}
                           </tr>
                         ))}
-                    </FragmentNoFC>
+                    </Fragment>
                   );
                 })}
               </tbody>
