@@ -401,25 +401,32 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
 }
 
 // ---------------------- 2. Central drivers ----------------------
-function SectionCentral({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const get = (year: number) =>
     data.central.find((g) => g.scenario_id === scenario.id && g.year === year) ?? null;
 
   const upsert = async (year: number, field: string, value: number) => {
     const existing = get(year);
     if (existing) {
-      await supabase.from("central_assumptions").update({ [field]: value } as any).eq("id", existing.id);
+      patch({ type: "update", table: "central", id: existing.id, changes: { [field]: value } });
+      const { error } = await supabase.from("central_assumptions").update({ [field]: value } as any).eq("id", existing.id);
+      if (error) throw error;
     } else {
-      await supabase.from("central_assumptions").insert({
-        scenario_id: scenario.id,
-        year,
-        central_price_increase_pct: 0.03,
-        central_volume_increase_pct: 0.02,
-        central_reduction_pct: 0,
-        [field]: value,
-      } as any);
+      const { data: inserted, error } = await supabase
+        .from("central_assumptions")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          central_price_increase_pct: 0.03,
+          central_volume_increase_pct: 0.02,
+          central_reduction_pct: 0,
+          [field]: value,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "central", row: inserted });
     }
-    onChange();
   };
 
   const drivers = [
