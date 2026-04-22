@@ -1002,7 +1002,7 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
 }
 
 // ---------------------- 8. Capex plan ----------------------
-function SectionCapex({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const types = ["Hardware", "Software", "Prosjekt"] as const;
   const rows = data.capexPlan.filter((c) => c.scenario_id === scenario.id);
 
@@ -1028,41 +1028,57 @@ function SectionCapex({ data, scenario, onChange }: { data: AllData; scenario: S
     const existing = aggregatedLine.get(`${type}-${year}`);
     if (existing) {
       if (value === 0) {
-        await supabase.from("capex_plan").delete().eq("id", existing.id);
+        patch({ type: "delete", table: "capexPlan", id: existing.id });
+        const { error } = await supabase.from("capex_plan").delete().eq("id", existing.id);
+        if (error) throw error;
       } else {
-        await supabase.from("capex_plan").update({ amount: value }).eq("id", existing.id);
+        patch({ type: "update", table: "capexPlan", id: existing.id, changes: { amount: value } });
+        const { error } = await supabase.from("capex_plan").update({ amount: value }).eq("id", existing.id);
+        if (error) throw error;
       }
     } else if (value !== 0) {
-      await supabase.from("capex_plan").insert({
-        scenario_id: scenario.id,
-        capex_type: type,
-        year,
-        amount: value,
-        description: null,
-      });
+      const { data: inserted, error } = await supabase
+        .from("capex_plan")
+        .insert({
+          scenario_id: scenario.id,
+          capex_type: type,
+          year,
+          amount: value,
+          description: null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "capexPlan", row: inserted });
     }
-    onChange();
   };
 
   const updateDetailField = async (id: string, field: string, value: any) => {
-    await supabase.from("capex_plan").update({ [field]: value } as any).eq("id", id);
-    onChange();
+    patch({ type: "update", table: "capexPlan", id, changes: { [field]: value } });
+    const { error } = await supabase.from("capex_plan").update({ [field]: value } as any).eq("id", id);
+    if (error) throw error;
   };
 
   const addDetail = async () => {
-    await supabase.from("capex_plan").insert({
-      scenario_id: scenario.id,
-      capex_type: "Hardware",
-      year: 2027,
-      amount: 0,
-      description: "Ny investering",
-    });
-    onChange();
+    const { data: inserted, error } = await supabase
+      .from("capex_plan")
+      .insert({
+        scenario_id: scenario.id,
+        capex_type: "Hardware",
+        year: 2027,
+        amount: 0,
+        description: "Ny investering",
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    patch({ type: "upsert", table: "capexPlan", row: inserted });
   };
 
   const removeDetail = async (id: string) => {
-    await supabase.from("capex_plan").delete().eq("id", id);
-    onChange();
+    patch({ type: "delete", table: "capexPlan", id });
+    const { error } = await supabase.from("capex_plan").delete().eq("id", id);
+    if (error) throw error;
   };
 
   const detailedRows = rows.filter((r) => r.description);
