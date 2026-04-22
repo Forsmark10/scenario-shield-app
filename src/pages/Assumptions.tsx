@@ -476,14 +476,24 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
 }
 
 // ---------------------- 3. Internal FTE ----------------------
-function SectionInternalFte({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const rateFor = (level: Level) => data.intRates.find((r) => r.level === level);
 
   const updateRate = async (level: Level, value: number) => {
     const r = rateFor(level);
-    if (r) await supabase.from("internal_fte_base_rates").update({ base_annual_cost: value }).eq("id", r.id);
-    else await supabase.from("internal_fte_base_rates").insert({ level, base_annual_cost: value });
-    onChange();
+    if (r) {
+      patch({ type: "update", table: "intRates", id: r.id, changes: { base_annual_cost: value } });
+      const { error } = await supabase.from("internal_fte_base_rates").update({ base_annual_cost: value }).eq("id", r.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("internal_fte_base_rates")
+        .insert({ level, base_annual_cost: value })
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "intRates", row: inserted });
+    }
   };
 
   const getChange = (year: number, level: Level) =>
@@ -492,18 +502,18 @@ function SectionInternalFte({ data, scenario, onChange }: { data: AllData; scena
   const upsertChange = async (year: number, level: Level, field: "increase" | "decrease", value: number) => {
     const existing = getChange(year, level);
     if (existing) {
-      await supabase.from("internal_fte_changes").update({ [field]: value } as any).eq("id", existing.id);
+      patch({ type: "update", table: "intChanges", id: existing.id, changes: { [field]: value } });
+      const { error } = await supabase.from("internal_fte_changes").update({ [field]: value } as any).eq("id", existing.id);
+      if (error) throw error;
     } else {
-      await supabase.from("internal_fte_changes").insert({
-        scenario_id: scenario.id,
-        year,
-        level,
-        increase: 0,
-        decrease: 0,
-        [field]: value,
-      } as any);
+      const { data: inserted, error } = await supabase
+        .from("internal_fte_changes")
+        .insert({ scenario_id: scenario.id, year, level, increase: 0, decrease: 0, [field]: value } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "intChanges", row: inserted });
     }
-    onChange();
   };
 
   return (
