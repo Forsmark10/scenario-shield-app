@@ -36,6 +36,27 @@ interface AllData {
   categories: string[];
 }
 
+type TableKey =
+  | "global"
+  | "central"
+  | "intRates"
+  | "extRates"
+  | "intChanges"
+  | "extChanges"
+  | "conversions"
+  | "nearshoringBase"
+  | "nearshoringAdds"
+  | "catAdj"
+  | "capexPlan";
+
+type PatchAction =
+  | { type: "upsert"; table: TableKey; row: any; matchBy?: (r: any) => boolean }
+  | { type: "update"; table: TableKey; id: string; changes: Record<string, any> }
+  | { type: "delete"; table: TableKey; id: string }
+  | { type: "setSingleton"; table: "nearshoringBase"; row: any };
+
+export type Patch = (action: PatchAction) => void;
+
 export default function Assumptions() {
   const [data, setData] = useState<AllData | null>(null);
   const [loading, setLoading] = useState(true);
