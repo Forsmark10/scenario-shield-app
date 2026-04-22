@@ -936,15 +936,25 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
 }
 
 // ---------------------- 7. Category adjustments ----------------------
-function SectionCategoryAdj({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const get = (cat: string, year: number) =>
     data.catAdj.find((a) => a.scenario_id === scenario.id && a.category === cat && a.year === year);
 
   const upsert = async (cat: string, year: number, value: number) => {
     const r = get(cat, year);
-    if (r) await supabase.from("category_adjustments").update({ adjustment_pct: value }).eq("id", r.id);
-    else await supabase.from("category_adjustments").insert({ scenario_id: scenario.id, category: cat, year, adjustment_pct: value });
-    onChange();
+    if (r) {
+      patch({ type: "update", table: "catAdj", id: r.id, changes: { adjustment_pct: value } });
+      const { error } = await supabase.from("category_adjustments").update({ adjustment_pct: value }).eq("id", r.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("category_adjustments")
+        .insert({ scenario_id: scenario.id, category: cat, year, adjustment_pct: value })
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "catAdj", row: inserted });
+    }
   };
 
   return (
