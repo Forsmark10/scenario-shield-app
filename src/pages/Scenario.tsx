@@ -167,7 +167,7 @@ export default function Scenario() {
             Rådata per kostnadslinje med beregnede prognoser 2027–2031.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-muted-foreground">Enhet</span>
           <Select value={unit} onValueChange={(v) => setUnit(v as Unit)}>
             <SelectTrigger className="w-[110px] h-9">
@@ -179,6 +179,22 @@ export default function Scenario() {
               <SelectItem value="MNOK">MNOK</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4 mr-1.5" /> Importer
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={exporting || !scenarioId || allScenarios.loading}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-1.5" />
+            )}
+            Eksport Excel
+          </Button>
         </div>
       </div>
 
