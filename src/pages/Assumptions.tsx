@@ -253,7 +253,7 @@ function SectionGlobal({ data, scenario, onChange }: { data: AllData; scenario: 
   const upsert = async (year: number, field: string, value: number) => {
     const existing = get(year);
     if (existing) {
-      await supabase.from("global_assumptions").update({ [field]: value }).eq("id", existing.id);
+      await supabase.from("global_assumptions").update({ [field]: value } as any).eq("id", existing.id);
     } else {
       await supabase.from("global_assumptions").insert({
         scenario_id: scenario.id,
@@ -262,7 +262,7 @@ function SectionGlobal({ data, scenario, onChange }: { data: AllData; scenario: 
         price_increase_pct: 0.05,
         eur_nok_rate: 11.5,
         [field]: value,
-      });
+      } as any);
     }
     onChange();
   };
@@ -317,7 +317,7 @@ function SectionCentral({ data, scenario, onChange }: { data: AllData; scenario:
   const upsert = async (year: number, field: string, value: number) => {
     const existing = get(year);
     if (existing) {
-      await supabase.from("central_assumptions").update({ [field]: value }).eq("id", existing.id);
+      await supabase.from("central_assumptions").update({ [field]: value } as any).eq("id", existing.id);
     } else {
       await supabase.from("central_assumptions").insert({
         scenario_id: scenario.id,
@@ -326,7 +326,7 @@ function SectionCentral({ data, scenario, onChange }: { data: AllData; scenario:
         central_volume_increase_pct: 0.02,
         central_reduction_pct: 0,
         [field]: value,
-      });
+      } as any);
     }
     onChange();
   };
@@ -390,7 +390,7 @@ function SectionInternalFte({ data, scenario, onChange }: { data: AllData; scena
   const upsertChange = async (year: number, level: Level, field: "increase" | "decrease", value: number) => {
     const existing = getChange(year, level);
     if (existing) {
-      await supabase.from("internal_fte_changes").update({ [field]: value }).eq("id", existing.id);
+      await supabase.from("internal_fte_changes").update({ [field]: value } as any).eq("id", existing.id);
     } else {
       await supabase.from("internal_fte_changes").insert({
         scenario_id: scenario.id,
@@ -399,7 +399,7 @@ function SectionInternalFte({ data, scenario, onChange }: { data: AllData; scena
         increase: 0,
         decrease: 0,
         [field]: value,
-      });
+      } as any);
     }
     onChange();
   };
@@ -498,7 +498,7 @@ function SectionExternalFte({ data, scenario, onChange }: { data: AllData; scena
   const upsertChange = async (year: number, level: Level, field: "increase" | "decrease", value: number) => {
     const existing = getChange(year, level);
     if (existing) {
-      await supabase.from("external_fte_changes").update({ [field]: value }).eq("id", existing.id);
+      await supabase.from("external_fte_changes").update({ [field]: value } as any).eq("id", existing.id);
     } else {
       await supabase.from("external_fte_changes").insert({
         scenario_id: scenario.id,
@@ -507,7 +507,7 @@ function SectionExternalFte({ data, scenario, onChange }: { data: AllData; scena
         increase: 0,
         decrease: 0,
         [field]: value,
-      });
+      } as any);
     }
     onChange();
   };
@@ -602,7 +602,7 @@ function SectionConversions({ data, scenario, onChange }: { data: AllData; scena
   };
 
   const updateField = async (id: string, field: string, value: any) => {
-    await supabase.from("conversions").update({ [field]: value }).eq("id", id);
+    await supabase.from("conversions").update({ [field]: value } as any).eq("id", id);
     onChange();
   };
 
@@ -675,9 +675,9 @@ function SectionNearshoring({ data, scenario, onChange }: { data: AllData; scena
 
   const updateBase = async (field: string, value: number) => {
     if (base) {
-      await supabase.from("nearshoring_base").update({ [field]: value }).eq("id", base.id);
+      await supabase.from("nearshoring_base").update({ [field]: value } as any).eq("id", base.id);
     } else {
-      await supabase.from("nearshoring_base").insert({ base_annual_cost_eur: 75000, working_months: 12, [field]: value });
+      await supabase.from("nearshoring_base").insert({ base_annual_cost_eur: 75000, working_months: 12, [field]: value } as any);
     }
     onChange();
   };
@@ -694,7 +694,7 @@ function SectionNearshoring({ data, scenario, onChange }: { data: AllData; scena
   };
 
   const updateField = async (id: string, field: string, value: any) => {
-    await supabase.from("nearshoring_additions").update({ [field]: value }).eq("id", id);
+    await supabase.from("nearshoring_additions").update({ [field]: value } as any).eq("id", id);
     onChange();
   };
 
@@ -883,7 +883,7 @@ function SectionCapex({ data, scenario, onChange }: { data: AllData; scenario: S
   };
 
   const updateDetailField = async (id: string, field: string, value: any) => {
-    await supabase.from("capex_plan").update({ [field]: value }).eq("id", id);
+    await supabase.from("capex_plan").update({ [field]: value } as any).eq("id", id);
     onChange();
   };
 
