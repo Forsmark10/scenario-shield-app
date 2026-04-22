@@ -17,6 +17,23 @@ const sum = (arr: number[]) => arr.reduce((a, b) => a + (b ?? 0), 0);
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
+/**
+ * Kumulativ vekstfaktor: produkt av (1 + rate(Y)) for Y fra startYear t.o.m. endYear.
+ * Returnerer 1 hvis startYear > endYear (ingen vekst-år å multiplisere inn).
+ */
+function cumulativeFactor(
+  scenarioId: string,
+  startYear: number,
+  endYear: number,
+  rateFn: (year: number) => number
+): number {
+  let f = 1;
+  for (let Y = startYear; Y <= endYear; Y++) {
+    f *= 1 + rateFn(Y);
+  }
+  return f;
+}
+
 function getGlobal(
   assumptions: GlobalAssumption[],
   scenarioId: string,
