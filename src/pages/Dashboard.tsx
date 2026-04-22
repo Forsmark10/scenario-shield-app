@@ -47,16 +47,43 @@ const SCENARIO_COLOR = [
   "hsl(var(--scenario-aggressive))",
 ];
 
-const CAT_COLORS = [
-  "hsl(var(--cat-1))",
-  "hsl(var(--cat-2))",
-  "hsl(var(--cat-3))",
-  "hsl(var(--cat-4))",
-  "hsl(var(--cat-5))",
-  "hsl(var(--cat-6))",
-  "hsl(var(--cat-7))",
-  "hsl(var(--cat-8))",
+// Blue palette mapping per category (darkest = largest, placed at bottom of stack)
+const CATEGORY_COLOR_MAP: Record<string, string> = {
+  "Internal FTE": "#042C53",
+  "External FTE": "#0C447C",
+  "IT Costs": "#185FA5",
+  "Consultancy": "#378ADD",
+  "Operations & Personnel-related": "#5DA3E5",
+  "Depreciation": "#85B7EB",
+  "Capex": "#B5D4F4",
+  "Other operating income": "#D3D1C7",
+};
+
+// Stack ordering: darkest (largest) at bottom -> lightest at top
+const CATEGORY_STACK_ORDER = [
+  "Internal FTE",
+  "External FTE",
+  "IT Costs",
+  "Consultancy",
+  "Operations & Personnel-related",
+  "Depreciation",
+  "Capex",
+  "Other operating income",
 ];
+
+const CAT_FALLBACK = "#9CA3AF";
+function colorForCategory(cat: string) {
+  return CATEGORY_COLOR_MAP[cat] ?? CAT_FALLBACK;
+}
+
+// Sort categories so known ones follow stack order, unknown ones appended alphabetically
+function sortByStackOrder(cats: string[]): string[] {
+  const known = CATEGORY_STACK_ORDER.filter((c) => cats.includes(c));
+  const unknown = cats.filter((c) => !CATEGORY_STACK_ORDER.includes(c)).sort();
+  return [...known, ...unknown];
+}
+
+const DIVIDER_COLOR = "#888780";
 
 // Convert tNOK -> MNOK
 const toM = (v: number) => v / 1000;
