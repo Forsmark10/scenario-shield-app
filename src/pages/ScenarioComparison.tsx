@@ -123,13 +123,13 @@ export default function ScenarioComparison() {
               <TabsTrigger value="delta" className="text-xs px-3">Delta vs Steady</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled
-            onClick={() => toast({ title: "Excel-eksport – kommer snart" })}
-          >
-            <Download className="h-4 w-4 mr-1.5" /> Eksport Excel
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || loading}>
+            {exporting ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-1.5" />
+            )}
+            Eksport Excel
           </Button>
         </div>
       </div>
