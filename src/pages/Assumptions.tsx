@@ -594,14 +594,24 @@ function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario
 }
 
 // ---------------------- 4. External FTE ----------------------
-function SectionExternalFte({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const rateFor = (level: Level) => data.extRates.find((r) => r.level === level);
 
   const updateRate = async (level: Level, value: number) => {
     const r = rateFor(level);
-    if (r) await supabase.from("external_fte_base_rates").update({ base_monthly_cost: value }).eq("id", r.id);
-    else await supabase.from("external_fte_base_rates").insert({ level, base_monthly_cost: value, working_months: 11 });
-    onChange();
+    if (r) {
+      patch({ type: "update", table: "extRates", id: r.id, changes: { base_monthly_cost: value } });
+      const { error } = await supabase.from("external_fte_base_rates").update({ base_monthly_cost: value }).eq("id", r.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("external_fte_base_rates")
+        .insert({ level, base_monthly_cost: value, working_months: 11 })
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "extRates", row: inserted });
+    }
   };
 
   const getChange = (year: number, level: Level) =>
@@ -610,18 +620,18 @@ function SectionExternalFte({ data, scenario, onChange }: { data: AllData; scena
   const upsertChange = async (year: number, level: Level, field: "increase" | "decrease", value: number) => {
     const existing = getChange(year, level);
     if (existing) {
-      await supabase.from("external_fte_changes").update({ [field]: value } as any).eq("id", existing.id);
+      patch({ type: "update", table: "extChanges", id: existing.id, changes: { [field]: value } });
+      const { error } = await supabase.from("external_fte_changes").update({ [field]: value } as any).eq("id", existing.id);
+      if (error) throw error;
     } else {
-      await supabase.from("external_fte_changes").insert({
-        scenario_id: scenario.id,
-        year,
-        level,
-        increase: 0,
-        decrease: 0,
-        [field]: value,
-      } as any);
+      const { data: inserted, error } = await supabase
+        .from("external_fte_changes")
+        .insert({ scenario_id: scenario.id, year, level, increase: 0, decrease: 0, [field]: value } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "extChanges", row: inserted });
     }
-    onChange();
   };
 
   return (
