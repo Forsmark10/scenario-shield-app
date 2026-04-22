@@ -173,14 +173,14 @@ export default function Assumptions() {
 
         {data.scenarios.map((s) => (
           <TabsContent key={s.id} value={s.id} className="mt-4 space-y-4">
-            <SectionGlobal data={data} scenario={s} onChange={refresh} />
-            <SectionCentral data={data} scenario={s} onChange={refresh} />
-            <SectionInternalFte data={data} scenario={s} onChange={refresh} />
-            <SectionExternalFte data={data} scenario={s} onChange={refresh} />
-            <SectionConversions data={data} scenario={s} onChange={refresh} />
-            <SectionNearshoring data={data} scenario={s} onChange={refresh} />
-            <SectionCategoryAdj data={data} scenario={s} onChange={refresh} />
-            <SectionCapex data={data} scenario={s} onChange={refresh} />
+            <SectionGlobal data={data} scenario={s} patch={patch} />
+            <SectionCentral data={data} scenario={s} patch={patch} />
+            <SectionInternalFte data={data} scenario={s} patch={patch} />
+            <SectionExternalFte data={data} scenario={s} patch={patch} />
+            <SectionConversions data={data} scenario={s} patch={patch} />
+            <SectionNearshoring data={data} scenario={s} patch={patch} />
+            <SectionCategoryAdj data={data} scenario={s} patch={patch} />
+            <SectionCapex data={data} scenario={s} patch={patch} />
 
             <div className="flex items-center justify-between pt-2">
               <p className="text-xs text-muted-foreground">Endringer lagres automatisk (debounce 500 ms).</p>
