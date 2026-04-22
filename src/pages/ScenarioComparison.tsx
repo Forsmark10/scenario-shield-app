@@ -1,13 +1,14 @@
 import { Fragment, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { useAllScenarios, type ScenarioBundle } from "@/hooks/useAllScenarios";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { formatNumberNO } from "@/lib/format";
+import { exportWorkbook } from "@/lib/excelExport";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 type Mode = "absolute" | "delta";
@@ -31,9 +32,24 @@ function value(bundle: ScenarioBundle, category: string, project: string | null,
 
 export default function ScenarioComparison() {
   const { loading, error, scenarios } = useAllScenarios();
+  const settings = useAppSettings();
   const [mode, setMode] = useState<Mode>("absolute");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const { toast } = useToast();
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!scenarios.length) return;
+    setExporting(true);
+    try {
+      await new Promise((r) => setTimeout(r, 30));
+      exportWorkbook({ scenarios, costCenterName: settings?.cost_center_name ?? "Kostnadssenter" });
+      toast.success("Excel-fil lastet ned");
+    } catch (e: any) {
+      toast.error("Eksport feilet", { description: e?.message ?? String(e) });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const tree = useMemo(() => {
     const map = new Map<string, Set<string>>();
@@ -107,13 +123,13 @@ export default function ScenarioComparison() {
               <TabsTrigger value="delta" className="text-xs px-3">Delta vs Steady</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled
-            onClick={() => toast({ title: "Excel-eksport – kommer snart" })}
-          >
-            <Download className="h-4 w-4 mr-1.5" /> Eksport Excel
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || loading}>
+            {exporting ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-1.5" />
+            )}
+            Eksport Excel
           </Button>
         </div>
       </div>

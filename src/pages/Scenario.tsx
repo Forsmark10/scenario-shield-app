@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, X, Download, Upload, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useForecast } from "@/hooks/useForecast";
+import { useAllScenarios } from "@/hooks/useAllScenarios";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import { formatUnit, type Unit } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { exportWorkbook } from "@/lib/excelExport";
+import { ImportDialog } from "@/components/ImportDialog";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -33,6 +38,7 @@ const MONTHS_NO = ["Jan", "Feb", "Mar", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep"
 
 export default function Scenario() {
   const settings = useAppSettings();
+  const allScenarios = useAllScenarios();
   const [unit, setUnit] = useState<Unit>("tNOK");
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
@@ -41,6 +47,29 @@ export default function Scenario() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!allScenarios.scenarios.length || !scenarioId) {
+      toast.error("Eksport ikke tilgjengelig");
+      return;
+    }
+    setExporting(true);
+    try {
+      await new Promise((r) => setTimeout(r, 30));
+      exportWorkbook({
+        scenarios: allScenarios.scenarios,
+        costCenterName: settings?.cost_center_name ?? "Kostnadssenter",
+        focusedScenarioId: scenarioId,
+      });
+      toast.success("Excel-fil lastet ned");
+    } catch (e: any) {
+      toast.error("Eksport feilet", { description: e?.message ?? String(e) });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     if (settings) setUnit(settings.default_unit);
@@ -138,7 +167,7 @@ export default function Scenario() {
             Rådata per kostnadslinje med beregnede prognoser 2027–2031.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs text-muted-foreground">Enhet</span>
           <Select value={unit} onValueChange={(v) => setUnit(v as Unit)}>
             <SelectTrigger className="w-[110px] h-9">
@@ -150,6 +179,22 @@ export default function Scenario() {
               <SelectItem value="MNOK">MNOK</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4 mr-1.5" /> Importer
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExport}
+            disabled={exporting || !scenarioId || allScenarios.loading}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-1.5" />
+            )}
+            Eksport Excel
+          </Button>
         </div>
       </div>
 
@@ -377,6 +422,8 @@ export default function Scenario() {
           )}
         </SheetContent>
       </Sheet>
+
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={() => window.location.reload()} />
     </div>
   );
 }
