@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          cost_center_name: string
+          created_at: string
+          default_unit: string
+          id: string
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          cost_center_name?: string
+          created_at?: string
+          default_unit?: string
+          id?: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          cost_center_name?: string
+          created_at?: string
+          default_unit?: string
+          id?: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       capex_plan: {
         Row: {
           amount: number

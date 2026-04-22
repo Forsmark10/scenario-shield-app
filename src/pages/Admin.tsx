@@ -84,24 +84,20 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container py-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              LTP — Long-Term Plan
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Kostnadsstyring og scenarioplanlegging
-            </p>
-          </div>
-          <Button variant="outline" asChild>
-            <a href="/debug">Debug beregning →</a>
-          </Button>
+    <div className="p-6 space-y-6">
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Health & Import</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Kontroller tabellrader og importer cost_lines fra CSV.
+          </p>
         </div>
-      </header>
+        <Button variant="outline" asChild>
+          <a href="/debug">Åpne beregnings-debug →</a>
+        </Button>
+      </div>
 
-      <main className="container py-8 space-y-6">
+      <div className="space-y-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -169,9 +165,10 @@ const Index = () => {
             </div>
           </CardContent>
         </Card>
-      </main>
+      </div>
     </div>
   );
 };
 
 export default Index;
+
