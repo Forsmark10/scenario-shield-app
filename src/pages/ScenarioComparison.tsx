@@ -32,9 +32,24 @@ function value(bundle: ScenarioBundle, category: string, project: string | null,
 
 export default function ScenarioComparison() {
   const { loading, error, scenarios } = useAllScenarios();
+  const settings = useAppSettings();
   const [mode, setMode] = useState<Mode>("absolute");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const { toast } = useToast();
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!scenarios.length) return;
+    setExporting(true);
+    try {
+      await new Promise((r) => setTimeout(r, 30));
+      exportWorkbook({ scenarios, costCenterName: settings?.cost_center_name ?? "Kostnadssenter" });
+      toast.success("Excel-fil lastet ned");
+    } catch (e: any) {
+      toast.error("Eksport feilet", { description: e?.message ?? String(e) });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const tree = useMemo(() => {
     const map = new Map<string, Set<string>>();
