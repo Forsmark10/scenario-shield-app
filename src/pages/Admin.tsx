@@ -165,9 +165,10 @@ const Index = () => {
             </div>
           </CardContent>
         </Card>
-      </main>
+      </div>
     </div>
   );
 };
 
 export default Index;
+
