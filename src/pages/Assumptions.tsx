@@ -280,6 +280,7 @@ function NumCell({
       setSaving(true);
       Promise.resolve(onCommit(num))
         .then(() => {
+          isDirtyRef.current = false;
           sonnerToast.success("Lagret", { duration: 1500, position: "bottom-right" });
         })
         .catch((err: any) => {
@@ -293,19 +294,25 @@ function NumCell({
   return (
     <div className={cn("relative", className)}>
       <Input
+        ref={inputRef}
         type="number"
         step={step}
         min={min}
         max={max}
         value={local}
+        onFocus={() => {
+          isFocusedRef.current = true;
+        }}
         onChange={(e) => {
+          isDirtyRef.current = true;
           setLocal(e.target.value);
           if (timer.current) clearTimeout(timer.current);
           timer.current = setTimeout(() => commit(e.target.value), 500);
         }}
         onBlur={() => {
+          isFocusedRef.current = false;
           if (timer.current) clearTimeout(timer.current);
-          commit(local);
+          if (isDirtyRef.current) commit(local);
         }}
         className={cn("h-8 text-xs text-right tabular-nums font-mono", suffix && "pr-6", saving && "ring-1 ring-primary/30")}
       />
