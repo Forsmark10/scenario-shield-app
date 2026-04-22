@@ -422,6 +422,8 @@ export default function Scenario() {
           )}
         </SheetContent>
       </Sheet>
+
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={() => window.location.reload()} />
     </div>
   );
 }
