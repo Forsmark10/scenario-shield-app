@@ -507,10 +507,22 @@ function ScenarioSection({
                     <Bar key={cat} dataKey={cat} stackId="a" fill={colorForCategory(cat)}>
                       {cat === lastStackCat && (
                         <LabelList
-                          dataKey="__total"
-                          position="top"
-                          formatter={(v: number) => formatNumberNO(v, 0)}
-                          style={{ fontSize: 10, fontWeight: 500, fill: "hsl(var(--foreground))" }}
+                          dataKey={cat}
+                          content={(props: any) => {
+                            const { x, y, width, index } = props;
+                            const total = Number(stackedData[index]?.__total ?? 0);
+                            if (!total) return null;
+                            return (
+                              <text
+                                x={Number(x) + Number(width) / 2}
+                                y={Number(y) - 6}
+                                textAnchor="middle"
+                                style={{ fontSize: 10, fontWeight: 500, fill: "hsl(var(--foreground))" }}
+                              >
+                                {formatNumberNO(total, 0)}
+                              </text>
+                            );
+                          }}
                         />
                       )}
                     </Bar>
@@ -524,8 +536,8 @@ function ScenarioSection({
           <div className="h-[280px]">
             <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">YoY-vekst %</div>
             <ResponsiveContainer width="100%" height="92%">
-              <LineChart data={yoyData} margin={{ top: 16, right: 16, bottom: 4, left: 0 }}>
-                <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+              <LineChart data={yoyData} margin={{ top: 16, right: 24, bottom: 4, left: 16 }}>
+                <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} padding={{ left: 12, right: 12 }} />
                 <YAxis hide />
                 <Tooltip
                   formatter={(v: number | null) => (v == null ? "" : `${formatPercentNO(v, 1)} %`)}
