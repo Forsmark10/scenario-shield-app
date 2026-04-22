@@ -53,6 +53,34 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* LTP chart palette – dark→light blue gradient (year columns) */
+    --year-ac-2025: 208 92% 17%;   /* #042C53 */
+    --year-bu-2026: 209 83% 27%;   /* #0C447C */
+    --year-fc-2026: 210 75% 37%;   /* #185FA5 */
+    --year-fc-2027: 210 71% 54%;   /* #378ADD */
+    --year-fc-2028: 210 71% 63%;   /* #5DA3E5 */
+    --year-fc-2029: 210 71% 72%;   /* #85B7EB */
+    --year-fc-2030: 210 73% 83%;   /* #B5D4F4 */
+    --year-fc-2031: 210 78% 94%;   /* #E6F1FB */
+
+    /* Scenario palette */
+    --scenario-steady: 210 75% 37%;     /* blue */
+    --scenario-moderate: 152 55% 38%;   /* green */
+    --scenario-aggressive: 22 88% 52%;  /* orange */
+
+    /* Stacked category palette */
+    --cat-1: 210 75% 37%;
+    --cat-2: 152 55% 45%;
+    --cat-3: 22 88% 55%;
+    --cat-4: 268 60% 55%;
+    --cat-5: 340 70% 52%;
+    --cat-6: 38 92% 52%;
+    --cat-7: 190 80% 40%;
+    --cat-8: 0 70% 55%;
+
+    --positive: 152 65% 35%;
+    --negative: 0 75% 50%;
   }
 
   .dark {
