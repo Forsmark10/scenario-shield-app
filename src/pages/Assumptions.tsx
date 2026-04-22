@@ -326,25 +326,36 @@ function NumCell({
 }
 
 // ---------------------- 1. Global drivers ----------------------
-function SectionGlobal({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const get = (year: number) =>
     data.global.find((g) => g.scenario_id === scenario.id && g.year === year) ?? null;
 
   const upsert = async (year: number, field: string, value: number) => {
     const existing = get(year);
     if (existing) {
-      await supabase.from("global_assumptions").update({ [field]: value } as any).eq("id", existing.id);
+      patch({ type: "update", table: "global", id: existing.id, changes: { [field]: value } });
+      const { error } = await supabase
+        .from("global_assumptions")
+        .update({ [field]: value } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
     } else {
-      await supabase.from("global_assumptions").insert({
+      const insertRow = {
         scenario_id: scenario.id,
         year,
         salary_increase_pct: 0.04,
         price_increase_pct: 0.05,
         eur_nok_rate: 11.5,
         [field]: value,
-      } as any);
+      };
+      const { data: inserted, error } = await supabase
+        .from("global_assumptions")
+        .insert(insertRow as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "global", row: inserted });
     }
-    onChange();
   };
 
   const drivers = [
