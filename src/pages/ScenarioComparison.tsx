@@ -1,13 +1,14 @@
 import { Fragment, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { useAllScenarios, type ScenarioBundle } from "@/hooks/useAllScenarios";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { formatNumberNO } from "@/lib/format";
+import { exportWorkbook } from "@/lib/excelExport";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 type Mode = "absolute" | "delta";
