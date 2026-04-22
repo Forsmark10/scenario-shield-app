@@ -1,10 +1,1026 @@
-import ComingSoon from "@/components/ComingSoon";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+
+const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
+const LEVELS = ["Low", "Medium", "High"] as const;
+type Level = (typeof LEVELS)[number];
+
+type Scenario = { id: string; name: string; sort_order: number };
+
+interface AllData {
+  scenarios: Scenario[];
+  global: any[];
+  central: any[];
+  intRates: any[];
+  extRates: any[];
+  intChanges: any[];
+  extChanges: any[];
+  conversions: any[];
+  nearshoringBase: any | null;
+  nearshoringAdds: any[];
+  catAdj: any[];
+  capexPlan: any[];
+  depRules: any[];
+  categories: string[];
+}
 
 export default function Assumptions() {
+  const [data, setData] = useState<AllData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeScenario, setActiveScenario] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const [
+        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, caRes, capRes, drRes, clRes,
+      ] = await Promise.all([
+        supabase.from("scenarios").select("*").eq("is_active", true).order("sort_order"),
+        supabase.from("global_assumptions").select("*"),
+        supabase.from("central_assumptions").select("*"),
+        supabase.from("internal_fte_base_rates").select("*"),
+        supabase.from("external_fte_base_rates").select("*"),
+        supabase.from("internal_fte_changes").select("*"),
+        supabase.from("external_fte_changes").select("*"),
+        supabase.from("conversions").select("*"),
+        supabase.from("nearshoring_base").select("*").limit(1).maybeSingle(),
+        supabase.from("nearshoring_additions").select("*"),
+        supabase.from("category_adjustments").select("*"),
+        supabase.from("capex_plan").select("*"),
+        supabase.from("depreciation_rules").select("*"),
+        supabase.from("cost_lines").select("category"),
+      ]);
+      if (cancelled) return;
+      const cats = Array.from(new Set((clRes.data ?? []).map((r: any) => r.category))).sort() as string[];
+      const next: AllData = {
+        scenarios: sRes.data ?? [],
+        global: gRes.data ?? [],
+        central: cRes.data ?? [],
+        intRates: irRes.data ?? [],
+        extRates: erRes.data ?? [],
+        intChanges: icRes.data ?? [],
+        extChanges: ecRes.data ?? [],
+        conversions: convRes.data ?? [],
+        nearshoringBase: nbRes.data ?? null,
+        nearshoringAdds: naRes.data ?? [],
+        catAdj: caRes.data ?? [],
+        capexPlan: capRes.data ?? [],
+        depRules: drRes.data ?? [],
+        categories: cats,
+      };
+      setData(next);
+      if (!activeScenario && next.scenarios.length) setActiveScenario(next.scenarios[0].id);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
+
+  if (loading || !data) {
+    return (
+      <div className="p-6 space-y-3">
+        <Skeleton className="h-12 w-64" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
   return (
-    <ComingSoon
-      title="Assumptions"
-      description="Editering av globale drivere, FTE-endringer, konverteringer, nearshoring, kategori-justeringer og capex-plan kommer i neste fase."
-    />
+    <div className="p-6 space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Assumptions</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Globale drivere, FTE-endringer og capex-plan per scenario. Endringer lagres automatisk.
+        </p>
+      </div>
+
+      <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
+        <TabsList>
+          {data.scenarios.map((s) => (
+            <TabsTrigger key={s.id} value={s.id} className="text-sm">
+              {s.name}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {data.scenarios.map((s) => (
+          <TabsContent key={s.id} value={s.id} className="mt-4 space-y-4">
+            <SectionGlobal data={data} scenario={s} onChange={refresh} />
+            <SectionCentral data={data} scenario={s} onChange={refresh} />
+            <SectionInternalFte data={data} scenario={s} onChange={refresh} />
+            <SectionExternalFte data={data} scenario={s} onChange={refresh} />
+            <SectionConversions data={data} scenario={s} onChange={refresh} />
+            <SectionNearshoring data={data} scenario={s} onChange={refresh} />
+            <SectionCategoryAdj data={data} scenario={s} onChange={refresh} />
+            <SectionCapex data={data} scenario={s} onChange={refresh} />
+
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-muted-foreground">Endringer lagres automatisk (debounce 500 ms).</p>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled
+                onClick={() => toast({ title: "Tilbakestill – kommer snart" })}
+              >
+                Tilbakestill til default-verdier
+              </Button>
+            </div>
+          </TabsContent>
+        ))}
+      </Tabs>
+    </div>
+  );
+}
+
+// ---------------------- Section wrapper ----------------------
+function Section({
+  title,
+  description,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Card>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger asChild>
+          <button className="w-full flex items-center justify-between px-5 py-4 text-left">
+            <div>
+              <h2 className="text-sm font-semibold">{title}</h2>
+              {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+            </div>
+            <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0 pb-5">{children}</CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
+
+// ---------------------- Debounced cell ----------------------
+function NumCell({
+  value,
+  onCommit,
+  suffix,
+  step = "0.001",
+  min,
+  max,
+  className,
+}: {
+  value: number;
+  onCommit: (v: number) => Promise<void> | void;
+  suffix?: string;
+  step?: string;
+  min?: number;
+  max?: number;
+  className?: string;
+}) {
+  const [local, setLocal] = useState(String(value ?? 0));
+  const [saving, setSaving] = useState(false);
+  const timer = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    setLocal(String(value ?? 0));
+  }, [value]);
+
+  const commit = useCallback(
+    (raw: string) => {
+      const num = Number(raw.replace(",", "."));
+      if (isNaN(num)) return;
+      setSaving(true);
+      Promise.resolve(onCommit(num)).finally(() => setSaving(false));
+    },
+    [onCommit],
+  );
+
+  return (
+    <div className={cn("relative", className)}>
+      <Input
+        type="number"
+        step={step}
+        min={min}
+        max={max}
+        value={local}
+        onChange={(e) => {
+          setLocal(e.target.value);
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(() => commit(e.target.value), 500);
+        }}
+        onBlur={() => {
+          if (timer.current) clearTimeout(timer.current);
+          commit(local);
+        }}
+        className={cn("h-8 text-xs text-right tabular-nums font-mono", suffix && "pr-6", saving && "ring-1 ring-primary/30")}
+      />
+      {suffix && (
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">
+          {suffix}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ---------------------- 1. Global drivers ----------------------
+function SectionGlobal({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+  const get = (year: number) =>
+    data.global.find((g) => g.scenario_id === scenario.id && g.year === year) ?? null;
+
+  const upsert = async (year: number, field: string, value: number) => {
+    const existing = get(year);
+    if (existing) {
+      await supabase.from("global_assumptions").update({ [field]: value }).eq("id", existing.id);
+    } else {
+      await supabase.from("global_assumptions").insert({
+        scenario_id: scenario.id,
+        year,
+        salary_increase_pct: 0.04,
+        price_increase_pct: 0.05,
+        eur_nok_rate: 11.5,
+        [field]: value,
+      });
+    }
+    onChange();
+  };
+
+  const drivers = [
+    { key: "salary_increase_pct", label: "Lønnsvekst %", suffix: "%", scale: 100 },
+    { key: "price_increase_pct", label: "Prisvekst %", suffix: "%", scale: 100 },
+    { key: "eur_nok_rate", label: "EUR/NOK-kurs", suffix: "", scale: 1 },
+  ];
+
+  return (
+    <Section title="Globale drivere" description="Brukes på alle Local-kostnader (lønn, pris, valuta).">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left font-medium px-2 py-2 w-[180px]">Driver</th>
+            {FC_YEARS.map((y) => (
+              <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {drivers.map((d) => (
+            <tr key={d.key} className="border-b">
+              <td className="px-2 py-2">{d.label}</td>
+              {FC_YEARS.map((y) => {
+                const row = get(y);
+                const v = (row?.[d.key] ?? (d.key === "eur_nok_rate" ? 11.5 : d.key === "salary_increase_pct" ? 0.04 : 0.05)) * d.scale;
+                return (
+                  <td key={y} className="px-1 py-1">
+                    <NumCell
+                      value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
+                      suffix={d.suffix}
+                      onCommit={(num) => upsert(y, d.key, num / d.scale)}
+                    />
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Section>
+  );
+}
+
+// ---------------------- 2. Central drivers ----------------------
+function SectionCentral({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+  const get = (year: number) =>
+    data.central.find((g) => g.scenario_id === scenario.id && g.year === year) ?? null;
+
+  const upsert = async (year: number, field: string, value: number) => {
+    const existing = get(year);
+    if (existing) {
+      await supabase.from("central_assumptions").update({ [field]: value }).eq("id", existing.id);
+    } else {
+      await supabase.from("central_assumptions").insert({
+        scenario_id: scenario.id,
+        year,
+        central_price_increase_pct: 0.03,
+        central_volume_increase_pct: 0.02,
+        central_reduction_pct: 0,
+        [field]: value,
+      });
+    }
+    onChange();
+  };
+
+  const drivers = [
+    { key: "central_price_increase_pct", label: "Central pris %", default: 0.03 },
+    { key: "central_volume_increase_pct", label: "Central volum %", default: 0.02 },
+    { key: "central_reduction_pct", label: "Central reduksjon %", default: 0 },
+  ];
+
+  return (
+    <Section title="Central drivere" description="Pris og volum vokser kumulativt. Reduksjon trekkes fra til slutt og er ikke kumulativ.">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left font-medium px-2 py-2 w-[180px]">Driver</th>
+            {FC_YEARS.map((y) => (
+              <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {drivers.map((d) => (
+            <tr key={d.key} className="border-b">
+              <td className="px-2 py-2">{d.label}</td>
+              {FC_YEARS.map((y) => {
+                const row = get(y);
+                const v = ((row?.[d.key] ?? d.default) * 100);
+                return (
+                  <td key={y} className="px-1 py-1">
+                    <NumCell
+                      value={Number(v.toFixed(2))}
+                      suffix="%"
+                      onCommit={(num) => upsert(y, d.key, num / 100)}
+                    />
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Section>
+  );
+}
+
+// ---------------------- 3. Internal FTE ----------------------
+function SectionInternalFte({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+  const rateFor = (level: Level) => data.intRates.find((r) => r.level === level);
+
+  const updateRate = async (level: Level, value: number) => {
+    const r = rateFor(level);
+    if (r) await supabase.from("internal_fte_base_rates").update({ base_annual_cost: value }).eq("id", r.id);
+    else await supabase.from("internal_fte_base_rates").insert({ level, base_annual_cost: value });
+    onChange();
+  };
+
+  const getChange = (year: number, level: Level) =>
+    data.intChanges.find((c) => c.scenario_id === scenario.id && c.year === year && c.level === level) ?? null;
+
+  const upsertChange = async (year: number, level: Level, field: "increase" | "decrease", value: number) => {
+    const existing = getChange(year, level);
+    if (existing) {
+      await supabase.from("internal_fte_changes").update({ [field]: value }).eq("id", existing.id);
+    } else {
+      await supabase.from("internal_fte_changes").insert({
+        scenario_id: scenario.id,
+        year,
+        level,
+        increase: 0,
+        decrease: 0,
+        [field]: value,
+      });
+    }
+    onChange();
+  };
+
+  return (
+    <Section title="Internal FTE" description="Lønnsnivåer (globalt) og scenario-spesifikke FTE-endringer.">
+      <div className="space-y-5">
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            Basisrater (tNOK/år)
+          </h3>
+          <table className="text-xs">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left font-medium px-2 py-2 w-[100px]">Nivå</th>
+                <th className="text-right font-medium px-2 py-2 w-[160px]">Basisrate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {LEVELS.map((lvl) => {
+                const r = rateFor(lvl);
+                return (
+                  <tr key={lvl} className="border-b">
+                    <td className="px-2 py-1.5">{lvl}</td>
+                    <td className="px-1 py-1">
+                      <NumCell
+                        value={Number(r?.base_annual_cost ?? 0)}
+                        step="1"
+                        onCommit={(v) => updateRate(lvl, v)}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            FTE-endringer per år
+          </h3>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left font-medium px-2 py-2">Nivå</th>
+                <th className="text-left font-medium px-2 py-2">Type</th>
+                {FC_YEARS.map((y) => (
+                  <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {LEVELS.flatMap((lvl) =>
+                (["increase", "decrease"] as const).map((type) => (
+                  <tr key={`${lvl}-${type}`} className="border-b">
+                    <td className="px-2 py-1.5">{lvl}</td>
+                    <td className="px-2 py-1.5 capitalize text-muted-foreground">{type}</td>
+                    {FC_YEARS.map((y) => {
+                      const c = getChange(y, lvl);
+                      return (
+                        <td key={y} className="px-1 py-1">
+                          <NumCell
+                            value={Number(c?.[type] ?? 0)}
+                            step="1"
+                            onCommit={(v) => upsertChange(y, lvl, type, Math.round(v))}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                )),
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// ---------------------- 4. External FTE ----------------------
+function SectionExternalFte({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+  const rateFor = (level: Level) => data.extRates.find((r) => r.level === level);
+
+  const updateRate = async (level: Level, value: number) => {
+    const r = rateFor(level);
+    if (r) await supabase.from("external_fte_base_rates").update({ base_monthly_cost: value }).eq("id", r.id);
+    else await supabase.from("external_fte_base_rates").insert({ level, base_monthly_cost: value, working_months: 11 });
+    onChange();
+  };
+
+  const getChange = (year: number, level: Level) =>
+    data.extChanges.find((c) => c.scenario_id === scenario.id && c.year === year && c.level === level) ?? null;
+
+  const upsertChange = async (year: number, level: Level, field: "increase" | "decrease", value: number) => {
+    const existing = getChange(year, level);
+    if (existing) {
+      await supabase.from("external_fte_changes").update({ [field]: value }).eq("id", existing.id);
+    } else {
+      await supabase.from("external_fte_changes").insert({
+        scenario_id: scenario.id,
+        year,
+        level,
+        increase: 0,
+        decrease: 0,
+        [field]: value,
+      });
+    }
+    onChange();
+  };
+
+  return (
+    <Section title="External FTE" description="Månedskost-rater (globalt) og scenario-spesifikke endringer. 11 arbeidsmåneder per år (ingen juli).">
+      <div className="space-y-5">
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            Basisrater (tNOK/mnd)
+          </h3>
+          <table className="text-xs">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left font-medium px-2 py-2 w-[100px]">Nivå</th>
+                <th className="text-right font-medium px-2 py-2 w-[160px]">Månedsrate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {LEVELS.map((lvl) => {
+                const r = rateFor(lvl);
+                return (
+                  <tr key={lvl} className="border-b">
+                    <td className="px-2 py-1.5">{lvl}</td>
+                    <td className="px-1 py-1">
+                      <NumCell value={Number(r?.base_monthly_cost ?? 0)} step="1" onCommit={(v) => updateRate(lvl, v)} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            FTE-endringer per år
+          </h3>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left font-medium px-2 py-2">Nivå</th>
+                <th className="text-left font-medium px-2 py-2">Type</th>
+                {FC_YEARS.map((y) => (
+                  <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {LEVELS.flatMap((lvl) =>
+                (["increase", "decrease"] as const).map((type) => (
+                  <tr key={`${lvl}-${type}`} className="border-b">
+                    <td className="px-2 py-1.5">{lvl}</td>
+                    <td className="px-2 py-1.5 capitalize text-muted-foreground">{type}</td>
+                    {FC_YEARS.map((y) => {
+                      const c = getChange(y, lvl);
+                      return (
+                        <td key={y} className="px-1 py-1">
+                          <NumCell
+                            value={Number(c?.[type] ?? 0)}
+                            step="1"
+                            onCommit={(v) => upsertChange(y, lvl, type, Math.round(v))}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                )),
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// ---------------------- 5. Conversions ----------------------
+function SectionConversions({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+  const rows = data.conversions.filter((c) => c.scenario_id === scenario.id);
+
+  const addRow = async () => {
+    await supabase.from("conversions").insert({
+      scenario_id: scenario.id,
+      year: 2027,
+      external_level: "Low",
+      internal_level: "Low",
+      count: 0,
+      overlap_months: 3,
+    });
+    onChange();
+  };
+
+  const updateField = async (id: string, field: string, value: any) => {
+    await supabase.from("conversions").update({ [field]: value }).eq("id", id);
+    onChange();
+  };
+
+  const remove = async (id: string) => {
+    await supabase.from("conversions").delete().eq("id", id);
+    onChange();
+  };
+
+  return (
+    <Section title="Ekstern → Intern konvertering" description="Overlapp er 3 måneder (fast).">
+      <div className="space-y-3">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left font-medium px-2 py-2 w-[80px]">År</th>
+              <th className="text-left font-medium px-2 py-2 w-[120px]">Ekstern-nivå</th>
+              <th className="text-right font-medium px-2 py-2 w-[100px]">Antall</th>
+              <th className="text-left font-medium px-2 py-2 w-[120px]">→ Intern-nivå</th>
+              <th className="w-[40px]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={5} className="text-center text-muted-foreground px-2 py-4">Ingen konverteringer ennå.</td></tr>
+            )}
+            {rows.map((r) => (
+              <tr key={r.id} className="border-b">
+                <td className="px-1 py-1">
+                  <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="px-1 py-1">
+                  <Select value={r.external_level} onValueChange={(v) => updateField(r.id, "external_level", v)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>{LEVELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
+                  </Select>
+                </td>
+                <td className="px-1 py-1">
+                  <NumCell value={Number(r.count)} step="1" onCommit={(v) => updateField(r.id, "count", Math.round(v))} />
+                </td>
+                <td className="px-1 py-1">
+                  <Select value={r.internal_level} onValueChange={(v) => updateField(r.id, "internal_level", v)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>{LEVELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
+                  </Select>
+                </td>
+                <td className="px-1 py-1 text-center">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(r.id)}>
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <Button variant="outline" size="sm" onClick={addRow}><Plus className="h-3.5 w-3.5 mr-1" /> Legg til konvertering</Button>
+      </div>
+    </Section>
+  );
+}
+
+// ---------------------- 6. Nearshoring ----------------------
+function SectionNearshoring({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+  const base = data.nearshoringBase;
+  const adds = data.nearshoringAdds.filter((n) => n.scenario_id === scenario.id);
+
+  const updateBase = async (field: string, value: number) => {
+    if (base) {
+      await supabase.from("nearshoring_base").update({ [field]: value }).eq("id", base.id);
+    } else {
+      await supabase.from("nearshoring_base").insert({ base_annual_cost_eur: 75000, working_months: 12, [field]: value });
+    }
+    onChange();
+  };
+
+  const addRow = async () => {
+    await supabase.from("nearshoring_additions").insert({
+      scenario_id: scenario.id,
+      year: 2027,
+      replaces_external_level: "Low",
+      count: 0,
+      overlap_months: 3,
+    });
+    onChange();
+  };
+
+  const updateField = async (id: string, field: string, value: any) => {
+    await supabase.from("nearshoring_additions").update({ [field]: value }).eq("id", id);
+    onChange();
+  };
+
+  const remove = async (id: string) => {
+    await supabase.from("nearshoring_additions").delete().eq("id", id);
+    onChange();
+  };
+
+  return (
+    <Section title="Nearshoring" description="Faktureres i EUR per år, konverteres med valutakurs.">
+      <div className="space-y-5">
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Basiskost (globalt)</h3>
+          <div className="flex items-center gap-3">
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">Årskost (EUR)</label>
+              <NumCell
+                value={Number(base?.base_annual_cost_eur ?? 75000)}
+                step="100"
+                className="w-[160px]"
+                onCommit={(v) => updateBase("base_annual_cost_eur", v)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">Arbeidsmåneder</label>
+              <NumCell
+                value={Number(base?.working_months ?? 12)}
+                step="1"
+                className="w-[100px]"
+                onCommit={(v) => updateBase("working_months", Math.round(v))}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            Nye nearshoring-ressurser per år
+          </h3>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left font-medium px-2 py-2 w-[80px]">År</th>
+                <th className="text-left font-medium px-2 py-2 w-[200px]">Erstatter ekstern-nivå</th>
+                <th className="text-right font-medium px-2 py-2 w-[100px]">Antall</th>
+                <th className="w-[40px]"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {adds.length === 0 && (
+                <tr><td colSpan={4} className="text-center text-muted-foreground px-2 py-4">Ingen nearshoring-tillegg ennå.</td></tr>
+              )}
+              {adds.map((r) => (
+                <tr key={r.id} className="border-b">
+                  <td className="px-1 py-1">
+                    <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td className="px-1 py-1">
+                    <Select value={r.replaces_external_level} onValueChange={(v) => updateField(r.id, "replaces_external_level", v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>{LEVELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </td>
+                  <td className="px-1 py-1">
+                    <NumCell value={Number(r.count)} step="1" onCommit={(v) => updateField(r.id, "count", Math.round(v))} />
+                  </td>
+                  <td className="px-1 py-1 text-center">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(r.id)}>
+                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Button variant="outline" size="sm" className="mt-2" onClick={addRow}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Legg til ressurs
+          </Button>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// ---------------------- 7. Category adjustments ----------------------
+function SectionCategoryAdj({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+  const get = (cat: string, year: number) =>
+    data.catAdj.find((a) => a.scenario_id === scenario.id && a.category === cat && a.year === year);
+
+  const upsert = async (cat: string, year: number, value: number) => {
+    const r = get(cat, year);
+    if (r) await supabase.from("category_adjustments").update({ adjustment_pct: value }).eq("id", r.id);
+    else await supabase.from("category_adjustments").insert({ scenario_id: scenario.id, category: cat, year, adjustment_pct: value });
+    onChange();
+  };
+
+  return (
+    <Section
+      title="Kategori-justeringer"
+      description="Justering legges på toppen av prisvekst. Gjelder kun Local-kostnader. Range -50% til +50%."
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left font-medium px-2 py-2 w-[180px]">Kategori</th>
+              {FC_YEARS.map((y) => (
+                <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.categories.map((cat) => (
+              <tr key={cat} className="border-b">
+                <td className="px-2 py-1.5">{cat}</td>
+                {FC_YEARS.map((y) => {
+                  const row = get(cat, y);
+                  const v = Number((row?.adjustment_pct ?? 0)) * 100;
+                  return (
+                    <td key={y} className="px-1 py-1">
+                      <NumCell
+                        value={Number(v.toFixed(2))}
+                        suffix="%"
+                        min={-50}
+                        max={50}
+                        onCommit={(num) => upsert(cat, y, num / 100)}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Section>
+  );
+}
+
+// ---------------------- 8. Capex plan ----------------------
+function SectionCapex({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+  const types = ["Hardware", "Software", "Prosjekt"] as const;
+  const rows = data.capexPlan.filter((c) => c.scenario_id === scenario.id);
+
+  // Aggregated view: sum per type+year
+  const aggSum = (type: string, year: number) =>
+    rows.filter((r) => r.capex_type === type && r.year === year).reduce((a, r) => a + Number(r.amount || 0), 0);
+
+  // For aggregated edit: when no detailed rows exist, treat as a single placeholder; otherwise show readonly with link to detail
+  const aggregatedLine = useMemo(() => {
+    const map = new Map<string, any>();
+    types.forEach((t) =>
+      FC_YEARS.forEach((y) => {
+        const matches = rows.filter((r) => r.capex_type === t && r.year === y);
+        // If there's exactly one row with no description, treat as the bucket
+        const bucket = matches.find((m) => !m.description);
+        map.set(`${t}-${y}`, bucket ?? null);
+      }),
+    );
+    return map;
+  }, [rows]);
+
+  const upsertAggregated = async (type: string, year: number, value: number) => {
+    const existing = aggregatedLine.get(`${type}-${year}`);
+    if (existing) {
+      if (value === 0) {
+        await supabase.from("capex_plan").delete().eq("id", existing.id);
+      } else {
+        await supabase.from("capex_plan").update({ amount: value }).eq("id", existing.id);
+      }
+    } else if (value !== 0) {
+      await supabase.from("capex_plan").insert({
+        scenario_id: scenario.id,
+        capex_type: type,
+        year,
+        amount: value,
+        description: null,
+      });
+    }
+    onChange();
+  };
+
+  const updateDetailField = async (id: string, field: string, value: any) => {
+    await supabase.from("capex_plan").update({ [field]: value }).eq("id", id);
+    onChange();
+  };
+
+  const addDetail = async () => {
+    await supabase.from("capex_plan").insert({
+      scenario_id: scenario.id,
+      capex_type: "Hardware",
+      year: 2027,
+      amount: 0,
+      description: "Ny investering",
+    });
+    onChange();
+  };
+
+  const removeDetail = async (id: string) => {
+    await supabase.from("capex_plan").delete().eq("id", id);
+    onChange();
+  };
+
+  const detailedRows = rows.filter((r) => r.description);
+
+  const depInfo = data.depRules
+    .map((r) => `${r.capex_type}: ${r.depreciation_years} år`)
+    .join(" · ");
+
+  return (
+    <Section
+      title="Capex-plan"
+      description={`Avskrivningstider: ${depInfo || "Hardware 3 år · Software 5 år · Prosjekt 5 år"}`}
+    >
+      <div className="space-y-5">
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            Aggregert per type og år (tNOK)
+          </h3>
+          <p className="text-[11px] text-muted-foreground mb-2">
+            Disse bucketene representerer udokumenterte investeringer. Bruk «Detaljert» nedenfor for spesifikke prosjekter.
+          </p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left font-medium px-2 py-2 w-[130px]">Type</th>
+                {FC_YEARS.map((y) => (
+                  <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {types.map((t) => (
+                <tr key={t} className="border-b">
+                  <td className="px-2 py-1.5">{t}</td>
+                  {FC_YEARS.map((y) => (
+                    <td key={y} className="px-1 py-1">
+                      <NumCell
+                        value={Number(aggregatedLine.get(`${t}-${y}`)?.amount ?? 0)}
+                        step="100"
+                        onCommit={(v) => upsertAggregated(t, y, v)}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              <tr className="font-semibold">
+                <td className="px-2 py-2">Sum (alle rader)</td>
+                {FC_YEARS.map((y) => (
+                  <td key={y} className="text-right tabular-nums font-mono px-2 py-2">
+                    {types.reduce((a, t) => a + aggSum(t, y), 0).toLocaleString("nb-NO") || "—"}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Detaljert (navngitte investeringer)
+            </h3>
+            <Button variant="outline" size="sm" onClick={addDetail}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Legg til investering
+            </Button>
+          </div>
+          {detailedRows.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-3">Ingen detaljerte investeringer.</p>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left font-medium px-2 py-2 w-[130px]">Type</th>
+                  <th className="text-left font-medium px-2 py-2">Navn</th>
+                  <th className="text-left font-medium px-2 py-2 w-[80px]">År</th>
+                  <th className="text-right font-medium px-2 py-2 w-[140px]">Beløp (tNOK)</th>
+                  <th className="w-[40px]"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {detailedRows.map((r) => (
+                  <tr key={r.id} className="border-b">
+                    <td className="px-1 py-1">
+                      <Select value={r.capex_type} onValueChange={(v) => updateDetailField(r.id, "capex_type", v)}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>{types.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </td>
+                    <td className="px-1 py-1">
+                      <Input
+                        defaultValue={r.description ?? ""}
+                        onBlur={(e) => {
+                          if (e.target.value !== r.description) updateDetailField(r.id, "description", e.target.value);
+                        }}
+                        className="h-8 text-xs"
+                      />
+                    </td>
+                    <td className="px-1 py-1">
+                      <Select value={String(r.year)} onValueChange={(v) => updateDetailField(r.id, "year", Number(v))}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="px-1 py-1">
+                      <NumCell value={Number(r.amount)} step="100" onCommit={(v) => updateDetailField(r.id, "amount", v)} />
+                    </td>
+                    <td className="px-1 py-1 text-center">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeDetail(r.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </Section>
   );
 }
