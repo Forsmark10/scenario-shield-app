@@ -86,13 +86,18 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
-        <div className="container py-6">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            LTP — Long-Term Plan
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Kostnadsstyring og scenarioplanlegging
-          </p>
+        <div className="container py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              LTP — Long-Term Plan
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Kostnadsstyring og scenarioplanlegging
+            </p>
+          </div>
+          <Button variant="outline" asChild>
+            <a href="/debug">Debug beregning →</a>
+          </Button>
         </div>
       </header>
 
