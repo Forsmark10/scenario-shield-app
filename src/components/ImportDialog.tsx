@@ -152,7 +152,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
                 </Badge>
               )}
               {warningCount > 0 && (
-                <Badge className="gap-1 bg-amber-500/15 text-amber-700 border-amber-500/30 hover:bg-amber-500/25">
+                <Badge variant="outline" className="gap-1">
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {warningCount} advarsler
                 </Badge>
