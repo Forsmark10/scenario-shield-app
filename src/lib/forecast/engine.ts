@@ -451,20 +451,19 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   };
   for (const N of YEARS) {
     const g = getGlobal(global_assumptions, scenario_id, N);
+    const priceRate = (Y: number) =>
+      getGlobal(global_assumptions, scenario_id, Y).price_increase_pct;
     let amt = 0;
     const parts: string[] = [];
     for (let Y = 2027; Y <= N; Y++) {
-      const gY = getGlobal(global_assumptions, scenario_id, Y);
-      const yearsGrowth = N - Y + 1;
-      const grown = Math.pow(1 + gY.price_increase_pct, yearsGrowth);
+      const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
       for (const ns of scenarioNearshoring.filter((n) => n.year === Y)) {
         const annualEur = nearshoring_base.base_annual_cost_eur * grown;
-        // Konverter til tusen NOK (samme enhet som cost_lines)
         const annualNokK = (annualEur * g.eur_nok_rate) / 1000;
         const delta = ns.count * annualNokK;
         amt += delta;
         parts.push(
-          `Y${Y} ${ns.count}× ${round2(annualEur)} EUR × ${g.eur_nok_rate} NOK/EUR /1000 × grown ${round2(grown)} = ${round2(delta)} kNOK`
+          `Y${Y} ${ns.count}× ${round2(annualEur)} EUR × ${g.eur_nok_rate} NOK/EUR /1000 × cum(${Y}..${N})=${round2(grown)} = ${round2(delta)} kNOK`
         );
       }
     }
