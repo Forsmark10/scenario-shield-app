@@ -47,16 +47,43 @@ const SCENARIO_COLOR = [
   "hsl(var(--scenario-aggressive))",
 ];
 
-const CAT_COLORS = [
-  "hsl(var(--cat-1))",
-  "hsl(var(--cat-2))",
-  "hsl(var(--cat-3))",
-  "hsl(var(--cat-4))",
-  "hsl(var(--cat-5))",
-  "hsl(var(--cat-6))",
-  "hsl(var(--cat-7))",
-  "hsl(var(--cat-8))",
+// Blue palette mapping per category (darkest = largest, placed at bottom of stack)
+const CATEGORY_COLOR_MAP: Record<string, string> = {
+  "Internal FTE": "#042C53",
+  "External FTE": "#0C447C",
+  "IT Costs": "#185FA5",
+  "Consultancy": "#378ADD",
+  "Operations & Personnel-related": "#5DA3E5",
+  "Depreciation": "#85B7EB",
+  "Capex": "#B5D4F4",
+  "Other operating income": "#D3D1C7",
+};
+
+// Stack ordering: darkest (largest) at bottom -> lightest at top
+const CATEGORY_STACK_ORDER = [
+  "Internal FTE",
+  "External FTE",
+  "IT Costs",
+  "Consultancy",
+  "Operations & Personnel-related",
+  "Depreciation",
+  "Capex",
+  "Other operating income",
 ];
+
+const CAT_FALLBACK = "#9CA3AF";
+function colorForCategory(cat: string) {
+  return CATEGORY_COLOR_MAP[cat] ?? CAT_FALLBACK;
+}
+
+// Sort categories so known ones follow stack order, unknown ones appended alphabetically
+function sortByStackOrder(cats: string[]): string[] {
+  const known = CATEGORY_STACK_ORDER.filter((c) => cats.includes(c));
+  const unknown = cats.filter((c) => !CATEGORY_STACK_ORDER.includes(c)).sort();
+  return [...known, ...unknown];
+}
+
+const DIVIDER_COLOR = "#888780";
 
 // Convert tNOK -> MNOK
 const toM = (v: number) => v / 1000;
@@ -339,7 +366,7 @@ function ScenarioSection({
     { year: "FC 2031", value: toM(totals.fc[2031] ?? 0) },
   ];
 
-  const stackedCats = allCategories.filter((c) => !excludedCats.has(c));
+  const stackedCats = sortByStackOrder(allCategories.filter((c) => !excludedCats.has(c)));
   const stackedData = useMemo(
     () =>
       computeStackedYearly(bundle, view, typeFilter, excludedCats, stackedCats).map((r) => {
@@ -350,14 +377,60 @@ function ScenarioSection({
     [bundle, view, typeFilter, excludedCats, stackedCats],
   );
 
-  // YoY data
-  const yoyData: { year: string; value: number }[] = [];
-  const seq = barData;
-  for (let i = 1; i < seq.length; i++) {
-    const prev = seq[i - 1].value;
-    const cur = seq[i].value;
-    yoyData.push({ year: seq[i].year, value: prev !== 0 ? ((cur - prev) / prev) * 100 : 0 });
-  }
+  // YoY data — exclude BU 2026 (same year as FC 2026, no growth point)
+  const yoySeq = [
+    { year: "AC 2025", value: toM(totals.ac) },
+    { year: "FC 2026", value: toM(totals.fc26) },
+    { year: "FC 2027", value: toM(totals.fc[2027] ?? 0) },
+    { year: "FC 2028", value: toM(totals.fc[2028] ?? 0) },
+    { year: "FC 2029", value: toM(totals.fc[2029] ?? 0) },
+    { year: "FC 2030", value: toM(totals.fc[2030] ?? 0) },
+    { year: "FC 2031", value: toM(totals.fc[2031] ?? 0) },
+  ];
+  // Align YoY x-axis with bar chart (8 labels), but only place dots at the 6 valid points
+  const yoyData = barData.map((b, idx) => {
+    if (idx === 0 || b.year === "BU 2026") return { year: b.year, value: null as number | null };
+    const seqIdx = yoySeq.findIndex((s) => s.year === b.year);
+    if (seqIdx <= 0) return { year: b.year, value: null };
+    const prev = yoySeq[seqIdx - 1].value;
+    const cur = yoySeq[seqIdx].value;
+    return { year: b.year, value: prev !== 0 ? ((cur - prev) / prev) * 100 : 0 };
+  });
+
+  // Custom tooltip handles both Total and Stacked
+  const renderTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    if (breakdown === "Total") {
+      const v = Number(payload[0]?.value ?? 0);
+      return (
+        <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-md">
+          <div className="font-semibold mb-1">{label}</div>
+          <div className="tabular-nums">{formatNumberNO(v, 1)} MNOK</div>
+        </div>
+      );
+    }
+    const total = payload.reduce((a: number, p: any) => a + Number(p.value || 0), 0);
+    return (
+      <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-md min-w-[220px]">
+        <div className="font-semibold mb-1">{label}</div>
+        <div className="space-y-0.5">
+          {[...payload].reverse().map((p: any) => (
+            <div key={p.dataKey} className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: p.color }} />
+                {p.dataKey}
+              </span>
+              <span className="tabular-nums">{formatNumberNO(Number(p.value || 0), 1)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-1 pt-1 border-t flex items-center justify-between font-semibold">
+          <span>Total</span>
+          <span className="tabular-nums">{formatNumberNO(total, 1)} MNOK</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Card>
@@ -378,7 +451,7 @@ function ScenarioSection({
         <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-4">
           {/* Bars */}
           <div className="h-[280px] relative">
-            <div className="absolute top-0 left-0 right-0 flex justify-around text-[10px] text-muted-foreground uppercase tracking-wide pointer-events-none">
+            <div className="absolute top-0 left-0 right-0 flex justify-around text-[11px] font-bold text-foreground uppercase tracking-wide pointer-events-none z-10">
               <span className="ml-4">Historisk</span>
               <span>Baseline</span>
               <span className="mr-4">Forecast</span>
@@ -388,9 +461,9 @@ function ScenarioSection({
                 <BarChart data={barData} margin={{ top: 28, right: 12, bottom: 4, left: 0 }}>
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
-                  <Tooltip formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
-                  <ReferenceLine x="BU 2026" stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                  <ReferenceLine x="FC 2027" stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                  <Tooltip content={renderTooltip} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
+                  <ReferenceLine x="BU 2026" stroke={DIVIDER_COLOR} strokeWidth={2} strokeDasharray="5 4" />
+                  <ReferenceLine x="FC 2027" stroke={DIVIDER_COLOR} strokeWidth={2} strokeDasharray="5 4" />
                   <Bar dataKey="value" radius={[3, 3, 0, 0]}>
                     {barData.map((d) => (
                       <Cell key={d.year} fill={YEAR_COLOR[d.year]} />
@@ -407,12 +480,12 @@ function ScenarioSection({
                 <BarChart data={stackedData} margin={{ top: 28, right: 12, bottom: 4, left: 0 }}>
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
-                  <Tooltip formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
-                  <ReferenceLine x="BU 2026" stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                  <ReferenceLine x="FC 2027" stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                  <Tooltip content={renderTooltip} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
+                  <ReferenceLine x="BU 2026" stroke={DIVIDER_COLOR} strokeWidth={2} strokeDasharray="5 4" />
+                  <ReferenceLine x="FC 2027" stroke={DIVIDER_COLOR} strokeWidth={2} strokeDasharray="5 4" />
                   <Legend wrapperStyle={{ fontSize: 10 }} iconSize={8} />
-                  {stackedCats.map((cat, i) => (
-                    <Bar key={cat} dataKey={cat} stackId="a" fill={CAT_COLORS[i % CAT_COLORS.length]} />
+                  {stackedCats.map((cat) => (
+                    <Bar key={cat} dataKey={cat} stackId="a" fill={colorForCategory(cat)} />
                   ))}
                 </BarChart>
               )}
@@ -426,19 +499,26 @@ function ScenarioSection({
               <LineChart data={yoyData} margin={{ top: 16, right: 16, bottom: 4, left: 0 }}>
                 <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis hide />
-                <Tooltip formatter={(v: number) => `${formatPercentNO(v, 1)} %`} />
+                <Tooltip
+                  formatter={(v: number | null) => (v == null ? "" : `${formatPercentNO(v, 1)} %`)}
+                />
                 <Line
                   type="monotone"
                   dataKey="value"
                   stroke={color}
                   strokeWidth={2}
-                  dot={{ r: 3, fill: color }}
+                  connectNulls={false}
+                  dot={(props: any) => {
+                    const { cx, cy, payload, index } = props;
+                    if (payload?.value == null) return <g key={`empty-${index}`} />;
+                    return <circle key={`dot-${index}`} cx={cx} cy={cy} r={3} fill={color} />;
+                  }}
                   activeDot={{ r: 5 }}
                 >
                   <LabelList
                     dataKey="value"
                     position="top"
-                    formatter={(v: number) => formatPercentNO(v, 1)}
+                    formatter={(v: number | null) => (v == null ? "" : formatPercentNO(v, 1))}
                     style={{ fontSize: 10, fill: "hsl(var(--foreground))" }}
                   />
                 </Line>
