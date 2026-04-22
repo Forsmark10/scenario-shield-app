@@ -356,7 +356,11 @@ function SectionCentral({ data, scenario, onChange }: { data: AllData; scenario:
   ];
 
   return (
-    <Section title="Central drivere" description="Pris og volum vokser kumulativt. Reduksjon trekkes fra til slutt og er ikke kumulativ.">
+    <Section
+      title="Central drivere"
+      description="Pris og volum vokser kumulativt. Reduksjon trekkes fra til slutt og er ikke kumulativ."
+      tooltip="Pris- og volumøkninger multipliseres år-for-år (kumulativt). Reduksjonen trekkes fra det endelige tallet og påvirker ikke neste år. Brukes på Central-kostnader."
+    >
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b">
@@ -630,7 +634,11 @@ function SectionConversions({ data, scenario, onChange }: { data: AllData; scena
   };
 
   return (
-    <Section title="Ekstern → Intern konvertering" description="Overlapp er 3 måneder (fast).">
+    <Section
+      title="Ekstern → Intern konvertering"
+      description="Overlapp er 3 måneder (fast)."
+      tooltip="Konverterer en ekstern konsulent til intern ansatt. I overlappsperioden (3 mnd standard) regnes begge kostnader. Etter overlapp inngår ny intern i lønnsbasis."
+    >
       <div className="space-y-3">
         <table className="w-full text-xs">
           <thead>
@@ -722,7 +730,11 @@ function SectionNearshoring({ data, scenario, onChange }: { data: AllData; scena
   };
 
   return (
-    <Section title="Nearshoring" description="Faktureres i EUR per år, konverteres med valutakurs.">
+    <Section
+      title="Nearshoring"
+      description="Faktureres i EUR per år, konverteres med valutakurs."
+      tooltip="Nearshoring-ressurser erstatter eksterne. Kostnaden er i EUR og bruker valutakursen fra Globale drivere. Overlapp gir doble kostnader i innfasingsperioden."
+    >
       <div className="space-y-5">
         <div>
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Basiskost (globalt)</h3>
@@ -818,6 +830,7 @@ function SectionCategoryAdj({ data, scenario, onChange }: { data: AllData; scena
     <Section
       title="Kategori-justeringer"
       description="Justering legges på toppen av prisvekst. Gjelder kun Local-kostnader. Range -50% til +50%."
+      tooltip="Multiplikativ justering på toppen av Local-kostnader for valgt kategori. +10 % øker kategoriens Local-rader med 10 % i tillegg til prisvekst. Gjelder kun det året."
     >
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
