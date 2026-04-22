@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Search, X, Download, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -486,7 +486,7 @@ function MonthlyGrid({ values, unit }: { values: number[]; unit: Unit }) {
   );
 }
 
-function FragmentRow({
+const FragmentRow = memo(function FragmentRow({
   group,
   isOpen,
   unit,
@@ -583,7 +583,7 @@ function FragmentRow({
         ))}
     </>
   );
-}
+});
 
 // Hjelpefunksjon kun for typing
 function groupShape(): {

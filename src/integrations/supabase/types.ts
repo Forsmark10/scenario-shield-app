@@ -351,6 +351,44 @@ export type Database = {
           },
         ]
       }
+      forecast_snapshots: {
+        Row: {
+          created_at: string
+          data: Json
+          description: string | null
+          id: string
+          name: string
+          scenario_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          description?: string | null
+          id?: string
+          name: string
+          scenario_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          description?: string | null
+          id?: string
+          name?: string
+          scenario_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_snapshots_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       global_assumptions: {
         Row: {
           created_at: string

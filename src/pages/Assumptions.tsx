@@ -9,6 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
+import { InfoTip } from "@/components/InfoTip";
 import { cn } from "@/lib/utils";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
@@ -154,11 +156,13 @@ function Section({
   description,
   children,
   defaultOpen = true,
+  tooltip,
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  tooltip?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -167,7 +171,14 @@ function Section({
         <CollapsibleTrigger asChild>
           <button className="w-full flex items-center justify-between px-5 py-4 text-left">
             <div>
-              <h2 className="text-sm font-semibold">{title}</h2>
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-sm font-semibold">{title}</h2>
+                {tooltip && (
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <InfoTip text={tooltip} />
+                  </span>
+                )}
+              </div>
               {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
             </div>
             <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
@@ -212,7 +223,14 @@ function NumCell({
       const num = Number(raw.replace(",", "."));
       if (isNaN(num)) return;
       setSaving(true);
-      Promise.resolve(onCommit(num)).finally(() => setSaving(false));
+      Promise.resolve(onCommit(num))
+        .then(() => {
+          sonnerToast.success("Lagret", { duration: 1500, position: "bottom-right" });
+        })
+        .catch((err: any) => {
+          sonnerToast.error("Lagring feilet", { description: err?.message ?? String(err) });
+        })
+        .finally(() => setSaving(false));
     },
     [onCommit],
   );
@@ -338,7 +356,11 @@ function SectionCentral({ data, scenario, onChange }: { data: AllData; scenario:
   ];
 
   return (
-    <Section title="Central drivere" description="Pris og volum vokser kumulativt. Reduksjon trekkes fra til slutt og er ikke kumulativ.">
+    <Section
+      title="Central drivere"
+      description="Pris og volum vokser kumulativt. Reduksjon trekkes fra til slutt og er ikke kumulativ."
+      tooltip="Pris- og volumøkninger multipliseres år-for-år (kumulativt). Reduksjonen trekkes fra det endelige tallet og påvirker ikke neste år. Brukes på Central-kostnader."
+    >
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b">
@@ -612,7 +634,11 @@ function SectionConversions({ data, scenario, onChange }: { data: AllData; scena
   };
 
   return (
-    <Section title="Ekstern → Intern konvertering" description="Overlapp er 3 måneder (fast).">
+    <Section
+      title="Ekstern → Intern konvertering"
+      description="Overlapp er 3 måneder (fast)."
+      tooltip="Konverterer en ekstern konsulent til intern ansatt. I overlappsperioden (3 mnd standard) regnes begge kostnader. Etter overlapp inngår ny intern i lønnsbasis."
+    >
       <div className="space-y-3">
         <table className="w-full text-xs">
           <thead>
@@ -704,7 +730,11 @@ function SectionNearshoring({ data, scenario, onChange }: { data: AllData; scena
   };
 
   return (
-    <Section title="Nearshoring" description="Faktureres i EUR per år, konverteres med valutakurs.">
+    <Section
+      title="Nearshoring"
+      description="Faktureres i EUR per år, konverteres med valutakurs."
+      tooltip="Nearshoring-ressurser erstatter eksterne. Kostnaden er i EUR og bruker valutakursen fra Globale drivere. Overlapp gir doble kostnader i innfasingsperioden."
+    >
       <div className="space-y-5">
         <div>
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Basiskost (globalt)</h3>
@@ -800,6 +830,7 @@ function SectionCategoryAdj({ data, scenario, onChange }: { data: AllData; scena
     <Section
       title="Kategori-justeringer"
       description="Justering legges på toppen av prisvekst. Gjelder kun Local-kostnader. Range -50% til +50%."
+      tooltip="Multiplikativ justering på toppen av Local-kostnader for valgt kategori. +10 % øker kategoriens Local-rader med 10 % i tillegg til prisvekst. Gjelder kun det året."
     >
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
