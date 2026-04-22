@@ -173,7 +173,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
                       key={i}
                       className={cn(
                         "px-3 py-1.5 flex items-start gap-2",
-                        iss.severity === "error" ? "text-destructive" : "text-amber-700",
+                        iss.severity === "error" ? "text-destructive" : "text-muted-foreground",
                       )}
                     >
                       <span className="font-mono shrink-0">Rad {iss.row}</span>
