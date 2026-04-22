@@ -708,29 +708,36 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
 }
 
 // ---------------------- 5. Conversions ----------------------
-function SectionConversions({ data, scenario, onChange }: { data: AllData; scenario: Scenario; onChange: () => void }) {
+function SectionConversions({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const rows = data.conversions.filter((c) => c.scenario_id === scenario.id);
 
   const addRow = async () => {
-    await supabase.from("conversions").insert({
-      scenario_id: scenario.id,
-      year: 2027,
-      external_level: "Low",
-      internal_level: "Low",
-      count: 0,
-      overlap_months: 3,
-    });
-    onChange();
+    const { data: inserted, error } = await supabase
+      .from("conversions")
+      .insert({
+        scenario_id: scenario.id,
+        year: 2027,
+        external_level: "Low",
+        internal_level: "Low",
+        count: 0,
+        overlap_months: 3,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    patch({ type: "upsert", table: "conversions", row: inserted });
   };
 
   const updateField = async (id: string, field: string, value: any) => {
-    await supabase.from("conversions").update({ [field]: value } as any).eq("id", id);
-    onChange();
+    patch({ type: "update", table: "conversions", id, changes: { [field]: value } });
+    const { error } = await supabase.from("conversions").update({ [field]: value } as any).eq("id", id);
+    if (error) throw error;
   };
 
   const remove = async (id: string) => {
-    await supabase.from("conversions").delete().eq("id", id);
-    onChange();
+    patch({ type: "delete", table: "conversions", id });
+    const { error } = await supabase.from("conversions").delete().eq("id", id);
+    if (error) throw error;
   };
 
   return (
