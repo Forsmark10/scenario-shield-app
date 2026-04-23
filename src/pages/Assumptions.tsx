@@ -166,11 +166,22 @@ export default function Assumptions() {
 
   return (
     <div className="p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Assumptions</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Globale drivere, FTE-endringer og capex-plan per scenario. Endringer lagres automatisk.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Assumptions</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Globale drivere, FTE-endringer og capex-plan per scenario. Endringer lagres automatisk.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setHistoryOpen(true)}
+          disabled={!activeScenario}
+        >
+          <History className="h-4 w-4 mr-2" />
+          Historikk
+        </Button>
       </div>
 
       <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
@@ -207,6 +218,19 @@ export default function Assumptions() {
           </TabsContent>
         ))}
       </Tabs>
+
+      {activeScenario && (
+        <VersionHistoryPanel
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          scenarioId={activeScenario}
+          scenarioName={data.scenarios.find((s) => s.id === activeScenario)?.name ?? ""}
+          onRestored={() => {
+            autoVersion.resetWindow(activeScenario);
+            refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
