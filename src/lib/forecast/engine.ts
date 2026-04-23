@@ -87,6 +87,62 @@ function distributeMonthly(annual: number, pattern: number[]): number[] {
   return pattern.map((p) => (p / total) * annual);
 }
 
+type FteChangeRow = {
+  year: number;
+  level: Level;
+  increase: number;
+  decrease: number;
+};
+
+const fteChangeKey = (year: number, level: Level) => `${year}:${level}`;
+
+function buildFteChangeIndex(changes: FteChangeRow[]): Map<string, number> {
+  const index = new Map<string, number>();
+
+  for (const change of changes) {
+    index.set(
+      fteChangeKey(change.year, change.level),
+      (change.increase ?? 0) - (change.decrease ?? 0)
+    );
+  }
+
+  return index;
+}
+
+function getFteNetChange(index: Map<string, number>, year: number, level: Level): number {
+  return index.get(fteChangeKey(year, level)) ?? 0;
+}
+
+function logInternalMasterDebug(payload: {
+  scenarioId: string;
+  year: number;
+  base2026: number;
+  salaryFactor: number;
+  baseContribution: number;
+  changeContributions: Array<{
+    changeYear: number;
+    level: Level;
+    net: number;
+    rate: number;
+    growthFactor: number;
+    delta: number;
+  }>;
+  conversionContributions: Array<{
+    changeYear: number;
+    from: Level;
+    to: Level;
+    count: number;
+    rate: number;
+    growthFactor: number;
+    delta: number;
+  }>;
+  total: number;
+}) {
+  if (typeof window === "undefined" || payload.year !== 2028) return;
+
+  console.log("[Forecast] master_amount details", payload);
+}
+
 function emptyLine(
   cl: CostLineRow,
   base2026: number
@@ -146,6 +202,8 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   const scenarioExtChanges = external_fte_changes.filter(
     (c) => c.scenario_id === scenario_id
   );
+  const intChangeIndex = buildFteChangeIndex(scenarioIntChanges);
+  const extChangeIndex = buildFteChangeIndex(scenarioExtChanges);
 
   const lines: ForecastLine[] = [];
 
@@ -161,20 +219,42 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       getGlobal(global_assumptions, scenario_id, Y).salary_increase_pct;
     const salaryFactor = cumulativeFactor(scenario_id, 2027, N, salaryRate);
     let amount = masterBase * salaryFactor;
+    const changeContributions: Array<{
+      changeYear: number;
+      level: Level;
+      net: number;
+      rate: number;
+      growthFactor: number;
+      delta: number;
+    }> = [];
+    const conversionContributions: Array<{
+      changeYear: number;
+      from: Level;
+      to: Level;
+      count: number;
+      rate: number;
+      growthFactor: number;
+      delta: number;
+    }> = [];
     const parts: string[] = [
       `base=${round2(masterBase)} × cum_salary(2027..${N})=${round2(salaryFactor)} → ${round2(masterBase * salaryFactor)}`,
     ];
     for (let Y = 2027; Y <= N; Y++) {
       const grown = cumulativeFactor(scenario_id, Y, N, salaryRate);
       for (const lvl of LEVELS) {
-        const ch = scenarioIntChanges.find(
-          (c) => c.year === Y && c.level === lvl
-        );
-        const net = (ch?.increase ?? 0) - (ch?.decrease ?? 0);
+        const net = getFteNetChange(intChangeIndex, Y, lvl);
         if (net === 0) continue;
         const rate = intRate(lvl);
         const delta = net * rate * grown;
         amount += delta;
+        changeContributions.push({
+          changeYear: Y,
+          level: lvl,
+          net,
+          rate,
+          growthFactor: grown,
+          delta,
+        });
         parts.push(
           `+ Y${Y} ${lvl} net=${net} × rate=${rate} × cum_salary(${Y}..${N})=${round2(grown)} → ${round2(delta)}`
         );
@@ -187,6 +267,15 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
         const rate = intRate(conv.internal_level);
         const delta = conv.count * rate * grown;
         amount += delta;
+        conversionContributions.push({
+          changeYear: Y,
+          from: conv.external_level,
+          to: conv.internal_level,
+          count: conv.count,
+          rate,
+          growthFactor: grown,
+          delta,
+        });
         parts.push(
           `+ Konv Y${Y} ${conv.external_level}→${conv.internal_level} ×${conv.count} × ${rate} × ${round2(grown)} → ${round2(delta)}`
         );
@@ -194,6 +283,16 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     }
     masterByYear[N] = amount;
     masterBreakdown[N] = parts.join("\n");
+    logInternalMasterDebug({
+      scenarioId: scenario_id,
+      year: N,
+      base2026: masterBase,
+      salaryFactor,
+      baseContribution: masterBase * salaryFactor,
+      changeContributions,
+      conversionContributions,
+      total: amount,
+    });
   }
 
   // ---------- Loop cost_lines ----------
@@ -250,10 +349,7 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
         for (let Y = 2027; Y <= N; Y++) {
           const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
           for (const lvl of LEVELS) {
-            const ch = scenarioExtChanges.find(
-              (c) => c.year === Y && c.level === lvl
-            );
-            const net = (ch?.increase ?? 0) - (ch?.decrease ?? 0);
+            const net = getFteNetChange(extChangeIndex, Y, lvl);
             if (net === 0) continue;
             const r = extRate(lvl);
             const annual = r.base_monthly_cost * r.working_months;
