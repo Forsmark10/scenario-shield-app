@@ -42,7 +42,12 @@ export default function Scenario() {
   const allScenarios = useAllScenarios();
   const [unit, setUnit] = useState<Unit>("tNOK");
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
-  const [scenarioId, setScenarioId] = useState<string | null>(null);
+  const [scenarioId, setScenarioIdState] = useState<string | null>(null);
+  const [storedScenario, setStoredScenario] = useActiveScenario();
+  const setScenarioId = (id: string) => {
+    setScenarioIdState(id);
+    setStoredScenario(id);
+  };
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
