@@ -519,13 +519,13 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   );
   const extConvLine = makeVirtualExtLine(
     "ext_fte_conversions",
-    "Konvertering ekstern→intern (ekstern reduksjon)",
-    "Konvertering",
+    "Konvertering til intern (ekstern reduksjon)",
+    "Konvertering til intern",
   );
   const extNsReductionLine = makeVirtualExtLine(
     "ext_fte_nearshoring_reduction",
-    "Nearshoring – ekstern reduksjon",
-    "Nearshoring",
+    "Nearshoring-konvertering (ekstern reduksjon)",
+    "Nearshoring-konvertering",
   );
 
   for (const N of YEARS) {
