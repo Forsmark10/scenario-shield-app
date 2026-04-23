@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import content from "@/content/om-modellen.md?raw";
 
 export default function OmModellen() {
@@ -13,9 +14,11 @@ export default function OmModellen() {
           prose-p:text-sm prose-p:leading-relaxed prose-p:text-foreground/85
           prose-li:text-sm prose-li:text-foreground/85
           prose-strong:text-foreground prose-strong:font-semibold
-          prose-hr:my-8 prose-hr:border-border"
+          prose-hr:my-8 prose-hr:border-border
+          prose-table:text-sm prose-th:text-left prose-th:font-semibold
+          prose-code:text-xs prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded"
       >
-        <ReactMarkdown>{content}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </article>
     </div>
   );
