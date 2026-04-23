@@ -293,6 +293,7 @@ function NumCell({
   min,
   max,
   className,
+  errorHint,
 }: {
   value: number;
   onCommit: (v: number) => Promise<void> | void;
@@ -301,9 +302,12 @@ function NumCell({
   min?: number;
   max?: number;
   className?: string;
+  /** Vist under feltet hvis brukeren skriver en verdi utenfor min/max. */
+  errorHint?: string;
 }) {
   const [local, setLocal] = useState(String(value ?? 0));
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const timer = useRef<NodeJS.Timeout>();
   const inputRef = useRef<HTMLInputElement>(null);
   const isFocusedRef = useRef(false);
@@ -315,10 +319,30 @@ function NumCell({
     setLocal(String(value ?? 0));
   }, [value]);
 
+  const validate = useCallback(
+    (num: number): string | null => {
+      if (min !== undefined && num < min) {
+        return errorHint ?? `Verdien må være ≥ ${min}.`;
+      }
+      if (max !== undefined && num > max) {
+        return errorHint ?? `Verdien må være ≤ ${max}.`;
+      }
+      return null;
+    },
+    [min, max, errorHint],
+  );
+
   const commit = useCallback(
     (raw: string) => {
       const num = Number(raw.replace(",", "."));
       if (isNaN(num)) return;
+      const err = validate(num);
+      if (err) {
+        setError(err);
+        sonnerToast.error("Ugyldig verdi", { description: err, duration: 2500 });
+        return;
+      }
+      setError(null);
       setSaving(true);
       Promise.resolve(onCommit(num))
         .then(() => {
@@ -330,7 +354,7 @@ function NumCell({
         })
         .finally(() => setSaving(false));
     },
-    [onCommit],
+    [onCommit, validate],
   );
 
   return (
@@ -348,6 +372,14 @@ function NumCell({
         onChange={(e) => {
           isDirtyRef.current = true;
           setLocal(e.target.value);
+          // Live-validering for umiddelbar feedback
+          const num = Number(e.target.value.replace(",", "."));
+          if (!isNaN(num)) {
+            const err = validate(num);
+            setError(err);
+          } else {
+            setError(null);
+          }
           if (timer.current) clearTimeout(timer.current);
           timer.current = setTimeout(() => commit(e.target.value), 500);
         }}
@@ -356,12 +388,23 @@ function NumCell({
           if (timer.current) clearTimeout(timer.current);
           if (isDirtyRef.current) commit(local);
         }}
-        className={cn("h-8 text-xs text-right tabular-nums font-mono", suffix && "pr-6", saving && "ring-1 ring-primary/30")}
+        className={cn(
+          "h-8 text-xs text-right tabular-nums font-mono",
+          suffix && "pr-6",
+          saving && "ring-1 ring-primary/30",
+          error && "border-destructive ring-1 ring-destructive/40",
+        )}
+        aria-invalid={!!error}
       />
       {suffix && (
         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">
           {suffix}
         </span>
+      )}
+      {error && (
+        <p className="mt-0.5 text-[10px] leading-tight text-destructive whitespace-normal">
+          {error}
+        </p>
       )}
     </div>
   );
