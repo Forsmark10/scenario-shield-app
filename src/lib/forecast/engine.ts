@@ -651,7 +651,7 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     line_id: `virtual:nearshoring`,
     source: "virtual",
     category: "External FTE",
-    project: "Nearshoring",
+    project: "Nearshoring-kost",
     account: null,
     account_name: "Nearshoring (nye ressurser)",
     cost_type: "Local",
