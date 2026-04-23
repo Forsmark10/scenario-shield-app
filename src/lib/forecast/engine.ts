@@ -320,10 +320,20 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       if (cl.cost_type === "Central") {
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, cPriceRate);
         const volumeFactor = cumulativeFactor(scenario_id, 2027, N, cVolRate);
-        // central_reduction_pct er IKKE kumulativ - kun engangseffekt det året
-        const reductionFactor = 1 - c.central_reduction_pct;
-        amount = base * priceFactor * volumeFactor * reductionFactor;
-        bd = `Central: base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cum_vol=${round2(volumeFactor)} × red(${N})=${round2(reductionFactor)} = ${round2(amount)}`;
+        // Reduksjon = permanent reforhandling. En reduksjon satt i år Y gjelder fom Y og alle påfølgende år.
+        // Flere reduksjoner over år multipliseres sammen: PRODUCT((1 - red_Y) for Y from 2027 to N).
+        const reductionParts: string[] = [];
+        let reductionFactor = 1;
+        for (let Y = 2027; Y <= N; Y++) {
+          const redY = getCentral(central_assumptions, scenario_id, Y).central_reduction_pct;
+          if (redY) {
+            reductionFactor *= 1 - redY;
+            reductionParts.push(`(1-${redY}@Y${Y})`);
+          }
+        }
+        amount = base * reductionFactor * priceFactor * volumeFactor;
+        const redDesc = reductionParts.length ? reductionParts.join("×") : "1";
+        bd = `Central: base=${round2(base)} × cum_red(2027..${N})=${redDesc}=${round2(reductionFactor)} × cum_price=${round2(priceFactor)} × cum_vol=${round2(volumeFactor)} = ${round2(amount)}`;
       } else if (cl.category === "Internal FTE") {
         // ===== INTERNAL FTE =====
         if (cl.is_fte_master) {
