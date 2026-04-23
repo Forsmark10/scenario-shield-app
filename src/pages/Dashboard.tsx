@@ -599,6 +599,30 @@ function ScenarioComparisonChart({
     });
   }, [scenarios, view, typeFilter, excludedCats]);
 
+  const yDomain = useMemo<[number, number]>(() => {
+    const vals: number[] = [];
+    data.forEach((row) => {
+      scenarios.forEach((b) => {
+        const v = row[b.meta.name];
+        if (typeof v === "number" && Number.isFinite(v)) vals.push(v);
+      });
+    });
+    if (vals.length === 0) return [0, 1];
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const range = max - min || Math.abs(max) || 1;
+    const pad = range * 0.1;
+    const niceFloor = (v: number) => {
+      const step = Math.pow(10, Math.max(0, Math.floor(Math.log10(Math.abs(v) || 1)) - 1));
+      return Math.floor(v / step) * step;
+    };
+    const niceCeil = (v: number) => {
+      const step = Math.pow(10, Math.max(0, Math.floor(Math.log10(Math.abs(v) || 1)) - 1));
+      return Math.ceil(v / step) * step;
+    };
+    return [niceFloor(min - pad), niceCeil(max + pad)];
+  }, [data, scenarios]);
+
   return (
     <Card>
       <CardContent className="pt-5">
@@ -609,7 +633,14 @@ function ScenarioComparisonChart({
             <LineChart data={data} margin={{ top: 12, right: 24, bottom: 4, left: 0 }}>
               <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} />
               <XAxis dataKey="year" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatNumberNO(v, 0)} />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                domain={yDomain}
+                allowDataOverflow={false}
+                tickFormatter={(v) => formatNumberNO(v, 0)}
+              />
               <Tooltip formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`} />
               <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={10} />
               {scenarios.map((b, i) => (
@@ -626,6 +657,9 @@ function ScenarioComparisonChart({
             </LineChart>
           </ResponsiveContainer>
         </div>
+        <p className="text-[11px] text-muted-foreground mt-2 italic">
+          Y-aksen er tilpasset scenario-rangen for å tydeliggjøre forskjeller.
+        </p>
       </CardContent>
     </Card>
   );
