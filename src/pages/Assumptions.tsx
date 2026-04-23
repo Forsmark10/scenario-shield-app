@@ -1002,8 +1002,8 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
   return (
     <Section
       title="Kategori-justeringer"
-      description="Justering legges på toppen av prisvekst. Gjelder kun Local-kostnader. Range -50% til +50%."
-      tooltip="Multiplikativ justering på toppen av Local-kostnader for valgt kategori. +10 % øker kategoriens Local-rader med 10 % i tillegg til prisvekst. Gjelder kun det året."
+      description="Justering legges på toppen av prisvekst og representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere justeringer over år multipliseres sammen. Positive verdier (for eksempel +5%) reverserer tidligere reduksjoner. Gjelder kun Local-kostnader. Range -50% til +50%."
+      tooltip="Justering legges på toppen av prisvekst og representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere justeringer over år multipliseres sammen. Positive verdier (for eksempel +5%) reverserer tidligere reduksjoner. Gjelder kun Local-kostnader. Range -50% til +50%."
     >
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
