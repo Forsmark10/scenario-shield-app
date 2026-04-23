@@ -251,6 +251,7 @@ export function GoalSeekPanel({ scenarioId, scenarioName, categories, onApplied 
                     <TableHead className="w-10"></TableHead>
                     <TableHead>Endring</TableHead>
                     <TableHead className="w-16">År</TableHead>
+                    <TableHead className="w-40">Fra → Til</TableHead>
                     <TableHead className="w-32 text-right">Effekt (MNOK)</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -265,6 +266,9 @@ export function GoalSeekPanel({ scenarioId, scenarioName, categories, onApplied 
                       </TableCell>
                       <TableCell className="text-xs">{c.description}</TableCell>
                       <TableCell className="text-xs">{c.year}</TableCell>
+                      <TableCell className="text-xs tabular-nums text-muted-foreground">
+                        {formatBeforeAfter(c)}
+                      </TableCell>
                       <TableCell className={`text-xs text-right tabular-nums ${c.estimated_impact_mnok < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
                         {c.estimated_impact_mnok > 0 ? "+" : ""}
                         {c.estimated_impact_mnok.toFixed(1)}
