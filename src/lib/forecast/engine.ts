@@ -434,9 +434,56 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           amount = base;
           bd = `Eksisterende avskrivning (flat) = ${round2(base)}`;
         }
+
+        // Aggreger nye avskrivninger fra capex_plan basert på prosjekt-mapping
+        // Hardware (60842) ← capex Hardware; Software (60130) ← capex Software; ALFA (60130) ← capex Prosjekt
+        const deprMap: Record<string, "Hardware" | "Software" | "Prosjekt" | null> = {
+          Hardware: "Hardware",
+          Software: "Software",
+          ALFA: "Prosjekt",
+        };
+        const ctForLine = deprMap[cl.project] ?? null;
+        if (ctForLine) {
+          const rule = depreciation_rules.find((r) => r.capex_type === ctForLine);
+          if (rule) {
+            const extras: string[] = [];
+            let extra = 0;
+            for (const cap of scenarioCapex.filter((c) => c.capex_type === ctForLine)) {
+              const startY = cap.year + 1;
+              const endY = cap.year + rule.depreciation_years;
+              if (N >= startY && N <= endY) {
+                const annual = cap.amount / rule.depreciation_years;
+                extra += annual;
+                extras.push(
+                  `+ Capex Y${cap.year} ${cap.amount}/${rule.depreciation_years} = ${round2(annual)}`
+                );
+              }
+            }
+            if (extra !== 0) {
+              amount += extra;
+              bd += `\nNye avskrivninger (${ctForLine}):\n${extras.join("\n")}\nSum tillegg = ${round2(extra)}`;
+            }
+          }
+        }
       } else if (cl.category === "Capex") {
-        amount = 0;
-        bd = `Capex baseline-rad — faktisk per år vises i 'Capex - <type>' virtuelle linjer.`;
+        // Aggreger capex_plan-utbetalinger inn i eksisterende Capex-linjer basert på prosjekt-mapping
+        // Hardware (11321) ← Hardware; Software (11327) ← Software; Project (11327) ← Prosjekt
+        const capexMap: Record<string, "Hardware" | "Software" | "Prosjekt" | null> = {
+          Hardware: "Hardware",
+          Software: "Software",
+          Project: "Prosjekt",
+        };
+        const ctForLine = capexMap[cl.project] ?? null;
+        if (ctForLine) {
+          const matches = scenarioCapex.filter(
+            (c) => c.capex_type === ctForLine && c.year === N
+          );
+          amount = matches.reduce((a, c) => a + c.amount, 0);
+          bd = `Capex ${ctForLine} år ${N} = ${round2(amount)} (sum av ${matches.length} planlinje(r))`;
+        } else {
+          amount = 0;
+          bd = `Capex baseline (ukjent prosjekt-mapping): 0`;
+        }
       } else {
         // ===== ØVRIGE LOKALE (Operations, IT Costs, Consultancy, Other operating income) =====
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
