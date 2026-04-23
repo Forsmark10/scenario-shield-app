@@ -87,6 +87,62 @@ function distributeMonthly(annual: number, pattern: number[]): number[] {
   return pattern.map((p) => (p / total) * annual);
 }
 
+type FteChangeRow = {
+  year: number;
+  level: Level;
+  increase: number;
+  decrease: number;
+};
+
+const fteChangeKey = (year: number, level: Level) => `${year}:${level}`;
+
+function buildFteChangeIndex(changes: FteChangeRow[]): Map<string, number> {
+  const index = new Map<string, number>();
+
+  for (const change of changes) {
+    index.set(
+      fteChangeKey(change.year, change.level),
+      (change.increase ?? 0) - (change.decrease ?? 0)
+    );
+  }
+
+  return index;
+}
+
+function getFteNetChange(index: Map<string, number>, year: number, level: Level): number {
+  return index.get(fteChangeKey(year, level)) ?? 0;
+}
+
+function logInternalMasterDebug(payload: {
+  scenarioId: string;
+  year: number;
+  base2026: number;
+  salaryFactor: number;
+  baseContribution: number;
+  changeContributions: Array<{
+    changeYear: number;
+    level: Level;
+    net: number;
+    rate: number;
+    growthFactor: number;
+    delta: number;
+  }>;
+  conversionContributions: Array<{
+    changeYear: number;
+    from: Level;
+    to: Level;
+    count: number;
+    rate: number;
+    growthFactor: number;
+    delta: number;
+  }>;
+  total: number;
+}) {
+  if (typeof window === "undefined" || payload.year !== 2028) return;
+
+  console.log("[Forecast] master_amount details", payload);
+}
+
 function emptyLine(
   cl: CostLineRow,
   base2026: number
