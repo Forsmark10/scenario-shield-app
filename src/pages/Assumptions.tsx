@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, History, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { InfoTip } from "@/components/InfoTip";
+import { VersionHistoryPanel } from "@/components/VersionHistoryPanel";
+import { useAutoVersion } from "@/hooks/useAutoVersion";
 import { cn } from "@/lib/utils";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
