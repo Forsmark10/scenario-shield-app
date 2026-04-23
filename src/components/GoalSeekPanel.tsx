@@ -150,6 +150,7 @@ export function GoalSeekPanel({ scenarioId, scenarioName, categories, onApplied 
       return;
     }
     setApplying(true);
+    console.log(`[GoalSeek] Anvender ${picks.length} endringer for scenario ${scenarioName} (${scenarioId})`);
     try {
       // Lagre versjon FØR endringer (sikkerhet for angring).
       try {
@@ -159,25 +160,43 @@ export function GoalSeekPanel({ scenarioId, scenarioName, categories, onApplied 
           data: snap as any,
           summary: `Før AI-anvendelse (${picks.length} endring${picks.length === 1 ? "" : "er"})`,
         });
+        console.log("[GoalSeek] Pre-snapshot lagret i auto_versions");
       } catch (e) {
-        console.warn("Pre-AI snapshot feilet", e);
+        console.warn("[GoalSeek] Pre-AI snapshot feilet", e);
       }
 
       let applied = 0;
+      const failures: { change: AiChange; error: string }[] = [];
       for (const c of picks) {
         try {
+          console.log(`[GoalSeek] Anvender ${c.type} (år ${c.year}) →`, c.details);
           await applyChange(scenarioId, c);
           applied++;
-        } catch (e) {
-          console.error("Klarte ikke anvende endring", c, e);
+        } catch (e: any) {
+          const msg = e?.message ?? String(e);
+          console.error("[GoalSeek] Feil ved anvendelse av endring", c, e);
+          failures.push({ change: c, error: msg });
         }
       }
 
-      toast({ title: `${applied} endring${applied === 1 ? "" : "er"} anvendt til ${scenarioName}` });
+      console.log(`[GoalSeek] Re-fetcher data og re-beregner forecast (${applied}/${picks.length} ok)`);
+      if (failures.length) {
+        toast({
+          title: `${applied}/${picks.length} endringer anvendt`,
+          description: `${failures.length} feilet: ${failures[0].error}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: `${applied} endring${applied === 1 ? "" : "er"} anvendt til ${scenarioName}`,
+          description: "Dashboard er oppdatert.",
+        });
+      }
       setResponse(null);
       setSelected(new Set());
       setGoal("");
       onApplied();
+      console.log("[GoalSeek] Ferdig — dashboard skal være oppdatert");
     } finally {
       setApplying(false);
     }
@@ -282,27 +301,45 @@ export function GoalSeekPanel({ scenarioId, scenarioName, categories, onApplied 
 }
 
 // ---------------------- Anvend AI-endringer ----------------------
+function check<T>(res: { data: T; error: any }, label: string): T {
+  if (res.error) {
+    console.error(`[GoalSeek] DB-feil (${label}):`, res.error);
+    throw new Error(`${label}: ${res.error.message ?? "ukjent DB-feil"}`);
+  }
+  return res.data;
+}
+
 async function applyChange(scenarioId: string, c: AiChange) {
   const d = c.details || {};
   switch (c.type) {
     case "salary_increase":
     case "price_increase": {
       const field = c.type === "salary_increase" ? "salary_increase_pct" : "price_increase_pct";
-      const { data: existing } = await supabase
-        .from("global_assumptions")
-        .select("id")
-        .eq("scenario_id", scenarioId)
-        .eq("year", c.year)
-        .maybeSingle();
+      const existing = check(
+        await supabase
+          .from("global_assumptions")
+          .select("id")
+          .eq("scenario_id", scenarioId)
+          .eq("year", c.year)
+          .maybeSingle(),
+        "global_assumptions select",
+      );
       const pct = Number(d.pct ?? d.value ?? 0);
+      console.log(`[GoalSeek]   → global_assumptions.${field} = ${pct} (år ${c.year})`);
       if (existing?.id) {
-        await supabase.from("global_assumptions").update({ [field]: pct } as any).eq("id", existing.id);
+        check(
+          await supabase.from("global_assumptions").update({ [field]: pct } as any).eq("id", existing.id),
+          "global_assumptions update",
+        );
       } else {
-        await supabase.from("global_assumptions").insert({
-          scenario_id: scenarioId,
-          year: c.year,
-          [field]: pct,
-        } as any);
+        check(
+          await supabase.from("global_assumptions").insert({
+            scenario_id: scenarioId,
+            year: c.year,
+            [field]: pct,
+          } as any),
+          "global_assumptions insert",
+        );
       }
       return;
     }
@@ -315,21 +352,31 @@ async function applyChange(scenarioId: string, c: AiChange) {
         central_reduction: "central_reduction_pct",
       };
       const field = fieldMap[c.type];
-      const { data: existing } = await supabase
-        .from("central_assumptions")
-        .select("id")
-        .eq("scenario_id", scenarioId)
-        .eq("year", c.year)
-        .maybeSingle();
+      const existing = check(
+        await supabase
+          .from("central_assumptions")
+          .select("id")
+          .eq("scenario_id", scenarioId)
+          .eq("year", c.year)
+          .maybeSingle(),
+        "central_assumptions select",
+      );
       const pct = Number(d.pct ?? d.value ?? 0);
+      console.log(`[GoalSeek]   → central_assumptions.${field} = ${pct} (år ${c.year})`);
       if (existing?.id) {
-        await supabase.from("central_assumptions").update({ [field]: pct } as any).eq("id", existing.id);
+        check(
+          await supabase.from("central_assumptions").update({ [field]: pct } as any).eq("id", existing.id),
+          "central_assumptions update",
+        );
       } else {
-        await supabase.from("central_assumptions").insert({
-          scenario_id: scenarioId,
-          year: c.year,
-          [field]: pct,
-        } as any);
+        check(
+          await supabase.from("central_assumptions").insert({
+            scenario_id: scenarioId,
+            year: c.year,
+            [field]: pct,
+          } as any),
+          "central_assumptions insert",
+        );
       }
       return;
     }
@@ -339,81 +386,112 @@ async function applyChange(scenarioId: string, c: AiChange) {
       const level = String(d.level ?? "Medium");
       const inc = Number(d.increase ?? 0);
       const dec = Number(d.decrease ?? 0);
-      const { data: existing } = await supabase
-        .from(table)
-        .select("id, increase, decrease")
-        .eq("scenario_id", scenarioId)
-        .eq("year", c.year)
-        .eq("level", level)
-        .maybeSingle();
+      const existing = check(
+        await supabase
+          .from(table)
+          .select("id, increase, decrease")
+          .eq("scenario_id", scenarioId)
+          .eq("year", c.year)
+          .eq("level", level)
+          .maybeSingle(),
+        `${table} select`,
+      );
+      console.log(`[GoalSeek]   → ${table} (${level}, år ${c.year}) +${inc} / -${dec}`);
       if (existing?.id) {
-        await supabase.from(table).update({
-          increase: (existing.increase ?? 0) + inc,
-          decrease: (existing.decrease ?? 0) + dec,
-        }).eq("id", existing.id);
+        check(
+          await supabase.from(table).update({
+            increase: (existing.increase ?? 0) + inc,
+            decrease: (existing.decrease ?? 0) + dec,
+          }).eq("id", existing.id),
+          `${table} update`,
+        );
       } else {
-        await supabase.from(table).insert({
-          scenario_id: scenarioId,
-          year: c.year,
-          level,
-          increase: inc,
-          decrease: dec,
-        } as any);
+        check(
+          await supabase.from(table).insert({
+            scenario_id: scenarioId,
+            year: c.year,
+            level,
+            increase: inc,
+            decrease: dec,
+          } as any),
+          `${table} insert`,
+        );
       }
       return;
     }
     case "conversion": {
-      await supabase.from("conversions").insert({
+      const payload = {
         scenario_id: scenarioId,
         year: c.year,
         external_level: String(d.external_level ?? "Medium"),
         internal_level: String(d.internal_level ?? "Low"),
         count: Number(d.count ?? 0),
         overlap_months: Number(d.overlap_months ?? 3),
-      } as any);
+      };
+      console.log("[GoalSeek]   → conversions insert", payload);
+      check(await supabase.from("conversions").insert(payload as any), "conversions insert");
       return;
     }
     case "nearshoring": {
-      await supabase.from("nearshoring_additions").insert({
+      const payload = {
         scenario_id: scenarioId,
         year: c.year,
         replaces_external_level: String(d.replaces_external_level ?? d.level ?? "Medium"),
         count: Number(d.count ?? 0),
         overlap_months: Number(d.overlap_months ?? 3),
-      } as any);
+      };
+      console.log("[GoalSeek]   → nearshoring_additions insert", payload);
+      check(
+        await supabase.from("nearshoring_additions").insert(payload as any),
+        "nearshoring_additions insert",
+      );
       return;
     }
     case "category_adjustment": {
       const cat = String(d.category ?? "");
-      if (!cat) return;
+      if (!cat) {
+        throw new Error("category_adjustment mangler category");
+      }
       const pct = Number(d.adjustment_pct ?? d.pct ?? 0);
-      const { data: existing } = await supabase
-        .from("category_adjustments")
-        .select("id")
-        .eq("scenario_id", scenarioId)
-        .eq("year", c.year)
-        .eq("category", cat)
-        .maybeSingle();
+      const existing = check(
+        await supabase
+          .from("category_adjustments")
+          .select("id")
+          .eq("scenario_id", scenarioId)
+          .eq("year", c.year)
+          .eq("category", cat)
+          .maybeSingle(),
+        "category_adjustments select",
+      );
+      console.log(`[GoalSeek]   → category_adjustments[${cat}] = ${pct} (år ${c.year})`);
       if (existing?.id) {
-        await supabase.from("category_adjustments").update({ adjustment_pct: pct }).eq("id", existing.id);
+        check(
+          await supabase.from("category_adjustments").update({ adjustment_pct: pct }).eq("id", existing.id),
+          "category_adjustments update",
+        );
       } else {
-        await supabase.from("category_adjustments").insert({
-          scenario_id: scenarioId,
-          year: c.year,
-          category: cat,
-          adjustment_pct: pct,
-        } as any);
+        check(
+          await supabase.from("category_adjustments").insert({
+            scenario_id: scenarioId,
+            year: c.year,
+            category: cat,
+            adjustment_pct: pct,
+          } as any),
+          "category_adjustments insert",
+        );
       }
       return;
     }
     case "capex": {
-      await supabase.from("capex_plan").insert({
+      const payload = {
         scenario_id: scenarioId,
         year: c.year,
         capex_type: String(d.capex_type ?? "Hardware"),
         amount: Number(d.amount ?? 0),
         description: d.description ?? c.description,
-      } as any);
+      };
+      console.log("[GoalSeek]   → capex_plan insert", payload);
+      check(await supabase.from("capex_plan").insert(payload as any), "capex_plan insert");
       return;
     }
   }
