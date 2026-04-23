@@ -64,7 +64,10 @@ export default function Assumptions() {
   const [loading, setLoading] = useState(true);
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const { toast } = useToast();
+  const autoVersion = useAutoVersion();
+  const initialFingerprint = useRef<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
