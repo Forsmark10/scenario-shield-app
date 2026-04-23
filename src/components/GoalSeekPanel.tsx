@@ -150,6 +150,7 @@ export function GoalSeekPanel({ scenarioId, scenarioName, categories, onApplied 
       return;
     }
     setApplying(true);
+    console.log(`[GoalSeek] Anvender ${picks.length} endringer for scenario ${scenarioName} (${scenarioId})`);
     try {
       // Lagre versjon FØR endringer (sikkerhet for angring).
       try {
@@ -159,25 +160,43 @@ export function GoalSeekPanel({ scenarioId, scenarioName, categories, onApplied 
           data: snap as any,
           summary: `Før AI-anvendelse (${picks.length} endring${picks.length === 1 ? "" : "er"})`,
         });
+        console.log("[GoalSeek] Pre-snapshot lagret i auto_versions");
       } catch (e) {
-        console.warn("Pre-AI snapshot feilet", e);
+        console.warn("[GoalSeek] Pre-AI snapshot feilet", e);
       }
 
       let applied = 0;
+      const failures: { change: AiChange; error: string }[] = [];
       for (const c of picks) {
         try {
+          console.log(`[GoalSeek] Anvender ${c.type} (år ${c.year}) →`, c.details);
           await applyChange(scenarioId, c);
           applied++;
-        } catch (e) {
-          console.error("Klarte ikke anvende endring", c, e);
+        } catch (e: any) {
+          const msg = e?.message ?? String(e);
+          console.error("[GoalSeek] Feil ved anvendelse av endring", c, e);
+          failures.push({ change: c, error: msg });
         }
       }
 
-      toast({ title: `${applied} endring${applied === 1 ? "" : "er"} anvendt til ${scenarioName}` });
+      console.log(`[GoalSeek] Re-fetcher data og re-beregner forecast (${applied}/${picks.length} ok)`);
+      if (failures.length) {
+        toast({
+          title: `${applied}/${picks.length} endringer anvendt`,
+          description: `${failures.length} feilet: ${failures[0].error}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: `${applied} endring${applied === 1 ? "" : "er"} anvendt til ${scenarioName}`,
+          description: "Dashboard er oppdatert.",
+        });
+      }
       setResponse(null);
       setSelected(new Set());
       setGoal("");
       onApplied();
+      console.log("[GoalSeek] Ferdig — dashboard skal være oppdatert");
     } finally {
       setApplying(false);
     }
