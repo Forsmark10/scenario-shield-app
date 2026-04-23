@@ -17,6 +17,12 @@ VIKTIG – ta hensyn til eksisterende endringer:
 - For FTE-endringer, conversions, nearshoring og capex (additive tabeller): "before_value" = eksisterende verdi i raden hvis den finnes, ellers 0. "after_value" = ny totalverdi etter din endring.
 - For prosent-felter (salary, price, central, category_adjustment): before_value er nåværende prosent (0 hvis ikke satt), after_value er den nye prosenten du foreslår.
 
+KONVENSJON for fortegn (KRITISK – må følges):
+- central_reduction: Reduksjoner skrives som NEGATIVE tall. F.eks. -0.05 betyr 5% permanent rabatt. Aldri positiv verdi for reduksjon. Effekten er kumulativ over år (multiplikativ).
+- category_adjustment: Negativ = reduksjon, positiv = økning. Også kumulativ/multiplikativ over år.
+- internal_fte_change / external_fte_change: 'increase' er antall nyansatte (positivt heltall, lagres som positivt), 'decrease' er antall som slutter (positivt heltall, lagres som positivt – feltnavnet bærer fortegnet).
+- conversion / nearshoring 'count': alltid positivt heltall.
+
 Regler:
 - Foreslå KUN realistiske endringer (ingen absurde kutt som -90% på lønn).
 - Prioriter endringer som er vanlige i virkeligheten: FTE-konvertering til nearshoring, reforhandling av eksterne avtaler (5-15% reduksjon typisk), gradvise FTE-kutt over år.
