@@ -539,8 +539,8 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
   return (
     <Section
       title="Central drivere"
-      description="Pris og volum vokser kumulativt år for år. Reduksjon representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere reduksjoner over år multipliseres sammen."
-      tooltip="Pris og volum multipliseres år-for-år (kumulativt). Reduksjon er permanent reforhandling: satt i år Y gjelder den fom Y og alle påfølgende år, og flere reduksjoner multipliseres sammen (ikke adderes)."
+      description="Pris og volum vokser kumulativt år for år. Reduksjon representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere reduksjoner over år multipliseres sammen. Reduksjoner skrives som negative tall (f.eks. −5 for 5% rabatt)."
+      tooltip="Pris og volum multipliseres år-for-år (kumulativt). Reduksjon er permanent reforhandling: satt i år Y gjelder den fom Y og alle påfølgende år, og flere reduksjoner multipliseres sammen. Konvensjon: skriv reduksjon som negativ verdi (−5 = 5% rabatt)."
     >
       <table className="w-full text-xs">
         <thead>
@@ -552,24 +552,40 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d) => (
-            <tr key={d.key} className="border-b">
-              <td className="px-2 py-2">{d.label}</td>
-              {FC_YEARS.map((y) => {
-                const row = get(y);
-                const v = ((row?.[d.key] ?? d.default) * 100);
-                return (
-                  <td key={y} className="px-1 py-1">
-                    <NumCell
-                      value={Number(v.toFixed(2))}
-                      suffix="%"
-                      onCommit={(num) => upsert(y, d.key, num / 100)}
-                    />
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+          {drivers.map((d) => {
+            const isReduction = d.key === "central_reduction_pct";
+            return (
+              <tr key={d.key} className="border-b">
+                <td className="px-2 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <span>{d.label}</span>
+                    {isReduction && (
+                      <InfoTip text="Skriv reduksjoner som negative tall. Eksempel: −5 betyr 5% permanent rabatt fra og med dette året." />
+                    )}
+                  </div>
+                </td>
+                {FC_YEARS.map((y) => {
+                  const row = get(y);
+                  const v = ((row?.[d.key] ?? d.default) * 100);
+                  return (
+                    <td key={y} className="px-1 py-1 align-top">
+                      <NumCell
+                        value={Number(v.toFixed(2))}
+                        suffix="%"
+                        max={isReduction ? 0 : undefined}
+                        errorHint={
+                          isReduction
+                            ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
+                            : undefined
+                        }
+                        onCommit={(num) => upsert(y, d.key, num / 100)}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </Section>
