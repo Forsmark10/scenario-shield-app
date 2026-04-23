@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { InfoTip } from "@/components/InfoTip";
 import { VersionHistoryPanel } from "@/components/VersionHistoryPanel";
+import { GoalSeekPanel } from "@/components/GoalSeekPanel";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
 import { cn } from "@/lib/utils";
 
@@ -195,6 +196,12 @@ export default function Assumptions() {
 
         {data.scenarios.map((s) => (
           <TabsContent key={s.id} value={s.id} className="mt-4 space-y-4">
+            <GoalSeekPanel
+              scenarioId={s.id}
+              scenarioName={s.name}
+              categories={data.categories}
+              onApplied={refresh}
+            />
             <SectionGlobal data={data} scenario={s} patch={patch} />
             <SectionCentral data={data} scenario={s} patch={patch} />
             <SectionInternalFte data={data} scenario={s} patch={patch} />
