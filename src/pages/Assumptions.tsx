@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, History, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import { InfoTip } from "@/components/InfoTip";
+import { VersionHistoryPanel } from "@/components/VersionHistoryPanel";
+import { useAutoVersion } from "@/hooks/useAutoVersion";
 import { cn } from "@/lib/utils";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
@@ -62,7 +64,10 @@ export default function Assumptions() {
   const [loading, setLoading] = useState(true);
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const { toast } = useToast();
+  const autoVersion = useAutoVersion();
+  const initialFingerprint = useRef<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -140,7 +145,13 @@ export default function Assumptions() {
       (next as any)[tbl] = arr;
       return next;
     });
-  }, []);
+    // Trigger auto-versjonering – debounced + 5-min vindu håndteres i hooken.
+    const sid =
+      (action as any).row?.scenario_id ??
+      (action as any).changes?.scenario_id ??
+      activeScenario;
+    if (sid) autoVersion.trigger(sid);
+  }, [autoVersion, activeScenario]);
 
   const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
 
@@ -155,11 +166,22 @@ export default function Assumptions() {
 
   return (
     <div className="p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Assumptions</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Globale drivere, FTE-endringer og capex-plan per scenario. Endringer lagres automatisk.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Assumptions</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Globale drivere, FTE-endringer og capex-plan per scenario. Endringer lagres automatisk.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setHistoryOpen(true)}
+          disabled={!activeScenario}
+        >
+          <History className="h-4 w-4 mr-2" />
+          Historikk
+        </Button>
       </div>
 
       <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
@@ -196,6 +218,19 @@ export default function Assumptions() {
           </TabsContent>
         ))}
       </Tabs>
+
+      {activeScenario && (
+        <VersionHistoryPanel
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          scenarioId={activeScenario}
+          scenarioName={data.scenarios.find((s) => s.id === activeScenario)?.name ?? ""}
+          onRestored={() => {
+            autoVersion.resetWindow(activeScenario);
+            refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
