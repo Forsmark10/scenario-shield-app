@@ -816,12 +816,24 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
                     <td className="px-2 py-1.5 capitalize text-muted-foreground">{type}</td>
                     {FC_YEARS.map((y) => {
                       const c = getChange(y, lvl);
+                      const stored = Number(c?.[type] ?? 0);
+                      const display = type === "decrease" ? -stored : stored;
                       return (
-                        <td key={y} className="px-1 py-1">
+                        <td key={y} className="px-1 py-1 align-top">
                           <NumCell
-                            value={Number(c?.[type] ?? 0)}
+                            value={display}
                             step="1"
-                            onCommit={(v) => upsertChange(y, lvl, type, Math.round(v))}
+                            min={type === "increase" ? 0 : undefined}
+                            max={type === "decrease" ? 0 : undefined}
+                            errorHint={
+                              type === "increase"
+                                ? "Increase må være 0 eller positiv."
+                                : "Decrease må være 0 eller negativ. Skriv −2 for to færre FTE."
+                            }
+                            onCommit={(v) => {
+                              const stored = type === "decrease" ? Math.abs(Math.round(v)) : Math.round(v);
+                              return upsertChange(y, lvl, type, stored);
+                            }}
                           />
                         </td>
                       );
