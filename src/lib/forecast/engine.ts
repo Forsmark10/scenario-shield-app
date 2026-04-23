@@ -78,6 +78,29 @@ function getCatAdj(
   return row?.adjustment_pct ?? 0;
 }
 
+/**
+ * Kumulativ kategori-justering: PRODUCT((1 + adj_Y) for Y from 2027 to N).
+ * En justering er permanent reforhandling – satt i år Y gjelder fra og med Y og alle påfølgende år.
+ * Returnerer { factor, desc } der desc viser bidragene per år for breakdown.
+ */
+function cumulativeCatAdj(
+  adjustments: CategoryAdjustment[],
+  scenarioId: string,
+  category: string,
+  endYear: number
+): { factor: number; desc: string } {
+  let factor = 1;
+  const parts: string[] = [];
+  for (let Y = 2027; Y <= endYear; Y++) {
+    const adj = getCatAdj(adjustments, scenarioId, category, Y);
+    if (adj) {
+      factor *= 1 + adj;
+      parts.push(`(1+${adj}@Y${Y})`);
+    }
+  }
+  return { factor, desc: parts.length ? parts.join("×") : "1" };
+}
+
 function distributeMonthly(annual: number, pattern: number[]): number[] {
   const total = sum(pattern);
   if (total === 0) {
