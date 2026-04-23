@@ -500,3 +500,37 @@ async function applyChange(scenarioId: string, c: AiChange) {
     }
   }
 }
+
+// ---------------------- Formatering "Fra → Til" ----------------------
+function formatBeforeAfter(c: AiChange): string {
+  const d = c.details || {};
+  const isPctType =
+    c.type === "salary_increase" ||
+    c.type === "price_increase" ||
+    c.type === "central_price" ||
+    c.type === "central_volume" ||
+    c.type === "central_reduction" ||
+    c.type === "category_adjustment";
+
+  const fmt = (v: any): string => {
+    if (v === null || v === undefined || v === "") return "—";
+    if (typeof v === "number") {
+      if (isPctType) return `${(v * 100).toFixed(1)}%`;
+      return String(v);
+    }
+    return String(v);
+  };
+
+  const before = d.before_value ?? d.from ?? d.previous;
+  const after =
+    d.after_value ??
+    d.to ??
+    d.pct ??
+    d.adjustment_pct ??
+    d.amount ??
+    d.count ??
+    d.value;
+
+  if (before === undefined && after === undefined) return "—";
+  return `${fmt(before)} → ${fmt(after)}`;
+}
