@@ -524,10 +524,14 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       } else {
         // ===== ØVRIGE LOKALE (Operations, IT Costs, Consultancy, Other operating income) =====
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
-        const adj = getCatAdj(category_adjustments, scenario_id, cl.category, N);
-        const catFactor = 1 + adj;
+        const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
+          category_adjustments,
+          scenario_id,
+          cl.category,
+          N
+        );
         amount = base * priceFactor * catFactor;
-        bd = `${cl.category}: ${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cat(1+${adj})=${round2(catFactor)} = ${round2(amount)}`;
+        bd = `${cl.category}: ${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cum_cat_adj(2027..${N})=${catDesc}=${round2(catFactor)} = ${round2(amount)}`;
       }
 
       line.amounts[N] = amount;
