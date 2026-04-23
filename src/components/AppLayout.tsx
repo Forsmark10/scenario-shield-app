@@ -91,7 +91,7 @@ export default function AppLayout() {
                 onClick={() => setImportOpen(true)}
               >
                 <Upload className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden md:inline">Importer</span>
+                <span className="hidden md:inline">Importer / Oppdater fra Excel</span>
               </Button>
               <Button
                 variant="outline"
