@@ -502,79 +502,10 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     lines.push(line);
   }
 
-  // ---------- VIRTUAL: Nye avskrivninger fra capex_plan ----------
-  const capexTypes: Array<"Hardware" | "Software" | "Prosjekt"> = [
-    "Hardware",
-    "Software",
-    "Prosjekt",
-  ];
-  for (const ct of capexTypes) {
-    const rule = depreciation_rules.find((r) => r.capex_type === ct);
-    if (!rule) continue;
-    const vline: ForecastLine = {
-      line_id: `virtual:depr:${ct}`,
-      source: "virtual",
-      category: "Depreciation",
-      project: `Nye avskrivninger - ${ct}`,
-      account: null,
-      account_name: `Nye avskrivninger - ${ct}`,
-      cost_type: "Local",
-      is_capex: false,
-      is_depreciation: true,
-      base_2026: 0,
-      amounts: {},
-      monthly_2027: [],
-      breakdown_source: {},
-    };
-    for (const N of YEARS) {
-      let amt = 0;
-      const parts: string[] = [];
-      for (const cap of scenarioCapex.filter((c) => c.capex_type === ct)) {
-        const startY = cap.year + 1;
-        const endY = cap.year + rule.depreciation_years;
-        if (N >= startY && N <= endY) {
-          const annual = cap.amount / rule.depreciation_years;
-          amt += annual;
-          parts.push(
-            `Capex Y${cap.year} ${cap.amount}/${rule.depreciation_years} = ${round2(annual)}`
-          );
-        }
-      }
-      vline.amounts[N] = amt;
-      vline.breakdown_source[N] =
-        parts.length > 0 ? parts.join("\n") : `Ingen aktive avskrivninger i ${N}`;
-    }
-    vline.monthly_2027 = Array(12).fill((vline.amounts[2027] ?? 0) / 12);
-    lines.push(vline);
-  }
+  // (Tidligere virtuelle Capex- og Depreciation-linjer er fjernet.
+  // Capex-utbetalinger og nye avskrivninger aggregeres nå direkte inn i
+  // de eksisterende Excel-baserte cost_lines i Capex-/Depreciation-løkken over.)
 
-  // ---------- VIRTUAL: Capex-utbetalinger (Spend-view) ----------
-  for (const ct of capexTypes) {
-    const vline: ForecastLine = {
-      line_id: `virtual:capex:${ct}`,
-      source: "virtual",
-      category: "Capex",
-      project: `Capex - ${ct}`,
-      account: null,
-      account_name: `Capex - ${ct}`,
-      cost_type: "Local",
-      is_capex: true,
-      is_depreciation: false,
-      base_2026: 0,
-      amounts: {},
-      monthly_2027: [],
-      breakdown_source: {},
-    };
-    for (const N of YEARS) {
-      const amt = scenarioCapex
-        .filter((c) => c.capex_type === ct && c.year === N)
-        .reduce((a, c) => a + c.amount, 0);
-      vline.amounts[N] = amt;
-      vline.breakdown_source[N] = `Sum capex_plan ${ct} år ${N} = ${round2(amt)}`;
-    }
-    vline.monthly_2027 = Array(12).fill((vline.amounts[2027] ?? 0) / 12);
-    lines.push(vline);
-  }
 
   // ---------- VIRTUAL: Nearshoring kostnad ----------
   const nsLine: ForecastLine = {
