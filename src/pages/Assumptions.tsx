@@ -14,6 +14,7 @@ import { InfoTip } from "@/components/InfoTip";
 import { VersionHistoryPanel } from "@/components/VersionHistoryPanel";
 import { GoalSeekPanel } from "@/components/GoalSeekPanel";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
+import { useActiveScenario } from "@/hooks/useActiveScenario";
 import { cn } from "@/lib/utils";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
