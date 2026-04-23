@@ -920,7 +920,7 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
                   </Select>
                 </td>
                 <td className="px-1 py-1">
-                  <NumCell value={Number(r.count)} step="1" onCommit={(v) => updateField(r.id, "count", Math.round(v))} />
+                  <NumCell value={Number(r.count)} step="1" min={0} errorHint="Antall må være 0 eller positivt." onCommit={(v) => updateField(r.id, "count", Math.max(0, Math.round(v)))} />
                 </td>
                 <td className="px-1 py-1">
                   <Select value={r.internal_level} onValueChange={(v) => updateField(r.id, "internal_level", v)}>
@@ -1057,7 +1057,7 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
                     </Select>
                   </td>
                   <td className="px-1 py-1">
-                    <NumCell value={Number(r.count)} step="1" onCommit={(v) => updateField(r.id, "count", Math.round(v))} />
+                    <NumCell value={Number(r.count)} step="1" min={0} errorHint="Antall må være 0 eller positivt." onCommit={(v) => updateField(r.id, "count", Math.max(0, Math.round(v)))} />
                   </td>
                   <td className="px-1 py-1 text-center">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(r.id)}>
