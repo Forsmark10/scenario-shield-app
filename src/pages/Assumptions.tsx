@@ -462,11 +462,10 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
   const drivers = [
     { key: "salary_increase_pct", label: "Lønnsvekst %", suffix: "%", scale: 100 },
     { key: "price_increase_pct", label: "Prisvekst %", suffix: "%", scale: 100 },
-    { key: "eur_nok_rate", label: "EUR/NOK-kurs", suffix: "", scale: 1 },
   ];
 
   return (
-    <Section title="Globale drivere" description="Brukes på alle Local-kostnader (lønn, pris, valuta).">
+    <Section title="Globale drivere" description="Brukes på alle Local-kostnader (lønn og pris).">
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b">
@@ -482,7 +481,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
               <td className="px-2 py-2">{d.label}</td>
               {FC_YEARS.map((y) => {
                 const row = get(y);
-                const v = (row?.[d.key] ?? (d.key === "eur_nok_rate" ? 11.5 : d.key === "salary_increase_pct" ? 0.04 : 0.05)) * d.scale;
+                const v = (row?.[d.key] ?? (d.key === "salary_increase_pct" ? 0.04 : 0.05)) * d.scale;
                 return (
                   <td key={y} className="px-1 py-1">
                     <NumCell
