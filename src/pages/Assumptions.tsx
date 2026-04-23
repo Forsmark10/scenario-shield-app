@@ -145,7 +145,13 @@ export default function Assumptions() {
       (next as any)[tbl] = arr;
       return next;
     });
-  }, []);
+    // Trigger auto-versjonering – debounced + 5-min vindu håndteres i hooken.
+    const sid =
+      (action as any).row?.scenario_id ??
+      (action as any).changes?.scenario_id ??
+      activeScenario;
+    if (sid) autoVersion.trigger(sid);
+  }, [autoVersion, activeScenario]);
 
   const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
 
