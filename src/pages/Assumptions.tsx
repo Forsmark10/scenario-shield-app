@@ -947,6 +947,35 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
   const base = data.nearshoringBase;
   const adds = data.nearshoringAdds.filter((n) => n.scenario_id === scenario.id);
 
+  const getGlobal = (year: number) =>
+    data.global.find((g) => g.scenario_id === scenario.id && g.year === year) ?? null;
+
+  const upsertFx = async (year: number, value: number) => {
+    const existing = getGlobal(year);
+    if (existing) {
+      patch({ type: "update", table: "global", id: existing.id, changes: { eur_nok_rate: value } });
+      const { error } = await supabase
+        .from("global_assumptions")
+        .update({ eur_nok_rate: value } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("global_assumptions")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          salary_increase_pct: 0.04,
+          price_increase_pct: 0.05,
+          eur_nok_rate: value,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "global", row: inserted });
+    }
+  };
+
   const updateBase = async (field: string, value: number) => {
     if (base) {
       patch({ type: "setSingleton", table: "nearshoringBase", row: { ...base, [field]: value } });
