@@ -344,14 +344,16 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, cPriceRate);
         const volumeFactor = cumulativeFactor(scenario_id, 2027, N, cVolRate);
         // Reduksjon = permanent reforhandling. En reduksjon satt i år Y gjelder fom Y og alle påfølgende år.
-        // Flere reduksjoner over år multipliseres sammen: PRODUCT((1 - red_Y) for Y from 2027 to N).
+        // KONVENSJON: reduction_pct lagres med fortegn som matcher betydningen.
+        // Negativ verdi (f.eks. -0.05) = 5% rabatt. Positiv verdi = økning (sjelden, men tillatt).
+        // Formel: PRODUCT((1 + red_Y) for Y from 2027 to N).
         const reductionParts: string[] = [];
         let reductionFactor = 1;
         for (let Y = 2027; Y <= N; Y++) {
           const redY = getCentral(central_assumptions, scenario_id, Y).central_reduction_pct;
           if (redY) {
-            reductionFactor *= 1 - redY;
-            reductionParts.push(`(1-${redY}@Y${Y})`);
+            reductionFactor *= 1 + redY;
+            reductionParts.push(`(1${redY >= 0 ? "+" : ""}${redY}@Y${Y})`);
           }
         }
         amount = base * reductionFactor * priceFactor * volumeFactor;
