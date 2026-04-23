@@ -296,6 +296,15 @@ export default function Dashboard() {
         excludedCats={excludedCats}
       />
 
+      {/* Savings */}
+      <SavingsSection
+        scenarios={scenarios}
+        view={view}
+        typeFilter={typeFilter}
+        excludedCats={excludedCats}
+        allCategories={allCategories}
+      />
+
       {/* Detail table */}
       <Collapsible open={tableOpen} onOpenChange={setTableOpen}>
         <Card>
@@ -761,5 +770,292 @@ function DetailTable({
         </tfoot>
       </table>
     </div>
+  );
+}
+
+// ----------------- Savings section -----------------
+
+function computeScenarioYearByCategory(
+  bundle: ScenarioBundle,
+  view: ViewMode,
+  typeFilter: TypeFilter,
+  excludedCategories: Set<string>,
+): Record<string, Record<number, number>> {
+  const lines = bundle.result.lines.filter((l) => {
+    if (typeFilter !== "all" && l.cost_type !== typeFilter) return false;
+    if (excludedCategories.has(l.category)) return false;
+    if (view === "PL" && l.is_capex) return false;
+    if (view === "Spend" && l.is_depreciation) return false;
+    return true;
+  });
+  const out: Record<string, Record<number, number>> = {};
+  for (const l of lines) {
+    if (!out[l.category]) out[l.category] = {};
+    for (const y of FC_YEARS) {
+      out[l.category][y] = (out[l.category][y] ?? 0) + (l.amounts[y] ?? 0);
+    }
+  }
+  return out;
+}
+
+function SavingsSection({
+  scenarios,
+  view,
+  typeFilter,
+  excludedCats,
+  allCategories,
+}: {
+  scenarios: ScenarioBundle[];
+  view: ViewMode;
+  typeFilter: TypeFilter;
+  excludedCats: Set<string>;
+  allCategories: string[];
+}) {
+  const steady = useMemo(() => {
+    return (
+      scenarios.find((s) => /steady/i.test(s.meta.name)) ??
+      scenarios[0] ??
+      null
+    );
+  }, [scenarios]);
+
+  const others = useMemo(
+    () => scenarios.filter((s) => s.meta.id !== steady?.meta.id),
+    [scenarios, steady],
+  );
+
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string>("");
+  const effectiveSelectedId = selectedScenarioId || others[0]?.meta.id || "";
+
+  const savingsByScenarioYear = useMemo(() => {
+    if (!steady) return {} as Record<string, Record<number, number>>;
+    const steadyByCat = computeScenarioYearByCategory(steady, view, typeFilter, excludedCats);
+    const result: Record<string, Record<number, number>> = {};
+    for (const sc of others) {
+      const scByCat = computeScenarioYearByCategory(sc, view, typeFilter, excludedCats);
+      const yearMap: Record<number, number> = {};
+      for (const y of FC_YEARS) {
+        let savings = 0;
+        const cats = new Set([...Object.keys(steadyByCat), ...Object.keys(scByCat)]);
+        for (const cat of cats) {
+          const a = steadyByCat[cat]?.[y] ?? 0;
+          const b = scByCat[cat]?.[y] ?? 0;
+          savings += a - b;
+        }
+        yearMap[y] = savings;
+      }
+      result[sc.meta.id] = yearMap;
+    }
+    return result;
+  }, [steady, others, view, typeFilter, excludedCats]);
+
+  const savingsByCategory = useMemo(() => {
+    if (!steady) return {} as Record<string, Record<number, number>>;
+    const sc = others.find((s) => s.meta.id === effectiveSelectedId);
+    if (!sc) return {};
+    const steadyByCat = computeScenarioYearByCategory(steady, view, typeFilter, excludedCats);
+    const scByCat = computeScenarioYearByCategory(sc, view, typeFilter, excludedCats);
+    const cats = new Set([...Object.keys(steadyByCat), ...Object.keys(scByCat)]);
+    const result: Record<string, Record<number, number>> = {};
+    for (const cat of cats) {
+      const yearMap: Record<number, number> = {};
+      for (const y of FC_YEARS) {
+        const a = steadyByCat[cat]?.[y] ?? 0;
+        const b = scByCat[cat]?.[y] ?? 0;
+        yearMap[y] = a - b;
+      }
+      result[cat] = yearMap;
+    }
+    return result;
+  }, [steady, others, effectiveSelectedId, view, typeFilter, excludedCats]);
+
+  if (!steady || others.length === 0) return null;
+
+  const lineData = FC_YEARS.map((y) => {
+    const row: Record<string, number | string> = { year: `FC ${y}` };
+    others.forEach((sc) => {
+      row[sc.meta.name] = toM(savingsByScenarioYear[sc.meta.id]?.[y] ?? 0);
+    });
+    return row;
+  });
+
+  const stackedCats = sortByStackOrder(
+    Object.keys(savingsByCategory).filter((c) => !excludedCats.has(c) && allCategories.includes(c)),
+  );
+  const stackedData = FC_YEARS.map((y) => {
+    const row: Record<string, number | string> = { year: `FC ${y}` };
+    stackedCats.forEach((c) => {
+      row[c] = toM(savingsByCategory[c]?.[y] ?? 0);
+    });
+    return row;
+  });
+
+  const selectedScenario = others.find((s) => s.meta.id === effectiveSelectedId) ?? others[0];
+  const sel2031 = toM(savingsByScenarioYear[selectedScenario.meta.id]?.[2031] ?? 0);
+  const selCum = FC_YEARS.reduce(
+    (a, y) => a + toM(savingsByScenarioYear[selectedScenario.meta.id]?.[y] ?? 0),
+    0,
+  );
+  const catTotals: Array<{ cat: string; total: number }> = Object.entries(savingsByCategory).map(
+    ([cat, yearMap]) => ({
+      cat,
+      total: FC_YEARS.reduce((a, y) => a + toM(yearMap[y] ?? 0), 0),
+    }),
+  );
+  catTotals.sort((a, b) => b.total - a.total);
+  const topCat = catTotals[0];
+
+  const lineYDomain: [number | string, number | string] = (() => {
+    const vals: number[] = [];
+    lineData.forEach((row) => {
+      others.forEach((sc) => {
+        const v = row[sc.meta.name];
+        if (typeof v === "number" && Number.isFinite(v)) vals.push(v);
+      });
+    });
+    vals.push(0);
+    if (vals.length === 0) return [0, "auto"];
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const range = max - min || Math.abs(max) || 1;
+    const pad = range * 0.1;
+    return [Math.floor(min - pad), Math.ceil(max + pad)];
+  })();
+
+  return (
+    <Card>
+      <CardContent className="pt-5">
+        <div className="flex items-baseline justify-between flex-wrap gap-2 mb-4">
+          <div>
+            <h2 className="text-[15px] font-medium tracking-tight">Besparelser</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Netto-effekt vs Steady State (positivt = besparelse)
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Scenario</span>
+            <Select value={effectiveSelectedId} onValueChange={(v) => setSelectedScenarioId(v)}>
+              <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {others.map((sc) => (
+                  <SelectItem key={sc.meta.id} value={sc.meta.id}>{sc.meta.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+          <div className="rounded-lg border bg-muted/20 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Besparelse 2031</div>
+            <div className={cn(
+              "text-xl font-semibold tabular-nums mt-1",
+              sel2031 >= 0 ? "text-[hsl(var(--positive))]" : "text-destructive",
+            )}>
+              {formatNumberNO(sel2031, 1)} MNOK
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">{selectedScenario.meta.name}</div>
+          </div>
+          <div className="rounded-lg border bg-muted/20 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Akkumulert 2027–2031</div>
+            <div className={cn(
+              "text-xl font-semibold tabular-nums mt-1",
+              selCum >= 0 ? "text-[hsl(var(--positive))]" : "text-destructive",
+            )}>
+              {formatNumberNO(selCum, 1)} MNOK
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">Sum over hele perioden</div>
+          </div>
+          <div className="rounded-lg border bg-muted/20 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Største besparelses-kategori</div>
+            <div className="text-xl font-semibold tabular-nums mt-1 truncate">
+              {topCat ? topCat.cat : "—"}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
+              {topCat ? `${formatNumberNO(topCat.total, 1)} MNOK akkumulert` : ""}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-2">Besparelser per år (MNOK)</div>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={lineData} margin={{ top: 12, right: 16, bottom: 4, left: 0 }}>
+                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    domain={lineYDomain}
+                    tickFormatter={(v) => formatNumberNO(v, 0)}
+                  />
+                  <Tooltip formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={10} />
+                  {others.map((sc, i) => {
+                    const idx = scenarios.findIndex((s) => s.meta.id === sc.meta.id);
+                    return (
+                      <Line
+                        key={sc.meta.id}
+                        type="monotone"
+                        dataKey={sc.meta.name}
+                        stroke={SCENARIO_COLOR[idx >= 0 ? idx : i + 1]}
+                        strokeWidth={2.5}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                      />
+                    );
+                  })}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-2">
+              Besparelser per kategori — {selectedScenario.meta.name}
+            </div>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stackedData} margin={{ top: 12, right: 16, bottom: 4, left: 0 }}>
+                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} />
+                  <XAxis dataKey="year" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => formatNumberNO(v, 0)}
+                  />
+                  <Tooltip formatter={(v: number, name: string) => [`${formatNumberNO(v, 1)} MNOK`, name]} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={10} />
+                  {stackedCats.map((c) => (
+                    <Bar key={c} dataKey={c} stackId="savings" fill={colorForCategory(c)}>
+                      {stackedData.map((row, idx) => {
+                        const v = Number(row[c] ?? 0);
+                        return (
+                          <Cell
+                            key={`${c}-${idx}`}
+                            fill={colorForCategory(c)}
+                            fillOpacity={v < 0 ? 0.4 : 1}
+                          />
+                        );
+                      })}
+                    </Bar>
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground mt-3 italic">
+          Netto-effekter av konverteringer og nearshoring er aggregert: f.eks. besparelse fra fjernet ekstern
+          minus kost av ny intern/nearshoring vises som én netto-besparelse. Negative verdier indikerer at nye
+          investeringer/kostnader overstiger besparelsene i det året.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
