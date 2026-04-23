@@ -296,7 +296,7 @@ async function applyChange(scenarioId: string, c: AiChange) {
         .maybeSingle();
       const pct = Number(d.pct ?? d.value ?? 0);
       if (existing?.id) {
-        await supabase.from("global_assumptions").update({ [field]: pct }).eq("id", existing.id);
+        await supabase.from("global_assumptions").update({ [field]: pct } as any).eq("id", existing.id);
       } else {
         await supabase.from("global_assumptions").insert({
           scenario_id: scenarioId,
@@ -323,7 +323,7 @@ async function applyChange(scenarioId: string, c: AiChange) {
         .maybeSingle();
       const pct = Number(d.pct ?? d.value ?? 0);
       if (existing?.id) {
-        await supabase.from("central_assumptions").update({ [field]: pct }).eq("id", existing.id);
+        await supabase.from("central_assumptions").update({ [field]: pct } as any).eq("id", existing.id);
       } else {
         await supabase.from("central_assumptions").insert({
           scenario_id: scenarioId,
