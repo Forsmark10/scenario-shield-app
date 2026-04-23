@@ -296,6 +296,15 @@ export default function Dashboard() {
         excludedCats={excludedCats}
       />
 
+      {/* Savings */}
+      <SavingsSection
+        scenarios={scenarios}
+        view={view}
+        typeFilter={typeFilter}
+        excludedCats={excludedCats}
+        allCategories={allCategories}
+      />
+
       {/* Detail table */}
       <Collapsible open={tableOpen} onOpenChange={setTableOpen}>
         <Card>
