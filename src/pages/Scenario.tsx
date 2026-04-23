@@ -90,7 +90,12 @@ export default function Scenario() {
       .then(({ data }) => {
         if (data) {
           setScenarios(data);
-          if (!scenarioId && data.length) setScenarioId(data[0].id);
+          if (!scenarioId && data.length) {
+            const valid = storedScenario && data.some((s) => s.id === storedScenario);
+            const initial = valid ? storedScenario! : data[0].id;
+            setScenarioIdState(initial);
+            if (!valid) setStoredScenario(initial);
+          }
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
