@@ -373,78 +373,13 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           bd = `Øvrig Internal FTE: ${round2(base)} × cum_salary(2027..${N})=${round2(salaryFactor)} = ${round2(amount)}`;
         }
       } else if (cl.category === "External FTE") {
-        // ===== EXTERNAL FTE =====
+        // ===== EXTERNAL FTE (per-linje) =====
+        // Kun baseline-prisvekst og kumulativ kategori-justering påvirker
+        // den enkelte eksisterende External FTE-linjen. FTE-endringer,
+        // konverteringer og nearshoring legges på som SAMLEDE virtuelle
+        // linjer lenger ned (slik at de ikke fordeles per cost_line).
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
-        let amt = base * priceFactor;
-        const parts = [
-          `base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} → ${round2(amt)}`,
-        ];
-
-        // FTE-endringer ekstern
-        for (let Y = 2027; Y <= N; Y++) {
-          const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
-          for (const lvl of LEVELS) {
-            const net = getFteNetChange(extChangeIndex, Y, lvl);
-            if (net === 0) continue;
-            const r = extRate(lvl);
-            const annual = r.base_monthly_cost * r.working_months;
-            const delta = net * annual * grown;
-            amt += delta;
-            parts.push(
-              `+ Y${Y} ${lvl} net=${net} × annual=${annual} × cum(${Y}..${N})=${round2(grown)} = ${round2(delta)}`
-            );
-          }
-        }
-
-        // Konverteringer reduserer ekstern
-        for (let Y = 2027; Y <= N; Y++) {
-          const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
-          for (const conv of scenarioConversions.filter((c) => c.year === Y)) {
-            const r = extRate(conv.external_level);
-            const annual = r.base_monthly_cost * r.working_months;
-            if (Y === N) {
-              const removed = conv.count * annual * grown;
-              const overlap =
-                conv.count * r.base_monthly_cost * conv.overlap_months * grown;
-              amt -= removed;
-              amt += overlap;
-              parts.push(
-                `- Konv Y${Y} fjern ekstern ${conv.external_level} ×${conv.count} = -${round2(removed)} + overlap ${conv.overlap_months}m = +${round2(overlap)}`
-              );
-            } else {
-              const removed = conv.count * annual * grown;
-              amt -= removed;
-              parts.push(
-                `- Konv Y${Y} (etter) fjern ekstern ×${conv.count} = -${round2(removed)}`
-              );
-            }
-          }
-        }
-
-        // Nearshoring erstatter eksterne
-        for (let Y = 2027; Y <= N; Y++) {
-          const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
-          for (const ns of scenarioNearshoring.filter((n) => n.year === Y)) {
-            const r = extRate(ns.replaces_external_level);
-            const annual = r.base_monthly_cost * r.working_months;
-            if (Y === N) {
-              const removed = ns.count * annual * grown;
-              const overlap =
-                ns.count * r.base_monthly_cost * ns.overlap_months * grown;
-              amt -= removed;
-              amt += overlap;
-              parts.push(
-                `- Nearshoring Y${Y} fjern ekstern ${ns.replaces_external_level} ×${ns.count} = -${round2(removed)} + overlap = +${round2(overlap)}`
-              );
-            } else {
-              const removed = ns.count * annual * grown;
-              amt -= removed;
-              parts.push(`- Nearshoring Y${Y} fjern ×${ns.count} = -${round2(removed)}`);
-            }
-          }
-        }
-
-        // Kategori-justering (kumulativ – permanent reforhandling)
+        const amt = base * priceFactor;
         const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
           category_adjustments,
           scenario_id,
@@ -452,7 +387,7 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           N
         );
         amount = amt * catFactor;
-        bd = `External FTE:\n${parts.join("\n")}\n× cum_cat_adj(2027..${N})=${catDesc}=${round2(catFactor)} = ${round2(amount)}`;
+        bd = `External FTE (linje): base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amount)}`;
       } else if (cl.category === "Depreciation") {
         // ===== DEPRECIATION (existing) =====
         if (cl.is_existing_depreciation_alfa) {
