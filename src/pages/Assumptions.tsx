@@ -462,11 +462,10 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
   const drivers = [
     { key: "salary_increase_pct", label: "Lønnsvekst %", suffix: "%", scale: 100 },
     { key: "price_increase_pct", label: "Prisvekst %", suffix: "%", scale: 100 },
-    { key: "eur_nok_rate", label: "EUR/NOK-kurs", suffix: "", scale: 1 },
   ];
 
   return (
-    <Section title="Globale drivere" description="Brukes på alle Local-kostnader (lønn, pris, valuta).">
+    <Section title="Globale drivere" description="Brukes på alle Local-kostnader (lønn og pris).">
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b">
@@ -482,7 +481,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
               <td className="px-2 py-2">{d.label}</td>
               {FC_YEARS.map((y) => {
                 const row = get(y);
-                const v = (row?.[d.key] ?? (d.key === "eur_nok_rate" ? 11.5 : d.key === "salary_increase_pct" ? 0.04 : 0.05)) * d.scale;
+                const v = (row?.[d.key] ?? (d.key === "salary_increase_pct" ? 0.04 : 0.05)) * d.scale;
                 return (
                   <td key={y} className="px-1 py-1">
                     <NumCell
@@ -948,6 +947,35 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
   const base = data.nearshoringBase;
   const adds = data.nearshoringAdds.filter((n) => n.scenario_id === scenario.id);
 
+  const getGlobal = (year: number) =>
+    data.global.find((g) => g.scenario_id === scenario.id && g.year === year) ?? null;
+
+  const upsertFx = async (year: number, value: number) => {
+    const existing = getGlobal(year);
+    if (existing) {
+      patch({ type: "update", table: "global", id: existing.id, changes: { eur_nok_rate: value } });
+      const { error } = await supabase
+        .from("global_assumptions")
+        .update({ eur_nok_rate: value } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("global_assumptions")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          salary_increase_pct: 0.04,
+          price_increase_pct: 0.05,
+          eur_nok_rate: value,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "global", row: inserted });
+    }
+  };
+
   const updateBase = async (field: string, value: number) => {
     if (base) {
       patch({ type: "setSingleton", table: "nearshoringBase", row: { ...base, [field]: value } });
@@ -995,8 +1023,8 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
   return (
     <Section
       title="Nearshoring"
-      description="Faktureres i EUR per år, konverteres med valutakurs."
-      tooltip="Nearshoring-ressurser erstatter eksterne. Kostnaden er i EUR og bruker valutakursen fra Globale drivere. Overlapp gir doble kostnader i innfasingsperioden."
+      description="Faktureres i EUR per år, konverteres med EUR/NOK-kurs per år."
+      tooltip="Nearshoring-ressurser erstatter eksterne. Kostnaden er i EUR og konverteres med EUR/NOK-kursen for det aktuelle året. Overlapp gir doble kostnader i innfasingsperioden."
     >
       <div className="space-y-5">
         <div>
@@ -1021,6 +1049,40 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
               />
             </div>
           </div>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            EUR/NOK-kurs per år
+          </h3>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b">
+                {FC_YEARS.map((y) => (
+                  <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {FC_YEARS.map((y) => {
+                  const row = getGlobal(y);
+                  const v = Number(row?.eur_nok_rate ?? 11.5);
+                  return (
+                    <td key={y} className="px-1 py-1">
+                      <NumCell
+                        value={Number(v.toFixed(3))}
+                        step="0.01"
+                        min={0}
+                        errorHint="Valutakurs må være ≥ 0."
+                        onCommit={(num) => upsertFx(y, num)}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <div>
