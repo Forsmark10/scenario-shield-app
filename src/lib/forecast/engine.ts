@@ -442,11 +442,15 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           }
         }
 
-        // Kategori-justering
-        const adj = getCatAdj(category_adjustments, scenario_id, "External FTE", N);
-        const catFactor = 1 + adj;
+        // Kategori-justering (kumulativ – permanent reforhandling)
+        const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
+          category_adjustments,
+          scenario_id,
+          "External FTE",
+          N
+        );
         amount = amt * catFactor;
-        bd = `External FTE:\n${parts.join("\n")}\n× cat_adj(1+${adj})=${round2(catFactor)} = ${round2(amount)}`;
+        bd = `External FTE:\n${parts.join("\n")}\n× cum_cat_adj(2027..${N})=${catDesc}=${round2(catFactor)} = ${round2(amount)}`;
       } else if (cl.category === "Depreciation") {
         // ===== DEPRECIATION (existing) =====
         if (cl.is_existing_depreciation_alfa) {
