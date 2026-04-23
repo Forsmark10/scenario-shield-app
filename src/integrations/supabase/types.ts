@@ -41,6 +41,33 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_versions: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          scenario_id: string
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          scenario_id: string
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          scenario_id?: string
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       capex_plan: {
         Row: {
           amount: number
@@ -595,7 +622,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      prune_old_auto_versions: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
