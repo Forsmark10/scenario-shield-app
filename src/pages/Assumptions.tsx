@@ -113,13 +113,27 @@ export default function Assumptions() {
         categories: cats,
       };
       setData(next);
-      if (!activeScenario && next.scenarios.length) setActiveScenario(next.scenarios[0].id);
+      if (!activeScenario && next.scenarios.length) {
+        // Foretrekk lagret scenario hvis det fortsatt finnes blant aktive scenarier.
+        const valid = storedScenario && next.scenarios.some((s) => s.id === storedScenario);
+        const initial = valid ? storedScenario! : next.scenarios[0].id;
+        setActiveScenarioState(initial);
+        if (!valid) setStoredScenario(initial);
+      }
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
   }, [reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setActiveScenario = useCallback(
+    (id: string) => {
+      setActiveScenarioState(id);
+      setStoredScenario(id);
+    },
+    [setStoredScenario],
+  );
 
   const patch = useCallback<Patch>((action) => {
     setData((prev) => {
