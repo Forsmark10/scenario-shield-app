@@ -480,8 +480,8 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
   return (
     <Section
       title="Central drivere"
-      description="Pris og volum vokser kumulativt. Reduksjon trekkes fra til slutt og er ikke kumulativ."
-      tooltip="Pris- og volumøkninger multipliseres år-for-år (kumulativt). Reduksjonen trekkes fra det endelige tallet og påvirker ikke neste år. Brukes på Central-kostnader."
+      description="Pris og volum vokser kumulativt år for år. Reduksjon representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere reduksjoner over år multipliseres sammen."
+      tooltip="Pris og volum multipliseres år-for-år (kumulativt). Reduksjon er permanent reforhandling: satt i år Y gjelder den fom Y og alle påfølgende år, og flere reduksjoner multipliseres sammen (ikke adderes)."
     >
       <table className="w-full text-xs">
         <thead>
