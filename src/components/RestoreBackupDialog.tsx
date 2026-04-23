@@ -127,7 +127,7 @@ export function RestoreBackupDialog({ backup, onOpenChange, onRestored }: Props)
                   count={diff.added.length}
                 />
                 <Section
-                  icon={<Pencil className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
+                  icon={<Pencil className="h-4 w-4 text-[hsl(var(--warning))]" />}
                   title="Rader som endres tilbake"
                   count={diff.changed.length}
                 />

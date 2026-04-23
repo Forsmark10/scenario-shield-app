@@ -252,7 +252,7 @@ export function ImportDialog({ open, onOpenChange, onImported }: ImportDialogPro
                 </DiffSection>
 
                 <DiffSection
-                  icon={<Pencil className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
+                  icon={<Pencil className="h-4 w-4 text-[hsl(var(--warning))]" />}
                   title="Endrede rader"
                   count={diff.changed.length}
                   defaultOpen={diff.changed.length > 0 && diff.changed.length <= 30}

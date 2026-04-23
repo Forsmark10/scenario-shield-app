@@ -81,6 +81,7 @@ All colors MUST be HSL.
 
     --positive: 152 65% 35%;
     --negative: 0 75% 50%;
+    --warning: 38 92% 42%;
   }
 
   .dark {
