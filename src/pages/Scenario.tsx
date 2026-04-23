@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useForecast } from "@/hooks/useForecast";
 import { useAllScenarios } from "@/hooks/useAllScenarios";
 import { useAppSettings } from "@/hooks/useAppSettings";
+import { useActiveScenario } from "@/hooks/useActiveScenario";
 import { formatUnit, type Unit } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { exportWorkbook } from "@/lib/excelExport";
@@ -41,7 +42,12 @@ export default function Scenario() {
   const allScenarios = useAllScenarios();
   const [unit, setUnit] = useState<Unit>("tNOK");
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
-  const [scenarioId, setScenarioId] = useState<string | null>(null);
+  const [scenarioId, setScenarioIdState] = useState<string | null>(null);
+  const [storedScenario, setStoredScenario] = useActiveScenario();
+  const setScenarioId = (id: string) => {
+    setScenarioIdState(id);
+    setStoredScenario(id);
+  };
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -84,7 +90,12 @@ export default function Scenario() {
       .then(({ data }) => {
         if (data) {
           setScenarios(data);
-          if (!scenarioId && data.length) setScenarioId(data[0].id);
+          if (!scenarioId && data.length) {
+            const valid = storedScenario && data.some((s) => s.id === storedScenario);
+            const initial = valid ? storedScenario! : data[0].id;
+            setScenarioIdState(initial);
+            if (!valid) setStoredScenario(initial);
+          }
         }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -14,6 +14,7 @@ import { InfoTip } from "@/components/InfoTip";
 import { VersionHistoryPanel } from "@/components/VersionHistoryPanel";
 import { GoalSeekPanel } from "@/components/GoalSeekPanel";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
+import { useActiveScenario } from "@/hooks/useActiveScenario";
 import { cn } from "@/lib/utils";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
@@ -63,7 +64,8 @@ export type Patch = (action: PatchAction) => void;
 export default function Assumptions() {
   const [data, setData] = useState<AllData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeScenario, setActiveScenario] = useState<string | null>(null);
+  const [activeScenario, setActiveScenarioState] = useState<string | null>(null);
+  const [storedScenario, setStoredScenario] = useActiveScenario();
   const [reloadKey, setReloadKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const { toast } = useToast();
@@ -111,13 +113,27 @@ export default function Assumptions() {
         categories: cats,
       };
       setData(next);
-      if (!activeScenario && next.scenarios.length) setActiveScenario(next.scenarios[0].id);
+      if (!activeScenario && next.scenarios.length) {
+        // Foretrekk lagret scenario hvis det fortsatt finnes blant aktive scenarier.
+        const valid = storedScenario && next.scenarios.some((s) => s.id === storedScenario);
+        const initial = valid ? storedScenario! : next.scenarios[0].id;
+        setActiveScenarioState(initial);
+        if (!valid) setStoredScenario(initial);
+      }
       setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
   }, [reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setActiveScenario = useCallback(
+    (id: string) => {
+      setActiveScenarioState(id);
+      setStoredScenario(id);
+    },
+    [setStoredScenario],
+  );
 
   const patch = useCallback<Patch>((action) => {
     setData((prev) => {
@@ -293,6 +309,7 @@ function NumCell({
   min,
   max,
   className,
+  errorHint,
 }: {
   value: number;
   onCommit: (v: number) => Promise<void> | void;
@@ -301,9 +318,12 @@ function NumCell({
   min?: number;
   max?: number;
   className?: string;
+  /** Vist under feltet hvis brukeren skriver en verdi utenfor min/max. */
+  errorHint?: string;
 }) {
   const [local, setLocal] = useState(String(value ?? 0));
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const timer = useRef<NodeJS.Timeout>();
   const inputRef = useRef<HTMLInputElement>(null);
   const isFocusedRef = useRef(false);
@@ -315,10 +335,30 @@ function NumCell({
     setLocal(String(value ?? 0));
   }, [value]);
 
+  const validate = useCallback(
+    (num: number): string | null => {
+      if (min !== undefined && num < min) {
+        return errorHint ?? `Verdien må være ≥ ${min}.`;
+      }
+      if (max !== undefined && num > max) {
+        return errorHint ?? `Verdien må være ≤ ${max}.`;
+      }
+      return null;
+    },
+    [min, max, errorHint],
+  );
+
   const commit = useCallback(
     (raw: string) => {
       const num = Number(raw.replace(",", "."));
       if (isNaN(num)) return;
+      const err = validate(num);
+      if (err) {
+        setError(err);
+        sonnerToast.error("Ugyldig verdi", { description: err, duration: 2500 });
+        return;
+      }
+      setError(null);
       setSaving(true);
       Promise.resolve(onCommit(num))
         .then(() => {
@@ -330,7 +370,7 @@ function NumCell({
         })
         .finally(() => setSaving(false));
     },
-    [onCommit],
+    [onCommit, validate],
   );
 
   return (
@@ -348,6 +388,14 @@ function NumCell({
         onChange={(e) => {
           isDirtyRef.current = true;
           setLocal(e.target.value);
+          // Live-validering for umiddelbar feedback
+          const num = Number(e.target.value.replace(",", "."));
+          if (!isNaN(num)) {
+            const err = validate(num);
+            setError(err);
+          } else {
+            setError(null);
+          }
           if (timer.current) clearTimeout(timer.current);
           timer.current = setTimeout(() => commit(e.target.value), 500);
         }}
@@ -356,12 +404,23 @@ function NumCell({
           if (timer.current) clearTimeout(timer.current);
           if (isDirtyRef.current) commit(local);
         }}
-        className={cn("h-8 text-xs text-right tabular-nums font-mono", suffix && "pr-6", saving && "ring-1 ring-primary/30")}
+        className={cn(
+          "h-8 text-xs text-right tabular-nums font-mono",
+          suffix && "pr-6",
+          saving && "ring-1 ring-primary/30",
+          error && "border-destructive ring-1 ring-destructive/40",
+        )}
+        aria-invalid={!!error}
       />
       {suffix && (
         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">
           {suffix}
         </span>
+      )}
+      {error && (
+        <p className="mt-0.5 text-[10px] leading-tight text-destructive whitespace-normal">
+          {error}
+        </p>
       )}
     </div>
   );
@@ -480,8 +539,8 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
   return (
     <Section
       title="Central drivere"
-      description="Pris og volum vokser kumulativt år for år. Reduksjon representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere reduksjoner over år multipliseres sammen."
-      tooltip="Pris og volum multipliseres år-for-år (kumulativt). Reduksjon er permanent reforhandling: satt i år Y gjelder den fom Y og alle påfølgende år, og flere reduksjoner multipliseres sammen (ikke adderes)."
+      description="Pris og volum vokser kumulativt år for år. Reduksjon representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere reduksjoner over år multipliseres sammen. Reduksjoner skrives som negative tall (f.eks. −5 for 5% rabatt)."
+      tooltip="Pris og volum multipliseres år-for-år (kumulativt). Reduksjon er permanent reforhandling: satt i år Y gjelder den fom Y og alle påfølgende år, og flere reduksjoner multipliseres sammen. Konvensjon: skriv reduksjon som negativ verdi (−5 = 5% rabatt)."
     >
       <table className="w-full text-xs">
         <thead>
@@ -493,24 +552,40 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d) => (
-            <tr key={d.key} className="border-b">
-              <td className="px-2 py-2">{d.label}</td>
-              {FC_YEARS.map((y) => {
-                const row = get(y);
-                const v = ((row?.[d.key] ?? d.default) * 100);
-                return (
-                  <td key={y} className="px-1 py-1">
-                    <NumCell
-                      value={Number(v.toFixed(2))}
-                      suffix="%"
-                      onCommit={(num) => upsert(y, d.key, num / 100)}
-                    />
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+          {drivers.map((d) => {
+            const isReduction = d.key === "central_reduction_pct";
+            return (
+              <tr key={d.key} className="border-b">
+                <td className="px-2 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <span>{d.label}</span>
+                    {isReduction && (
+                      <InfoTip text="Skriv reduksjoner som negative tall. Eksempel: −5 betyr 5% permanent rabatt fra og med dette året." />
+                    )}
+                  </div>
+                </td>
+                {FC_YEARS.map((y) => {
+                  const row = get(y);
+                  const v = ((row?.[d.key] ?? d.default) * 100);
+                  return (
+                    <td key={y} className="px-1 py-1 align-top">
+                      <NumCell
+                        value={Number(v.toFixed(2))}
+                        suffix="%"
+                        max={isReduction ? 0 : undefined}
+                        errorHint={
+                          isReduction
+                            ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
+                            : undefined
+                        }
+                        onCommit={(num) => upsert(y, d.key, num / 100)}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </Section>
@@ -614,12 +689,25 @@ function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario
                     <td className="px-2 py-1.5 capitalize text-muted-foreground">{type}</td>
                     {FC_YEARS.map((y) => {
                       const c = getChange(y, lvl);
+                      const stored = Number(c?.[type] ?? 0);
+                      // Decrease lagres som positivt antall i DB, men brukeren skal skrive negativt.
+                      const display = type === "decrease" ? -stored : stored;
                       return (
-                        <td key={y} className="px-1 py-1">
+                        <td key={y} className="px-1 py-1 align-top">
                           <NumCell
-                            value={Number(c?.[type] ?? 0)}
+                            value={display}
                             step="1"
-                            onCommit={(v) => upsertChange(y, lvl, type, Math.round(v))}
+                            min={type === "increase" ? 0 : undefined}
+                            max={type === "decrease" ? 0 : undefined}
+                            errorHint={
+                              type === "increase"
+                                ? "Increase må være 0 eller positiv."
+                                : "Decrease må være 0 eller negativ. Skriv −2 for to færre FTE."
+                            }
+                            onCommit={(v) => {
+                              const stored = type === "decrease" ? Math.abs(Math.round(v)) : Math.round(v);
+                              return upsertChange(y, lvl, type, stored);
+                            }}
                           />
                         </td>
                       );
@@ -728,12 +816,24 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
                     <td className="px-2 py-1.5 capitalize text-muted-foreground">{type}</td>
                     {FC_YEARS.map((y) => {
                       const c = getChange(y, lvl);
+                      const stored = Number(c?.[type] ?? 0);
+                      const display = type === "decrease" ? -stored : stored;
                       return (
-                        <td key={y} className="px-1 py-1">
+                        <td key={y} className="px-1 py-1 align-top">
                           <NumCell
-                            value={Number(c?.[type] ?? 0)}
+                            value={display}
                             step="1"
-                            onCommit={(v) => upsertChange(y, lvl, type, Math.round(v))}
+                            min={type === "increase" ? 0 : undefined}
+                            max={type === "decrease" ? 0 : undefined}
+                            errorHint={
+                              type === "increase"
+                                ? "Increase må være 0 eller positiv."
+                                : "Decrease må være 0 eller negativ. Skriv −2 for to færre FTE."
+                            }
+                            onCommit={(v) => {
+                              const stored = type === "decrease" ? Math.abs(Math.round(v)) : Math.round(v);
+                              return upsertChange(y, lvl, type, stored);
+                            }}
                           />
                         </td>
                       );
@@ -820,7 +920,7 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
                   </Select>
                 </td>
                 <td className="px-1 py-1">
-                  <NumCell value={Number(r.count)} step="1" onCommit={(v) => updateField(r.id, "count", Math.round(v))} />
+                  <NumCell value={Number(r.count)} step="1" min={0} errorHint="Antall må være 0 eller positivt." onCommit={(v) => updateField(r.id, "count", Math.max(0, Math.round(v)))} />
                 </td>
                 <td className="px-1 py-1">
                   <Select value={r.internal_level} onValueChange={(v) => updateField(r.id, "internal_level", v)}>
@@ -957,7 +1057,7 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
                     </Select>
                   </td>
                   <td className="px-1 py-1">
-                    <NumCell value={Number(r.count)} step="1" onCommit={(v) => updateField(r.id, "count", Math.round(v))} />
+                    <NumCell value={Number(r.count)} step="1" min={0} errorHint="Antall må være 0 eller positivt." onCommit={(v) => updateField(r.id, "count", Math.max(0, Math.round(v)))} />
                   </td>
                   <td className="px-1 py-1 text-center">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(r.id)}>
