@@ -373,78 +373,13 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           bd = `Øvrig Internal FTE: ${round2(base)} × cum_salary(2027..${N})=${round2(salaryFactor)} = ${round2(amount)}`;
         }
       } else if (cl.category === "External FTE") {
-        // ===== EXTERNAL FTE =====
+        // ===== EXTERNAL FTE (per-linje) =====
+        // Kun baseline-prisvekst og kumulativ kategori-justering påvirker
+        // den enkelte eksisterende External FTE-linjen. FTE-endringer,
+        // konverteringer og nearshoring legges på som SAMLEDE virtuelle
+        // linjer lenger ned (slik at de ikke fordeles per cost_line).
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
-        let amt = base * priceFactor;
-        const parts = [
-          `base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} → ${round2(amt)}`,
-        ];
-
-        // FTE-endringer ekstern
-        for (let Y = 2027; Y <= N; Y++) {
-          const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
-          for (const lvl of LEVELS) {
-            const net = getFteNetChange(extChangeIndex, Y, lvl);
-            if (net === 0) continue;
-            const r = extRate(lvl);
-            const annual = r.base_monthly_cost * r.working_months;
-            const delta = net * annual * grown;
-            amt += delta;
-            parts.push(
-              `+ Y${Y} ${lvl} net=${net} × annual=${annual} × cum(${Y}..${N})=${round2(grown)} = ${round2(delta)}`
-            );
-          }
-        }
-
-        // Konverteringer reduserer ekstern
-        for (let Y = 2027; Y <= N; Y++) {
-          const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
-          for (const conv of scenarioConversions.filter((c) => c.year === Y)) {
-            const r = extRate(conv.external_level);
-            const annual = r.base_monthly_cost * r.working_months;
-            if (Y === N) {
-              const removed = conv.count * annual * grown;
-              const overlap =
-                conv.count * r.base_monthly_cost * conv.overlap_months * grown;
-              amt -= removed;
-              amt += overlap;
-              parts.push(
-                `- Konv Y${Y} fjern ekstern ${conv.external_level} ×${conv.count} = -${round2(removed)} + overlap ${conv.overlap_months}m = +${round2(overlap)}`
-              );
-            } else {
-              const removed = conv.count * annual * grown;
-              amt -= removed;
-              parts.push(
-                `- Konv Y${Y} (etter) fjern ekstern ×${conv.count} = -${round2(removed)}`
-              );
-            }
-          }
-        }
-
-        // Nearshoring erstatter eksterne
-        for (let Y = 2027; Y <= N; Y++) {
-          const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
-          for (const ns of scenarioNearshoring.filter((n) => n.year === Y)) {
-            const r = extRate(ns.replaces_external_level);
-            const annual = r.base_monthly_cost * r.working_months;
-            if (Y === N) {
-              const removed = ns.count * annual * grown;
-              const overlap =
-                ns.count * r.base_monthly_cost * ns.overlap_months * grown;
-              amt -= removed;
-              amt += overlap;
-              parts.push(
-                `- Nearshoring Y${Y} fjern ekstern ${ns.replaces_external_level} ×${ns.count} = -${round2(removed)} + overlap = +${round2(overlap)}`
-              );
-            } else {
-              const removed = ns.count * annual * grown;
-              amt -= removed;
-              parts.push(`- Nearshoring Y${Y} fjern ×${ns.count} = -${round2(removed)}`);
-            }
-          }
-        }
-
-        // Kategori-justering (kumulativ – permanent reforhandling)
+        const amt = base * priceFactor;
         const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
           category_adjustments,
           scenario_id,
@@ -452,7 +387,7 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           N
         );
         amount = amt * catFactor;
-        bd = `External FTE:\n${parts.join("\n")}\n× cum_cat_adj(2027..${N})=${catDesc}=${round2(catFactor)} = ${round2(amount)}`;
+        bd = `External FTE (linje): base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amount)}`;
       } else if (cl.category === "Depreciation") {
         // ===== DEPRECIATION (existing) =====
         if (cl.is_existing_depreciation_alfa) {
@@ -547,7 +482,168 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
 
   // (Tidligere virtuelle Capex- og Depreciation-linjer er fjernet.
   // Capex-utbetalinger og nye avskrivninger aggregeres nå direkte inn i
-  // de eksisterende Excel-baserte cost_lines i Capex-/Depreciation-løkken over.)
+
+
+  // ---------- VIRTUAL: Samlede External FTE-effekter ----------
+  // FTE-endringer, ekstern→intern konverteringer og nearshoring-erstatninger
+  // legges som SAMLEDE virtuelle linjer (ikke fordelt per cost_line, som
+  // ville multiplisert effekten med antall External FTE-linjer).
+  // Kumulativ kategori-justering for "External FTE" gjelder også disse.
+  const extPriceRate = (Y: number) =>
+    getGlobal(global_assumptions, scenario_id, Y).price_increase_pct;
+
+  const makeVirtualExtLine = (
+    suffix: string,
+    accountName: string,
+    project: string,
+  ): ForecastLine => ({
+    line_id: `virtual:${suffix}`,
+    source: "virtual",
+    category: "External FTE",
+    project,
+    account: null,
+    account_name: accountName,
+    cost_type: "Local",
+    is_capex: false,
+    is_depreciation: false,
+    base_2026: 0,
+    amounts: {},
+    monthly_2027: [],
+    breakdown_source: {},
+  });
+
+  const extChangesLine = makeVirtualExtLine(
+    "ext_fte_changes",
+    "External FTE-endringer (Increase/Decrease)",
+    "FTE-endringer",
+  );
+  const extConvLine = makeVirtualExtLine(
+    "ext_fte_conversions",
+    "Konvertering ekstern→intern (ekstern reduksjon)",
+    "Konvertering",
+  );
+  const extNsReductionLine = makeVirtualExtLine(
+    "ext_fte_nearshoring_reduction",
+    "Nearshoring – ekstern reduksjon",
+    "Nearshoring",
+  );
+
+  for (const N of YEARS) {
+    const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
+      category_adjustments,
+      scenario_id,
+      "External FTE",
+      N,
+    );
+
+    // 1) FTE-endringer
+    {
+      let amt = 0;
+      const parts: string[] = [];
+      for (let Y = 2027; Y <= N; Y++) {
+        const grown = cumulativeFactor(scenario_id, Y, N, extPriceRate);
+        for (const lvl of LEVELS) {
+          const net = getFteNetChange(extChangeIndex, Y, lvl);
+          if (net === 0) continue;
+          const r = extRate(lvl);
+          const annual = r.base_monthly_cost * r.working_months;
+          const delta = net * annual * grown;
+          amt += delta;
+          parts.push(
+            `Y${Y} ${lvl} net=${net} × annual=${annual} × cum_price(${Y}..${N})=${round2(grown)} = ${round2(delta)}`,
+          );
+        }
+      }
+      extChangesLine.amounts[N] = amt * catFactor;
+      extChangesLine.breakdown_source[N] = parts.length
+        ? `${parts.join("\n")}\n× cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amt * catFactor)}`
+        : "Ingen ekstern FTE-endring";
+    }
+
+    // 2) Konverteringer ekstern→intern (kun ekstern-siden; intern-økningen
+    //    ligger allerede i master_amount). Konverteringsåret: ekstern jobber
+    //    (working_months − overlap_months) måneder. Etter: full reduksjon.
+    {
+      let amt = 0;
+      const parts: string[] = [];
+      for (let Y = 2027; Y <= N; Y++) {
+        const grown = cumulativeFactor(scenario_id, Y, N, extPriceRate);
+        for (const conv of scenarioConversions.filter((c) => c.year === Y)) {
+          const r = extRate(conv.external_level);
+          if (Y === N) {
+            const months = Math.max(0, r.working_months - conv.overlap_months);
+            const reduction = -conv.count * r.base_monthly_cost * months * grown;
+            amt += reduction;
+            parts.push(
+              `Konv-år Y${Y} ${conv.external_level}: -${conv.count} × ${r.base_monthly_cost} × (${r.working_months}-${conv.overlap_months})=${months}m × cum=${round2(grown)} = ${round2(reduction)}`,
+            );
+          } else {
+            const annual = r.base_monthly_cost * r.working_months;
+            const reduction = -conv.count * annual * grown;
+            amt += reduction;
+            parts.push(
+              `Etter Y${Y} ${conv.external_level}: -${conv.count} × annual=${annual} × cum=${round2(grown)} = ${round2(reduction)}`,
+            );
+          }
+        }
+      }
+      extConvLine.amounts[N] = amt * catFactor;
+      extConvLine.breakdown_source[N] = parts.length
+        ? `${parts.join("\n")}\n× cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amt * catFactor)}`
+        : "Ingen konvertering";
+    }
+
+    // 3) Nearshoring – ekstern reduksjon (samme overlap-logikk)
+    {
+      let amt = 0;
+      const parts: string[] = [];
+      for (let Y = 2027; Y <= N; Y++) {
+        const grown = cumulativeFactor(scenario_id, Y, N, extPriceRate);
+        for (const ns of scenarioNearshoring.filter((n) => n.year === Y)) {
+          const r = extRate(ns.replaces_external_level);
+          if (Y === N) {
+            const months = Math.max(0, r.working_months - ns.overlap_months);
+            const reduction = -ns.count * r.base_monthly_cost * months * grown;
+            amt += reduction;
+            parts.push(
+              `Konv-år Y${Y} ${ns.replaces_external_level}: -${ns.count} × ${r.base_monthly_cost} × (${r.working_months}-${ns.overlap_months})=${months}m × cum=${round2(grown)} = ${round2(reduction)}`,
+            );
+            if (typeof window !== "undefined" && N === 2027) {
+              console.log("[Forecast] nearshoring ext-reduction Y2027", {
+                scenario_id,
+                level: ns.replaces_external_level,
+                count: ns.count,
+                monthly_rate: r.base_monthly_cost,
+                working_months: r.working_months,
+                overlap_months: ns.overlap_months,
+                effective_months: months,
+                price_factor: grown,
+                count_x_rate_x_months: ns.count * r.base_monthly_cost * months,
+                reduction,
+              });
+            }
+          } else {
+            const annual = r.base_monthly_cost * r.working_months;
+            const reduction = -ns.count * annual * grown;
+            amt += reduction;
+            parts.push(
+              `Etter Y${Y} ${ns.replaces_external_level}: -${ns.count} × annual=${annual} × cum=${round2(grown)} = ${round2(reduction)}`,
+            );
+          }
+        }
+      }
+      extNsReductionLine.amounts[N] = amt * catFactor;
+      extNsReductionLine.breakdown_source[N] = parts.length
+        ? `${parts.join("\n")}\n× cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amt * catFactor)}`
+        : "Ingen nearshoring-reduksjon";
+    }
+  }
+  extChangesLine.monthly_2027 = Array(12).fill((extChangesLine.amounts[2027] ?? 0) / 12);
+  extConvLine.monthly_2027 = Array(12).fill((extConvLine.amounts[2027] ?? 0) / 12);
+  extNsReductionLine.monthly_2027 = Array(12).fill((extNsReductionLine.amounts[2027] ?? 0) / 12);
+  lines.push(extChangesLine);
+  lines.push(extConvLine);
+  lines.push(extNsReductionLine);
 
 
   // ---------- VIRTUAL: Nearshoring kostnad ----------
