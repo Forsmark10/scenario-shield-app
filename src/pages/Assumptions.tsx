@@ -1023,8 +1023,8 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
   return (
     <Section
       title="Nearshoring"
-      description="Faktureres i EUR per år, konverteres med valutakurs."
-      tooltip="Nearshoring-ressurser erstatter eksterne. Kostnaden er i EUR og bruker valutakursen fra Globale drivere. Overlapp gir doble kostnader i innfasingsperioden."
+      description="Faktureres i EUR per år, konverteres med EUR/NOK-kurs per år."
+      tooltip="Nearshoring-ressurser erstatter eksterne. Kostnaden er i EUR og konverteres med EUR/NOK-kursen for det aktuelle året. Overlapp gir doble kostnader i innfasingsperioden."
     >
       <div className="space-y-5">
         <div>
