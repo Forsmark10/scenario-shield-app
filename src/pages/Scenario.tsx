@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useForecast } from "@/hooks/useForecast";
 import { useAllScenarios } from "@/hooks/useAllScenarios";
 import { useAppSettings } from "@/hooks/useAppSettings";
+import { useActiveScenario } from "@/hooks/useActiveScenario";
 import { formatUnit, type Unit } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { exportWorkbook } from "@/lib/excelExport";
