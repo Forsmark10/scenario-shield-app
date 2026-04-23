@@ -1053,6 +1053,40 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
 
         <div>
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            EUR/NOK-kurs per år
+          </h3>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b">
+                {FC_YEARS.map((y) => (
+                  <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {FC_YEARS.map((y) => {
+                  const row = getGlobal(y);
+                  const v = Number(row?.eur_nok_rate ?? 11.5);
+                  return (
+                    <td key={y} className="px-1 py-1">
+                      <NumCell
+                        value={Number(v.toFixed(3))}
+                        step="0.01"
+                        min={0}
+                        errorHint="Valutakurs må være ≥ 0."
+                        onCommit={(num) => upsertFx(y, num)}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
             Nye nearshoring-ressurser per år
           </h3>
           <table className="w-full text-xs">
