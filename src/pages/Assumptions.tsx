@@ -64,7 +64,8 @@ export type Patch = (action: PatchAction) => void;
 export default function Assumptions() {
   const [data, setData] = useState<AllData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeScenario, setActiveScenario] = useState<string | null>(null);
+  const [activeScenario, setActiveScenarioState] = useState<string | null>(null);
+  const [storedScenario, setStoredScenario] = useActiveScenario();
   const [reloadKey, setReloadKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const { toast } = useToast();
