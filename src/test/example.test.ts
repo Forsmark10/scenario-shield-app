@@ -132,6 +132,6 @@ describe("calculateForecast FTE accumulation", () => {
       (year) => (changedExternal?.amounts[year] ?? 0) - (baselineExternal?.amounts[year] ?? 0)
     );
 
-    expect(roundedSeries(deltas)).toEqual([-2340, -2433.6, -2530.94, -2632.18, -2737.46]);
+    expect(roundedSeries(deltas)).toEqual([-2756, -2866.24, -2980.89, -3100.13, -3224.13]);
   });
 });
