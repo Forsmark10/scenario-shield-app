@@ -159,3 +159,21 @@ Nei – du setter EUR/NOK-kurs per år. Dette lar deg modellere valutasensitivit
 
 ### Hvor mye overlapper nearshoring med eksterne?
 Når du erstatter en ekstern med en nearshoring-ressurs, har du 3 måneders overlapp med den eksterne (for kontinuitet og opplæring). Deretter er kun nearshoring-kost igjen.
+
+---
+
+## Besparelser
+
+Besparelser vises på Dashboard nederst og beregnes som forskjellen mellom Steady State og valgt scenario. Tallene viser alltid netto-effekten av tiltakene.
+
+For eksempel, når du konverterer en ekstern konsulent til en intern ansatt:
+
+- Ekstern-kostnaden reduseres (f.eks. −3 MNOK)
+- Intern-kostnaden øker (f.eks. +1,4 MNOK)
+- Besparelsen vises som netto **+1,6 MNOK**, ikke som to separate poster
+
+Tilsvarende for nearshoring: besparelsen fra å fjerne en ekstern konsulent minus nearshoring-kostnaden.
+
+Dette gjør det enkelt å svare på spørsmålet: *"Hvor mye sparer vi totalt?"* uten å måtte regne sammen ulike komponenter.
+
+**Merk:** I år hvor nye investeringer (Capex) eller oppstartskostnader (nearshoring-overlapp) er større enn besparelsene, kan netto-effekten være negativ i det enkelte året – selv om den er positiv over tid.
