@@ -1,6 +1,11 @@
 // Excel/CSV-import for cost_lines.
-// Genererer en parsed + validert preview før brukeren bekrefter import.
-// Speiler logikken i src/lib/csvImport.ts (samme flagg-regler).
+// Trygg "upsert"-flyt med diff-preview og auto-backup.
+//
+// Steg:
+//   1. parseImportFile(file)  -> ParseResult (validerer rader)
+//   2. diffImport(rows)        -> DiffResult  (added/changed/unchanged/removed)
+//   3. commitUpsert(diff)      -> CommitResult (tar backup, gjør UPDATE/INSERT/DELETE)
+//   4. listBackups() / restoreFromBackup() for gjenoppretting
 
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
@@ -34,7 +39,6 @@ export interface ParseResult {
   rows: ParsedRow[];
   issues: RowIssue[];
   totalRows: number;
-  /** Kategorier som finnes i cost_lines fra før (for advarsel ved nye verdier) */
   knownCategories: string[];
 }
 
@@ -60,7 +64,6 @@ const monthCols = (prefix: string) =>
 function pick(record: Record<string, any>, ...keys: string[]): any {
   for (const k of keys) {
     if (record[k] !== undefined && record[k] !== null && record[k] !== "") return record[k];
-    // case-insensitive lookup
     const lower = k.toLowerCase();
     for (const rk of Object.keys(record)) {
       if (rk.toLowerCase() === lower && record[rk] !== "") return record[rk];
@@ -71,7 +74,6 @@ function pick(record: Record<string, any>, ...keys: string[]): any {
 
 function rowsFromXlsx(file: ArrayBuffer): Record<string, any>[] {
   const wb = XLSX.read(file, { type: "array" });
-  // Bruk første ark (eller "cost_lines" hvis det finnes)
   const sheetName =
     wb.SheetNames.find((n) => n.toLowerCase().includes("cost_line")) ?? wb.SheetNames[0];
   const ws = wb.Sheets[sheetName];
@@ -94,7 +96,7 @@ function buildRow(
   knownCategories: Set<string>,
 ): { row: ParsedRow | null; issues: RowIssue[] } {
   const issues: RowIssue[] = [];
-  const sourceRow = idx + 2; // +1 for header, +1 for 1-basert
+  const sourceRow = idx + 2;
 
   const category = String(pick(raw, "Category", "category", "Kategori") ?? "").trim();
   const project = String(pick(raw, "Project", "project", "Prosjekt") ?? "").trim();
@@ -102,7 +104,6 @@ function buildRow(
   const accountName = String(pick(raw, "Account Name", "account_name", "Navn") ?? "").trim();
   const typeRaw = String(pick(raw, "Type", "cost_type") ?? "Local").trim();
 
-  // Hopp over tomme rader (ingen kategori OG ingen konto)
   if (!category && (accountRaw === undefined || accountRaw === "")) {
     return { row: null, issues: [] };
   }
@@ -132,7 +133,6 @@ function buildRow(
     });
   }
 
-  // Numerisk validering for AC + månedskolonner
   const ac2025raw = pick(raw, "AC 2025", "ac_2025");
   if (!isNumericLike(ac2025raw)) {
     issues.push({
@@ -188,7 +188,6 @@ function buildRow(
 }
 
 export async function parseImportFile(file: File): Promise<ParseResult> {
-  // Hent eksisterende kategorier for advarsel om nye verdier
   const { data: existing } = await supabase.from("cost_lines").select("category");
   const knownCategories = new Set<string>(
     (existing ?? []).map((r) => String(r.category)).filter(Boolean),
@@ -219,38 +218,288 @@ export async function parseImportFile(file: File): Promise<ParseResult> {
   };
 }
 
-export interface CommitResult {
-  inserted: number;
-  errors: string[];
+// ============================================================
+// DIFF + UPSERT
+// ============================================================
+
+export interface ExistingRow {
+  id: string;
+  category: string;
+  project: string;
+  account: number;
+  account_name: string;
+  cost_type: string;
+  ac_2025: number;
+  bu_2026_monthly: number[];
+  fc_2026_monthly: number[];
 }
 
-/** Erstatter cost_lines fullstendig med de parsede radene. */
-export async function commitImport(rows: ParsedRow[]): Promise<CommitResult> {
-  const errors: string[] = [];
-  if (!rows.length) return { inserted: 0, errors: ["Ingen rader å importere."] };
+export interface ChangedField {
+  field: string;
+  before: number;
+  after: number;
+}
 
-  // Slett alle eksisterende rader
-  const { error: delErr } = await supabase
+export interface ChangedRow {
+  existing: ExistingRow;
+  next: ParsedRow;
+  changedFields: ChangedField[];
+}
+
+export interface RemovedRow {
+  existing: ExistingRow;
+}
+
+export interface AddedRow {
+  next: ParsedRow;
+}
+
+export interface DiffResult {
+  added: AddedRow[];
+  changed: ChangedRow[];
+  unchanged: number;
+  removed: RemovedRow[];
+}
+
+const keyOf = (r: { category: string; project: string; account: number; cost_type: string }) =>
+  `${r.category}||${r.project}||${r.account}||${r.cost_type}`;
+
+const sumArr = (a: number[]) => a.reduce((s, x) => s + x, 0);
+
+const closeEnough = (a: number, b: number, eps = 0.5) => Math.abs(a - b) < eps;
+
+const arraysCloseEnough = (a: number[], b: number[]) => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!closeEnough(a[i], b[i])) return false;
+  }
+  return true;
+};
+
+export async function diffImport(rows: ParsedRow[]): Promise<DiffResult> {
+  const { data, error } = await supabase
     .from("cost_lines")
-    .delete()
-    .not("id", "is", null);
-  if (delErr) errors.push(`Sletting feilet: ${delErr.message}`);
+    .select("id,category,project,account,account_name,cost_type,ac_2025,bu_2026_monthly,fc_2026_monthly");
+  if (error) throw new Error(`Kunne ikke lese eksisterende rader: ${error.message}`);
 
-  // Insert i chunks
-  const payload = rows.map(({ source_row, ...r }) => r);
-  let inserted = 0;
-  const chunkSize = 200;
-  for (let i = 0; i < payload.length; i += chunkSize) {
-    const chunk = payload.slice(i, i + chunkSize);
-    const { error, count } = await supabase
-      .from("cost_lines")
-      .insert(chunk, { count: "exact" });
-    if (error) {
-      errors.push(`Rad ${i}–${i + chunk.length}: ${error.message}`);
+  const existingByKey = new Map<string, ExistingRow>();
+  (data ?? []).forEach((r: any) => {
+    existingByKey.set(keyOf(r), {
+      id: r.id,
+      category: r.category,
+      project: r.project ?? "",
+      account: Number(r.account),
+      account_name: r.account_name ?? "",
+      cost_type: r.cost_type,
+      ac_2025: Number(r.ac_2025) || 0,
+      bu_2026_monthly: (r.bu_2026_monthly ?? []).map(Number),
+      fc_2026_monthly: (r.fc_2026_monthly ?? []).map(Number),
+    });
+  });
+
+  const seenKeys = new Set<string>();
+  const added: AddedRow[] = [];
+  const changed: ChangedRow[] = [];
+  let unchanged = 0;
+
+  for (const next of rows) {
+    const k = keyOf(next);
+    seenKeys.add(k);
+    const existing = existingByKey.get(k);
+    if (!existing) {
+      added.push({ next });
+      continue;
+    }
+    const fields: ChangedField[] = [];
+    if (!closeEnough(existing.ac_2025, next.ac_2025)) {
+      fields.push({ field: "AC 2025", before: existing.ac_2025, after: next.ac_2025 });
+    }
+    const buBefore = sumArr(existing.bu_2026_monthly);
+    const buAfter = sumArr(next.bu_2026_monthly);
+    if (!arraysCloseEnough(existing.bu_2026_monthly, next.bu_2026_monthly)) {
+      fields.push({ field: "BU 2026", before: buBefore, after: buAfter });
+    }
+    const fcBefore = sumArr(existing.fc_2026_monthly);
+    const fcAfter = sumArr(next.fc_2026_monthly);
+    if (!arraysCloseEnough(existing.fc_2026_monthly, next.fc_2026_monthly)) {
+      fields.push({ field: "FC 2026", before: fcBefore, after: fcAfter });
+    }
+    if (existing.account_name !== next.account_name) {
+      // Tekstendring – vises som info, ikke som tall-diff
+      fields.push({ field: "Account Name", before: 0, after: 0 });
+    }
+    if (fields.length === 0) {
+      unchanged++;
     } else {
-      inserted += count ?? chunk.length;
+      changed.push({ existing, next, changedFields: fields });
     }
   }
 
-  return { inserted, errors };
+  const removed: RemovedRow[] = [];
+  for (const [k, ex] of existingByKey.entries()) {
+    if (!seenKeys.has(k)) removed.push({ existing: ex });
+  }
+
+  return { added, changed, unchanged, removed };
+}
+
+// ============================================================
+// BACKUP
+// ============================================================
+
+export interface BackupSummary {
+  id: string;
+  name: string;
+  row_count: number;
+  created_at: string;
+}
+
+async function createBackup(label: string): Promise<{ id: string | null; error?: string }> {
+  const { data, error } = await supabase.from("cost_lines").select("*");
+  if (error) return { id: null, error: `Backup feilet: ${error.message}` };
+  const rows = data ?? [];
+  const { data: ins, error: insErr } = await supabase
+    .from("cost_lines_backups" as any)
+    .insert({ name: label, row_count: rows.length, data: rows as any })
+    .select("id")
+    .single();
+  if (insErr) return { id: null, error: `Lagring av backup feilet: ${insErr.message}` };
+  // Best-effort: prune gamle (>30 dager)
+  supabase.rpc("prune_old_auto_versions").then(() => {});
+  return { id: (ins as any).id };
+}
+
+export async function listBackups(limit = 10): Promise<BackupSummary[]> {
+  const { data, error } = await supabase
+    .from("cost_lines_backups" as any)
+    .select("id,name,row_count,created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as BackupSummary[];
+}
+
+export async function deleteBackup(id: string): Promise<void> {
+  const { error } = await supabase.from("cost_lines_backups" as any).delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/** Henter en backup og konverterer rader til ParsedRow-format slik at samme diff/commit kan brukes. */
+export async function loadBackupAsRows(id: string): Promise<ParsedRow[]> {
+  const { data, error } = await supabase
+    .from("cost_lines_backups" as any)
+    .select("data")
+    .eq("id", id)
+    .single();
+  if (error) throw new Error(error.message);
+  const raw = ((data as any)?.data ?? []) as any[];
+  return raw.map((r, idx): ParsedRow => ({
+    category: r.category,
+    project: r.project ?? "",
+    account: Number(r.account) || 0,
+    account_name: r.account_name ?? "",
+    cost_type: r.cost_type === "Central" ? "Central" : "Local",
+    ac_2025: Number(r.ac_2025) || 0,
+    bu_2026_monthly: (r.bu_2026_monthly ?? []).map(Number),
+    fc_2026_monthly: (r.fc_2026_monthly ?? []).map(Number),
+    is_fte_master: !!r.is_fte_master,
+    fte_driver_pct: r.fte_driver_pct === null || r.fte_driver_pct === undefined ? null : Number(r.fte_driver_pct),
+    is_existing_depreciation_alfa: !!r.is_existing_depreciation_alfa,
+    is_existing_depreciation_phaseout: !!r.is_existing_depreciation_phaseout,
+    source_row: idx + 2,
+  }));
+}
+
+// ============================================================
+// COMMIT (upsert)
+// ============================================================
+
+export interface CommitResult {
+  inserted: number;
+  updated: number;
+  deleted: number;
+  backupId: string | null;
+  errors: string[];
+}
+
+const stripParsed = (r: ParsedRow) => {
+  const { source_row: _s, ...rest } = r;
+  return rest;
+};
+
+/** Tar backup, gjør oppdatering/innsetting/sletting basert på diff. */
+export async function commitUpsert(
+  diff: DiffResult,
+  options: { backupLabel?: string } = {},
+): Promise<CommitResult> {
+  const errors: string[] = [];
+
+  // 1. Auto-backup
+  const label =
+    options.backupLabel ??
+    `Auto-backup før import ${new Date().toLocaleString("nb-NO", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  const backup = await createBackup(label);
+  if (backup.error) errors.push(backup.error);
+
+  // 2. Inserts
+  let inserted = 0;
+  if (diff.added.length) {
+    const payload = diff.added.map((a) => stripParsed(a.next));
+    const chunkSize = 200;
+    for (let i = 0; i < payload.length; i += chunkSize) {
+      const chunk = payload.slice(i, i + chunkSize);
+      const { error, count } = await supabase
+        .from("cost_lines")
+        .insert(chunk, { count: "exact" });
+      if (error) errors.push(`Insert (${i}–${i + chunk.length}): ${error.message}`);
+      else inserted += count ?? chunk.length;
+    }
+  }
+
+  // 3. Updates (én per rad – PostgREST har ingen native bulk-update)
+  let updated = 0;
+  for (const c of diff.changed) {
+    const payload = stripParsed(c.next);
+    const { error } = await supabase
+      .from("cost_lines")
+      .update(payload)
+      .eq("id", c.existing.id);
+    if (error) errors.push(`Update ${c.existing.id}: ${error.message}`);
+    else updated++;
+  }
+
+  // 4. Deletes
+  let deleted = 0;
+  if (diff.removed.length) {
+    const ids = diff.removed.map((r) => r.existing.id);
+    const chunkSize = 200;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const { error, count } = await supabase
+        .from("cost_lines")
+        .delete({ count: "exact" })
+        .in("id", chunk);
+      if (error) errors.push(`Delete (${i}–${i + chunk.length}): ${error.message}`);
+      else deleted += count ?? chunk.length;
+    }
+  }
+
+  return { inserted, updated, deleted, backupId: backup.id, errors };
+}
+
+// Legacy navn beholdt for bakoverkompatibilitet (brukes ikke lenger i UI)
+export interface LegacyCommitResult {
+  inserted: number;
+  errors: string[];
+}
+export async function commitImport(rows: ParsedRow[]): Promise<LegacyCommitResult> {
+  const diff = await diffImport(rows);
+  const res = await commitUpsert(diff);
+  return { inserted: res.inserted + res.updated, errors: res.errors };
 }

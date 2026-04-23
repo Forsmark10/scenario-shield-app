@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Trash2, Eye, GitCompare, Loader2 } from "lucide-react";
+import { Trash2, Eye, GitCompare, RotateCcw, Database } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { formatNumberNO } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { listBackups, deleteBackup, type BackupSummary } from "@/lib/excelImport";
+import { RestoreBackupDialog } from "@/components/RestoreBackupDialog";
 
 interface Snapshot {
   id: string;
@@ -45,6 +47,12 @@ export default function History() {
   const [viewing, setViewing] = useState<Snapshot | null>(null);
   const [comparing, setComparing] = useState<Snapshot | null>(null);
   const [toDelete, setToDelete] = useState<Snapshot | null>(null);
+
+  const [backups, setBackups] = useState<BackupSummary[]>([]);
+  const [backupsLoading, setBackupsLoading] = useState(true);
+  const [backupReloadKey, setBackupReloadKey] = useState(0);
+  const [restoring, setRestoring] = useState<BackupSummary | null>(null);
+  const [backupToDelete, setBackupToDelete] = useState<BackupSummary | null>(null);
 
   const { scenarios } = useAllScenarios();
 
@@ -67,6 +75,25 @@ export default function History() {
     };
   }, [reloadKey]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setBackupsLoading(true);
+      try {
+        const list = await listBackups(10);
+        if (!cancelled) setBackups(list);
+      } catch (e: any) {
+        if (!cancelled)
+          toast.error("Kunne ikke laste auto-backups", { description: e?.message ?? String(e) });
+      } finally {
+        if (!cancelled) setBackupsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [backupReloadKey]);
+
   const scenarioName = (id: string) =>
     scenarios.find((s) => s.meta.id === id)?.meta.name ?? "Ukjent scenario";
 
@@ -85,68 +112,147 @@ export default function History() {
     setToDelete(null);
   };
 
+  const handleDeleteBackup = async () => {
+    if (!backupToDelete) return;
+    try {
+      await deleteBackup(backupToDelete.id);
+      toast.success("Backup slettet");
+      setBackupReloadKey((k) => k + 1);
+    } catch (e: any) {
+      toast.error("Kunne ikke slette backup", { description: e?.message ?? String(e) });
+    } finally {
+      setBackupToDelete(null);
+    }
+  };
+
   return (
-    <div className="p-6 space-y-4 max-w-5xl mx-auto">
+    <div className="p-6 space-y-8 max-w-5xl mx-auto">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Historikk</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Frosne kopier av scenarier. Lagre snapshot fra Dashboard eller Scenario Comparison.
+          Frosne kopier av scenarier og auto-backups av baseline-data.
         </p>
       </div>
 
-      {loading ? (
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full" />
-          ))}
+      {/* === Snapshots === */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-base font-semibold">Scenario-snapshots</h2>
+          <p className="text-xs text-muted-foreground">
+            Lagres manuelt fra Dashboard eller Scenario Comparison.
+          </p>
         </div>
-      ) : snapshots.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-sm text-muted-foreground">
-              Ingen snapshots enda. Klikk «Lagre snapshot» fra Dashboard eller Scenario
-              Comparison for å lage din første.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-3">
-          {snapshots.map((s) => (
-            <Card key={s.id}>
-              <CardContent className="p-4 flex items-start justify-between gap-4 flex-wrap">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-sm">{s.name}</h3>
-                    <Badge variant="outline">{scenarioName(s.scenario_id)}</Badge>
+        {loading ? (
+          <div className="space-y-3">
+            {[...Array(2)].map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full" />
+            ))}
+          </div>
+        ) : snapshots.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                Ingen snapshots enda. Klikk «Lagre snapshot» fra Dashboard eller Scenario
+                Comparison for å lage din første.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-3">
+            {snapshots.map((s) => (
+              <Card key={s.id}>
+                <CardContent className="p-4 flex items-start justify-between gap-4 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-sm">{s.name}</h3>
+                      <Badge variant="outline">{scenarioName(s.scenario_id)}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(s.created_at).toLocaleString("nb-NO")}
+                    </p>
+                    {s.description && (
+                      <p className="text-sm text-foreground/85 mt-2">{s.description}</p>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(s.created_at).toLocaleString("nb-NO")}
-                  </p>
-                  {s.description && (
-                    <p className="text-sm text-foreground/85 mt-2">{s.description}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Button variant="outline" size="sm" onClick={() => setViewing(s)}>
-                    <Eye className="h-4 w-4 mr-1.5" /> Vis
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setComparing(s)}>
-                    <GitCompare className="h-4 w-4 mr-1.5" /> Sammenlign
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setToDelete(s)}
-                    aria-label="Slett snapshot"
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  <div className="flex items-center gap-1.5">
+                    <Button variant="outline" size="sm" onClick={() => setViewing(s)}>
+                      <Eye className="h-4 w-4 mr-1.5" /> Vis
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setComparing(s)}>
+                      <GitCompare className="h-4 w-4 mr-1.5" /> Sammenlign
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setToDelete(s)}
+                      aria-label="Slett snapshot"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* === Auto-backups av cost_lines === */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Database className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-base font-semibold">Auto-backups av cost_lines</h2>
         </div>
-      )}
+        <p className="text-xs text-muted-foreground">
+          Tas automatisk før hver import. Beholdes i 30 dager. Viser de 10 nyeste.
+        </p>
+        {backupsLoading ? (
+          <div className="space-y-2">
+            {[...Array(2)].map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        ) : backups.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Ingen auto-backups enda. En backup tas neste gang du importerer.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-2">
+            {backups.map((b) => (
+              <Card key={b.id}>
+                <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-medium text-sm">{b.name}</h3>
+                      <Badge variant="secondary">{b.row_count} rader</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {new Date(b.created_at).toLocaleString("nb-NO")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button variant="outline" size="sm" onClick={() => setRestoring(b)}>
+                      <RotateCcw className="h-4 w-4 mr-1.5" /> Gjenopprett
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setBackupToDelete(b)}
+                      aria-label="Slett backup"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
 
       <ViewSnapshotDialog snapshot={viewing} onOpenChange={(o) => !o && setViewing(null)} />
       <CompareSnapshotDialog
@@ -155,6 +261,14 @@ export default function History() {
           comparing ? scenarios.find((s) => s.meta.id === comparing.scenario_id) : undefined
         }
         onOpenChange={(o) => !o && setComparing(null)}
+      />
+
+      <RestoreBackupDialog
+        backup={restoring}
+        onOpenChange={(o) => !o && setRestoring(null)}
+        onRestored={() => {
+          setBackupReloadKey((k) => k + 1);
+        }}
       />
 
       <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
@@ -168,6 +282,24 @@ export default function History() {
           <AlertDialogFooter>
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>Slett</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!backupToDelete}
+        onOpenChange={(o) => !o && setBackupToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Slette backup?</AlertDialogTitle>
+            <AlertDialogDescription>
+              «{backupToDelete?.name}» blir permanent slettet. Dette kan ikke angres.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteBackup}>Slett</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
