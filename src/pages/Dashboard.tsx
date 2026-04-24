@@ -275,6 +275,12 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Executive Summary (above scenario sections) */}
+      <ExecutiveSummary
+        scenarios={scenarios.map((b) => b.meta)}
+        colors={SCENARIO_COLOR}
+      />
+
       {/* Per-scenario sections */}
       {scenarios.map((bundle, i) => (
         <ScenarioSection
