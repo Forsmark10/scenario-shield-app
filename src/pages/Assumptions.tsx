@@ -781,6 +781,40 @@ function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
+  const upsertChangeComment = async (year: number, level: Level, comment: string | null) => {
+    const existing = getChange(year, level);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({
+        type: "update",
+        table: "intChanges",
+        id: existing.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("internal_fte_changes")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("internal_fte_changes")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          level,
+          increase: 0,
+          decrease: 0,
+          comment,
+          comment_updated_at: ts,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "intChanges", row: inserted });
+    }
+  };
+
   return (
     <Section title="Internal FTE" description="Lønnsnivåer (globalt) og scenario-spesifikke FTE-endringer.">
       <div className="space-y-5">
