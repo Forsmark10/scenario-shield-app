@@ -124,6 +124,9 @@ export type Database = {
           adjustment_pct: number
           category: string
           comment: string | null
+          comment_amount: string | null
+          comment_amount_updated_at: string | null
+          comment_amount_updated_by: string | null
           comment_updated_at: string | null
           comment_updated_by: string | null
           created_at: string
@@ -137,6 +140,9 @@ export type Database = {
           adjustment_pct?: number
           category: string
           comment?: string | null
+          comment_amount?: string | null
+          comment_amount_updated_at?: string | null
+          comment_amount_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
@@ -150,6 +156,9 @@ export type Database = {
           adjustment_pct?: number
           category?: string
           comment?: string | null
+          comment_amount?: string | null
+          comment_amount_updated_at?: string | null
+          comment_amount_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
