@@ -893,19 +893,15 @@ function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario
                       );
                       return (
                         <td key={y} className="px-1 py-1 align-top">
-                          {type === "increase" ? (
-                            <CellWithComment
-                              comment={c?.comment}
-                              updatedAt={c?.comment_updated_at}
-                              updatedBy={c?.comment_updated_by}
-                              onSaveComment={(next) => upsertChangeComment(y, lvl, next)}
-                              label={`Internal ${lvl} ${y}`}
-                            >
-                              {cell}
-                            </CellWithComment>
-                          ) : (
-                            cell
-                          )}
+                          <CellWithComment
+                            comment={c?.comment}
+                            updatedAt={c?.comment_updated_at}
+                            updatedBy={c?.comment_updated_by}
+                            onSaveComment={(next) => upsertChangeComment(y, lvl, next)}
+                            label={`Internal ${lvl} ${y} (${type})`}
+                          >
+                            {cell}
+                          </CellWithComment>
                         </td>
                       );
                     })}
@@ -1068,19 +1064,15 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
                       );
                       return (
                         <td key={y} className="px-1 py-1 align-top">
-                          {type === "increase" ? (
-                            <CellWithComment
-                              comment={c?.comment}
-                              updatedAt={c?.comment_updated_at}
-                              updatedBy={c?.comment_updated_by}
-                              onSaveComment={(next) => upsertChangeComment(y, lvl, next)}
-                              label={`External ${lvl} ${y}`}
-                            >
-                              {cell}
-                            </CellWithComment>
-                          ) : (
-                            cell
-                          )}
+                          <CellWithComment
+                            comment={c?.comment}
+                            updatedAt={c?.comment_updated_at}
+                            updatedBy={c?.comment_updated_by}
+                            onSaveComment={(next) => upsertChangeComment(y, lvl, next)}
+                            label={`External ${lvl} ${y} (${type})`}
+                          >
+                            {cell}
+                          </CellWithComment>
                         </td>
                       );
                     })}
