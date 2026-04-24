@@ -103,6 +103,7 @@ export default function Assumptions() {
   const [storedScenario, setStoredScenario] = useActiveScenario();
   const [reloadKey, setReloadKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const { toast } = useToast();
   const autoVersion = useAutoVersion();
   const initialFingerprint = useRef<Record<string, string>>({});
