@@ -514,6 +514,40 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
     }
   };
 
+  const upsertComment = async (year: number, comment: string | null) => {
+    const existing = get(year);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({
+        type: "update",
+        table: "global",
+        id: existing.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("global_assumptions")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("global_assumptions")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          salary_increase_pct: 0.04,
+          price_increase_pct: 0.05,
+          eur_nok_rate: 11.5,
+          comment,
+          comment_updated_at: ts,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "global", row: inserted });
+    }
+  };
+
   const drivers = [
     { key: "salary_increase_pct", label: "Lønnsvekst %", suffix: "%", scale: 100 },
     { key: "price_increase_pct", label: "Prisvekst %", suffix: "%", scale: 100 },
@@ -531,7 +565,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d) => (
+          {drivers.map((d, dIdx) => (
             <tr key={d.key} className="border-b">
               <td className="px-2 py-2">{d.label}</td>
               {FC_YEARS.map((y) => {
@@ -539,11 +573,27 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
                 const v = (row?.[d.key] ?? (d.key === "salary_increase_pct" ? 0.04 : 0.05)) * d.scale;
                 return (
                   <td key={y} className="px-1 py-1">
-                    <NumCell
-                      value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
-                      suffix={d.suffix}
-                      onCommit={(num) => upsert(y, d.key, num / d.scale)}
-                    />
+                    {dIdx === 0 ? (
+                      <CellWithComment
+                        comment={row?.comment}
+                        updatedAt={row?.comment_updated_at}
+                        updatedBy={row?.comment_updated_by}
+                        onSaveComment={(next) => upsertComment(y, next)}
+                        label={`Globale drivere ${y}`}
+                      >
+                        <NumCell
+                          value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
+                          suffix={d.suffix}
+                          onCommit={(num) => upsert(y, d.key, num / d.scale)}
+                        />
+                      </CellWithComment>
+                    ) : (
+                      <NumCell
+                        value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
+                        suffix={d.suffix}
+                        onCommit={(num) => upsert(y, d.key, num / d.scale)}
+                      />
+                    )}
                   </td>
                 );
               })}
