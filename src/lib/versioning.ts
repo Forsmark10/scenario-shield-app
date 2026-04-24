@@ -63,6 +63,9 @@ export function diffSummary(
 }
 
 function stripVolatile(rows: any[]) {
+  // Strip auto-managed timestamps/ids, but KEEP comment + comment_updated_at +
+  // comment_updated_by + adjustment_amount_tnok so changes to these trigger a
+  // new auto-version and show up in the diff summary.
   return rows
     .map(({ created_at, updated_at, id, ...rest }) => rest)
     .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));

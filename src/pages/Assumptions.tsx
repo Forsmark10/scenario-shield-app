@@ -781,6 +781,40 @@ function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
+  const upsertChangeComment = async (year: number, level: Level, comment: string | null) => {
+    const existing = getChange(year, level);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({
+        type: "update",
+        table: "intChanges",
+        id: existing.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("internal_fte_changes")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("internal_fte_changes")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          level,
+          increase: 0,
+          decrease: 0,
+          comment,
+          comment_updated_at: ts,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "intChanges", row: inserted });
+    }
+  };
+
   return (
     <Section title="Internal FTE" description="Lønnsnivåer (globalt) og scenario-spesifikke FTE-endringer.">
       <div className="space-y-5">
@@ -840,23 +874,38 @@ function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario
                       const stored = Number(c?.[type] ?? 0);
                       // Decrease lagres som positivt antall i DB, men brukeren skal skrive negativt.
                       const display = type === "decrease" ? -stored : stored;
+                      const cell = (
+                        <NumCell
+                          value={display}
+                          step="1"
+                          min={type === "increase" ? 0 : undefined}
+                          max={type === "decrease" ? 0 : undefined}
+                          errorHint={
+                            type === "increase"
+                              ? "Increase må være 0 eller positiv."
+                              : "Decrease må være 0 eller negativ. Skriv −2 for to færre FTE."
+                          }
+                          onCommit={(v) => {
+                            const stored = type === "decrease" ? Math.abs(Math.round(v)) : Math.round(v);
+                            return upsertChange(y, lvl, type, stored);
+                          }}
+                        />
+                      );
                       return (
                         <td key={y} className="px-1 py-1 align-top">
-                          <NumCell
-                            value={display}
-                            step="1"
-                            min={type === "increase" ? 0 : undefined}
-                            max={type === "decrease" ? 0 : undefined}
-                            errorHint={
-                              type === "increase"
-                                ? "Increase må være 0 eller positiv."
-                                : "Decrease må være 0 eller negativ. Skriv −2 for to færre FTE."
-                            }
-                            onCommit={(v) => {
-                              const stored = type === "decrease" ? Math.abs(Math.round(v)) : Math.round(v);
-                              return upsertChange(y, lvl, type, stored);
-                            }}
-                          />
+                          {type === "increase" ? (
+                            <CellWithComment
+                              comment={c?.comment}
+                              updatedAt={c?.comment_updated_at}
+                              updatedBy={c?.comment_updated_by}
+                              onSaveComment={(next) => upsertChangeComment(y, lvl, next)}
+                              label={`Internal ${lvl} ${y}`}
+                            >
+                              {cell}
+                            </CellWithComment>
+                          ) : (
+                            cell
+                          )}
                         </td>
                       );
                     })}
@@ -905,6 +954,40 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
       const { data: inserted, error } = await supabase
         .from("external_fte_changes")
         .insert({ scenario_id: scenario.id, year, level, increase: 0, decrease: 0, [field]: value } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "extChanges", row: inserted });
+    }
+  };
+
+  const upsertChangeComment = async (year: number, level: Level, comment: string | null) => {
+    const existing = getChange(year, level);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({
+        type: "update",
+        table: "extChanges",
+        id: existing.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("external_fte_changes")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("external_fte_changes")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          level,
+          increase: 0,
+          decrease: 0,
+          comment,
+          comment_updated_at: ts,
+        } as any)
         .select()
         .single();
       if (error) throw error;
@@ -966,23 +1049,38 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
                       const c = getChange(y, lvl);
                       const stored = Number(c?.[type] ?? 0);
                       const display = type === "decrease" ? -stored : stored;
+                      const cell = (
+                        <NumCell
+                          value={display}
+                          step="1"
+                          min={type === "increase" ? 0 : undefined}
+                          max={type === "decrease" ? 0 : undefined}
+                          errorHint={
+                            type === "increase"
+                              ? "Increase må være 0 eller positiv."
+                              : "Decrease må være 0 eller negativ. Skriv −2 for to færre FTE."
+                          }
+                          onCommit={(v) => {
+                            const stored = type === "decrease" ? Math.abs(Math.round(v)) : Math.round(v);
+                            return upsertChange(y, lvl, type, stored);
+                          }}
+                        />
+                      );
                       return (
                         <td key={y} className="px-1 py-1 align-top">
-                          <NumCell
-                            value={display}
-                            step="1"
-                            min={type === "increase" ? 0 : undefined}
-                            max={type === "decrease" ? 0 : undefined}
-                            errorHint={
-                              type === "increase"
-                                ? "Increase må være 0 eller positiv."
-                                : "Decrease må være 0 eller negativ. Skriv −2 for to færre FTE."
-                            }
-                            onCommit={(v) => {
-                              const stored = type === "decrease" ? Math.abs(Math.round(v)) : Math.round(v);
-                              return upsertChange(y, lvl, type, stored);
-                            }}
-                          />
+                          {type === "increase" ? (
+                            <CellWithComment
+                              comment={c?.comment}
+                              updatedAt={c?.comment_updated_at}
+                              updatedBy={c?.comment_updated_by}
+                              onSaveComment={(next) => upsertChangeComment(y, lvl, next)}
+                              label={`External ${lvl} ${y}`}
+                            >
+                              {cell}
+                            </CellWithComment>
+                          ) : (
+                            cell
+                          )}
                         </td>
                       );
                     })}
@@ -1024,6 +1122,21 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
     if (error) throw error;
   };
 
+  const updateComment = async (id: string, comment: string | null) => {
+    const ts = new Date().toISOString();
+    patch({
+      type: "update",
+      table: "conversions",
+      id,
+      changes: { comment, comment_updated_at: ts },
+    });
+    const { error } = await supabase
+      .from("conversions")
+      .update({ comment, comment_updated_at: ts } as any)
+      .eq("id", id);
+    if (error) throw error;
+  };
+
   const remove = async (id: string) => {
     patch({ type: "delete", table: "conversions", id });
     const { error } = await supabase.from("conversions").delete().eq("id", id);
@@ -1054,12 +1167,20 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
             {rows.map((r) => (
               <tr key={r.id} className="border-b">
                 <td className="px-1 py-1">
-                  <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <CellWithComment
+                    comment={r.comment}
+                    updatedAt={r.comment_updated_at}
+                    updatedBy={r.comment_updated_by}
+                    onSaveComment={(next) => updateComment(r.id, next)}
+                    label={`Konvertering ${r.year}`}
+                  >
+                    <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </CellWithComment>
                 </td>
                 <td className="px-1 py-1">
                   <Select value={r.external_level} onValueChange={(v) => updateField(r.id, "external_level", v)}>
@@ -1163,6 +1284,21 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
     if (error) throw error;
   };
 
+  const updateComment = async (id: string, comment: string | null) => {
+    const ts = new Date().toISOString();
+    patch({
+      type: "update",
+      table: "nearshoringAdds",
+      id,
+      changes: { comment, comment_updated_at: ts },
+    });
+    const { error } = await supabase
+      .from("nearshoring_additions")
+      .update({ comment, comment_updated_at: ts } as any)
+      .eq("id", id);
+    if (error) throw error;
+  };
+
   const remove = async (id: string) => {
     patch({ type: "delete", table: "nearshoringAdds", id });
     const { error } = await supabase.from("nearshoring_additions").delete().eq("id", id);
@@ -1254,12 +1390,20 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
               {adds.map((r) => (
                 <tr key={r.id} className="border-b">
                   <td className="px-1 py-1">
-                    <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <CellWithComment
+                      comment={r.comment}
+                      updatedAt={r.comment_updated_at}
+                      updatedBy={r.comment_updated_by}
+                      onSaveComment={(next) => updateComment(r.id, next)}
+                      label={`Nearshoring ${r.year}`}
+                    >
+                      <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </CellWithComment>
                   </td>
                   <td className="px-1 py-1">
                     <Select value={r.replaces_external_level} onValueChange={(v) => updateField(r.id, "replaces_external_level", v)}>
@@ -1491,6 +1635,21 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
     if (error) throw error;
   };
 
+  const updateDetailComment = async (id: string, comment: string | null) => {
+    const ts = new Date().toISOString();
+    patch({
+      type: "update",
+      table: "capexPlan",
+      id,
+      changes: { comment, comment_updated_at: ts },
+    });
+    const { error } = await supabase
+      .from("capex_plan")
+      .update({ comment, comment_updated_at: ts } as any)
+      .eq("id", id);
+    if (error) throw error;
+  };
+
   const addDetail = async () => {
     const { data: inserted, error } = await supabase
       .from("capex_plan")
@@ -1594,10 +1753,18 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
                 {detailedRows.map((r) => (
                   <tr key={r.id} className="border-b">
                     <td className="px-1 py-1">
-                      <Select value={r.capex_type} onValueChange={(v) => updateDetailField(r.id, "capex_type", v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>{types.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <CellWithComment
+                        comment={r.comment}
+                        updatedAt={r.comment_updated_at}
+                        updatedBy={r.comment_updated_by}
+                        onSaveComment={(next) => updateDetailComment(r.id, next)}
+                        label={`Capex: ${r.description ?? r.capex_type}`}
+                      >
+                        <Select value={r.capex_type} onValueChange={(v) => updateDetailField(r.id, "capex_type", v)}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>{types.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </CellWithComment>
                     </td>
                     <td className="px-1 py-1">
                       <Input
