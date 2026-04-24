@@ -1293,16 +1293,65 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
   const get = (cat: string, year: number) =>
     data.catAdj.find((a) => a.scenario_id === scenario.id && a.category === cat && a.year === year);
 
-  const upsert = async (cat: string, year: number, value: number) => {
+  const upsertField = async (
+    cat: string,
+    year: number,
+    field: "adjustment_pct" | "adjustment_amount_tnok",
+    value: number,
+  ) => {
     const r = get(cat, year);
     if (r) {
-      patch({ type: "update", table: "catAdj", id: r.id, changes: { adjustment_pct: value } });
-      const { error } = await supabase.from("category_adjustments").update({ adjustment_pct: value }).eq("id", r.id);
+      patch({ type: "update", table: "catAdj", id: r.id, changes: { [field]: value } });
+      const { error } = await supabase
+        .from("category_adjustments")
+        .update({ [field]: value } as any)
+        .eq("id", r.id);
       if (error) throw error;
     } else {
       const { data: inserted, error } = await supabase
         .from("category_adjustments")
-        .insert({ scenario_id: scenario.id, category: cat, year, adjustment_pct: value })
+        .insert({
+          scenario_id: scenario.id,
+          category: cat,
+          year,
+          adjustment_pct: 0,
+          adjustment_amount_tnok: 0,
+          [field]: value,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "catAdj", row: inserted });
+    }
+  };
+
+  const upsertComment = async (cat: string, year: number, comment: string | null) => {
+    const r = get(cat, year);
+    const ts = new Date().toISOString();
+    if (r) {
+      patch({
+        type: "update",
+        table: "catAdj",
+        id: r.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("category_adjustments")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", r.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("category_adjustments")
+        .insert({
+          scenario_id: scenario.id,
+          category: cat,
+          year,
+          adjustment_pct: 0,
+          adjustment_amount_tnok: 0,
+          comment,
+          comment_updated_at: ts,
+        } as any)
         .select()
         .single();
       if (error) throw error;
@@ -1313,17 +1362,23 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
   return (
     <Section
       title="Kategori-justeringer"
-      description="Justering legges på toppen av prisvekst og representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere justeringer over år multipliseres sammen. Positive verdier (for eksempel +5%) reverserer tidligere reduksjoner. Gjelder kun Local-kostnader. Range -50% til +50%."
-      tooltip="Justering legges på toppen av prisvekst og representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere justeringer over år multipliseres sammen. Positive verdier (for eksempel +5%) reverserer tidligere reduksjoner. Gjelder kun Local-kostnader. Range -50% til +50%."
+      description="To kombinerbare justeringer per kategori og år: prosent (multiplikativt på toppen av prisvekst, permanent reforhandling) og absolutt beløp i tNOK (additivt, fast beløp som ikke vokser med prisvekst). Begge er permanente fra året de settes."
+      tooltip="Prosent: -10% i 2027 gjelder 2027-2031 og multipliseres. Beløp: -500 tNOK i 2027 reduserer kategori-totalen med 500 tNOK hvert år fra 2027. Begge kan settes samtidig."
     >
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b">
-              <th className="text-left font-medium px-2 py-2 w-[180px]">Kategori</th>
+              <th className="text-left font-medium px-2 py-2 w-[160px]" rowSpan={2}>Kategori</th>
               {FC_YEARS.map((y) => (
-                <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+                <th key={y} className="text-center font-medium px-2 py-2" colSpan={2}>{y}</th>
               ))}
+            </tr>
+            <tr className="border-b">
+              {FC_YEARS.flatMap((y) => [
+                <th key={`${y}-p`} className="text-right font-normal text-[10px] text-muted-foreground px-1 py-1">%</th>,
+                <th key={`${y}-a`} className="text-right font-normal text-[10px] text-muted-foreground px-1 py-1">tNOK</th>,
+              ])}
             </tr>
           </thead>
           <tbody>
@@ -1332,23 +1387,47 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
                 <td className="px-2 py-1.5">{cat}</td>
                 {FC_YEARS.map((y) => {
                   const row = get(cat, y);
-                  const v = Number((row?.adjustment_pct ?? 0)) * 100;
+                  const pct = Number((row?.adjustment_pct ?? 0)) * 100;
+                  const amt = Number(row?.adjustment_amount_tnok ?? 0);
                   return (
-                    <td key={y} className="px-1 py-1">
-                      <NumCell
-                        value={Number(v.toFixed(2))}
-                        suffix="%"
-                        min={-50}
-                        max={50}
-                        onCommit={(num) => upsert(cat, y, num / 100)}
-                      />
-                    </td>
+                    <>
+                      <td key={`${y}-p`} className="px-1 py-1 w-[90px]">
+                        <CellWithComment
+                          comment={row?.comment}
+                          updatedAt={row?.comment_updated_at}
+                          updatedBy={row?.comment_updated_by}
+                          onSaveComment={(next) => upsertComment(cat, y, next)}
+                          label={`${cat} ${y}`}
+                        >
+                          <NumCell
+                            value={Number(pct.toFixed(2))}
+                            suffix="%"
+                            min={-50}
+                            max={50}
+                            onCommit={(num) => upsertField(cat, y, "adjustment_pct", num / 100)}
+                          />
+                        </CellWithComment>
+                      </td>
+                      <td key={`${y}-a`} className="px-1 py-1 w-[110px]">
+                        <NumCell
+                          value={amt}
+                          step="10"
+                          min={-99999}
+                          max={99999}
+                          errorHint="Range -99 999 til +99 999 tNOK."
+                          onCommit={(num) => upsertField(cat, y, "adjustment_amount_tnok", num)}
+                        />
+                      </td>
+                    </>
                   );
                 })}
               </tr>
             ))}
           </tbody>
         </table>
+        <p className="text-[11px] text-muted-foreground mt-2">
+          Reduksjoner skrives som negative tall (f.eks. <code>-10</code>% eller <code>-500</code> tNOK). Klikk på en celle og bruk kommentar-ikonet i hjørnet for å dokumentere hvorfor tiltaket ble lagt inn.
+        </p>
       </div>
     </Section>
   );
