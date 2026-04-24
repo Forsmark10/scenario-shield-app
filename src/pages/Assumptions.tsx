@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, History, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, History, MessageSquare, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -13,6 +13,8 @@ import { toast as sonnerToast } from "sonner";
 import { InfoTip } from "@/components/InfoTip";
 import { VersionHistoryPanel } from "@/components/VersionHistoryPanel";
 import { GoalSeekPanel } from "@/components/GoalSeekPanel";
+import { CommentPopover } from "@/components/CommentPopover";
+import { CommentsOverviewPanel } from "@/components/CommentsOverviewPanel";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
 import { useActiveScenario } from "@/hooks/useActiveScenario";
 import { cn } from "@/lib/utils";
@@ -20,6 +22,39 @@ import { cn } from "@/lib/utils";
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
 const LEVELS = ["Low", "Medium", "High"] as const;
 type Level = (typeof LEVELS)[number];
+
+/**
+ * Wrap NumCell + a comment dot in the same relative container.
+ * Makes every editable cell discoverable for comments without changing the input footprint.
+ */
+function CellWithComment({
+  comment,
+  updatedAt,
+  updatedBy,
+  onSaveComment,
+  label,
+  children,
+}: {
+  comment: string | null | undefined;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+  onSaveComment: (next: string | null) => Promise<void> | void;
+  label?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative group">
+      {children}
+      <CommentPopover
+        value={comment}
+        updatedAt={updatedAt}
+        updatedBy={updatedBy}
+        onSave={onSaveComment}
+        label={label}
+      />
+    </div>
+  );
+}
 
 type Scenario = { id: string; name: string; sort_order: number };
 
@@ -68,6 +103,7 @@ export default function Assumptions() {
   const [storedScenario, setStoredScenario] = useActiveScenario();
   const [reloadKey, setReloadKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const { toast } = useToast();
   const autoVersion = useAutoVersion();
   const initialFingerprint = useRef<Record<string, string>>({});
@@ -190,15 +226,26 @@ export default function Assumptions() {
             Globale drivere, FTE-endringer og capex-plan per scenario. Endringer lagres automatisk.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setHistoryOpen(true)}
-          disabled={!activeScenario}
-        >
-          <History className="h-4 w-4 mr-2" />
-          Historikk
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCommentsOpen(true)}
+            disabled={!activeScenario}
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Alle kommentarer
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setHistoryOpen(true)}
+            disabled={!activeScenario}
+          >
+            <History className="h-4 w-4 mr-2" />
+            Historikk
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
@@ -243,16 +290,24 @@ export default function Assumptions() {
       </Tabs>
 
       {activeScenario && (
-        <VersionHistoryPanel
-          open={historyOpen}
-          onOpenChange={setHistoryOpen}
-          scenarioId={activeScenario}
-          scenarioName={data.scenarios.find((s) => s.id === activeScenario)?.name ?? ""}
-          onRestored={() => {
-            autoVersion.resetWindow(activeScenario);
-            refresh();
-          }}
-        />
+        <>
+          <VersionHistoryPanel
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            scenarioId={activeScenario}
+            scenarioName={data.scenarios.find((s) => s.id === activeScenario)?.name ?? ""}
+            onRestored={() => {
+              autoVersion.resetWindow(activeScenario);
+              refresh();
+            }}
+          />
+          <CommentsOverviewPanel
+            open={commentsOpen}
+            onOpenChange={setCommentsOpen}
+            scenarioId={activeScenario}
+            scenarioName={data.scenarios.find((s) => s.id === activeScenario)?.name ?? ""}
+          />
+        </>
       )}
     </div>
   );
@@ -459,6 +514,40 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
     }
   };
 
+  const upsertComment = async (year: number, comment: string | null) => {
+    const existing = get(year);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({
+        type: "update",
+        table: "global",
+        id: existing.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("global_assumptions")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("global_assumptions")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          salary_increase_pct: 0.04,
+          price_increase_pct: 0.05,
+          eur_nok_rate: 11.5,
+          comment,
+          comment_updated_at: ts,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "global", row: inserted });
+    }
+  };
+
   const drivers = [
     { key: "salary_increase_pct", label: "Lønnsvekst %", suffix: "%", scale: 100 },
     { key: "price_increase_pct", label: "Prisvekst %", suffix: "%", scale: 100 },
@@ -476,7 +565,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d) => (
+          {drivers.map((d, dIdx) => (
             <tr key={d.key} className="border-b">
               <td className="px-2 py-2">{d.label}</td>
               {FC_YEARS.map((y) => {
@@ -484,11 +573,27 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
                 const v = (row?.[d.key] ?? (d.key === "salary_increase_pct" ? 0.04 : 0.05)) * d.scale;
                 return (
                   <td key={y} className="px-1 py-1">
-                    <NumCell
-                      value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
-                      suffix={d.suffix}
-                      onCommit={(num) => upsert(y, d.key, num / d.scale)}
-                    />
+                    {dIdx === 0 ? (
+                      <CellWithComment
+                        comment={row?.comment}
+                        updatedAt={row?.comment_updated_at}
+                        updatedBy={row?.comment_updated_by}
+                        onSaveComment={(next) => upsertComment(y, next)}
+                        label={`Globale drivere ${y}`}
+                      >
+                        <NumCell
+                          value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
+                          suffix={d.suffix}
+                          onCommit={(num) => upsert(y, d.key, num / d.scale)}
+                        />
+                      </CellWithComment>
+                    ) : (
+                      <NumCell
+                        value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
+                        suffix={d.suffix}
+                        onCommit={(num) => upsert(y, d.key, num / d.scale)}
+                      />
+                    )}
                   </td>
                 );
               })}
@@ -529,6 +634,35 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
     }
   };
 
+  const upsertComment = async (year: number, comment: string | null) => {
+    const existing = get(year);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({ type: "update", table: "central", id: existing.id, changes: { comment, comment_updated_at: ts } });
+      const { error } = await supabase
+        .from("central_assumptions")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("central_assumptions")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          central_price_increase_pct: 0.03,
+          central_volume_increase_pct: 0.02,
+          central_reduction_pct: 0,
+          comment,
+          comment_updated_at: ts,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "central", row: inserted });
+    }
+  };
+
   const drivers = [
     { key: "central_price_increase_pct", label: "Central pris %", default: 0.03 },
     { key: "central_volume_increase_pct", label: "Central volum %", default: 0.02 },
@@ -551,7 +685,7 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d) => {
+          {drivers.map((d, dIdx) => {
             const isReduction = d.key === "central_reduction_pct";
             return (
               <tr key={d.key} className="border-b">
@@ -566,19 +700,34 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
                 {FC_YEARS.map((y) => {
                   const row = get(y);
                   const v = ((row?.[d.key] ?? d.default) * 100);
+                  const cell = (
+                    <NumCell
+                      value={Number(v.toFixed(2))}
+                      suffix="%"
+                      max={isReduction ? 0 : undefined}
+                      errorHint={
+                        isReduction
+                          ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
+                          : undefined
+                      }
+                      onCommit={(num) => upsert(y, d.key, num / 100)}
+                    />
+                  );
                   return (
                     <td key={y} className="px-1 py-1 align-top">
-                      <NumCell
-                        value={Number(v.toFixed(2))}
-                        suffix="%"
-                        max={isReduction ? 0 : undefined}
-                        errorHint={
-                          isReduction
-                            ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
-                            : undefined
-                        }
-                        onCommit={(num) => upsert(y, d.key, num / 100)}
-                      />
+                      {dIdx === 0 ? (
+                        <CellWithComment
+                          comment={row?.comment}
+                          updatedAt={row?.comment_updated_at}
+                          updatedBy={row?.comment_updated_by}
+                          onSaveComment={(next) => upsertComment(y, next)}
+                          label={`Central drivere ${y}`}
+                        >
+                          {cell}
+                        </CellWithComment>
+                      ) : (
+                        cell
+                      )}
                     </td>
                   );
                 })}
@@ -1144,16 +1293,65 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
   const get = (cat: string, year: number) =>
     data.catAdj.find((a) => a.scenario_id === scenario.id && a.category === cat && a.year === year);
 
-  const upsert = async (cat: string, year: number, value: number) => {
+  const upsertField = async (
+    cat: string,
+    year: number,
+    field: "adjustment_pct" | "adjustment_amount_tnok",
+    value: number,
+  ) => {
     const r = get(cat, year);
     if (r) {
-      patch({ type: "update", table: "catAdj", id: r.id, changes: { adjustment_pct: value } });
-      const { error } = await supabase.from("category_adjustments").update({ adjustment_pct: value }).eq("id", r.id);
+      patch({ type: "update", table: "catAdj", id: r.id, changes: { [field]: value } });
+      const { error } = await supabase
+        .from("category_adjustments")
+        .update({ [field]: value } as any)
+        .eq("id", r.id);
       if (error) throw error;
     } else {
       const { data: inserted, error } = await supabase
         .from("category_adjustments")
-        .insert({ scenario_id: scenario.id, category: cat, year, adjustment_pct: value })
+        .insert({
+          scenario_id: scenario.id,
+          category: cat,
+          year,
+          adjustment_pct: 0,
+          adjustment_amount_tnok: 0,
+          [field]: value,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "catAdj", row: inserted });
+    }
+  };
+
+  const upsertComment = async (cat: string, year: number, comment: string | null) => {
+    const r = get(cat, year);
+    const ts = new Date().toISOString();
+    if (r) {
+      patch({
+        type: "update",
+        table: "catAdj",
+        id: r.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("category_adjustments")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", r.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("category_adjustments")
+        .insert({
+          scenario_id: scenario.id,
+          category: cat,
+          year,
+          adjustment_pct: 0,
+          adjustment_amount_tnok: 0,
+          comment,
+          comment_updated_at: ts,
+        } as any)
         .select()
         .single();
       if (error) throw error;
@@ -1164,17 +1362,23 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
   return (
     <Section
       title="Kategori-justeringer"
-      description="Justering legges på toppen av prisvekst og representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere justeringer over år multipliseres sammen. Positive verdier (for eksempel +5%) reverserer tidligere reduksjoner. Gjelder kun Local-kostnader. Range -50% til +50%."
-      tooltip="Justering legges på toppen av prisvekst og representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere justeringer over år multipliseres sammen. Positive verdier (for eksempel +5%) reverserer tidligere reduksjoner. Gjelder kun Local-kostnader. Range -50% til +50%."
+      description="To kombinerbare justeringer per kategori og år: prosent (multiplikativt på toppen av prisvekst, permanent reforhandling) og absolutt beløp i tNOK (additivt, fast beløp som ikke vokser med prisvekst). Begge er permanente fra året de settes."
+      tooltip="Prosent: -10% i 2027 gjelder 2027-2031 og multipliseres. Beløp: -500 tNOK i 2027 reduserer kategori-totalen med 500 tNOK hvert år fra 2027. Begge kan settes samtidig."
     >
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b">
-              <th className="text-left font-medium px-2 py-2 w-[180px]">Kategori</th>
+              <th className="text-left font-medium px-2 py-2 w-[160px]" rowSpan={2}>Kategori</th>
               {FC_YEARS.map((y) => (
-                <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+                <th key={y} className="text-center font-medium px-2 py-2" colSpan={2}>{y}</th>
               ))}
+            </tr>
+            <tr className="border-b">
+              {FC_YEARS.flatMap((y) => [
+                <th key={`${y}-p`} className="text-right font-normal text-[10px] text-muted-foreground px-1 py-1">%</th>,
+                <th key={`${y}-a`} className="text-right font-normal text-[10px] text-muted-foreground px-1 py-1">tNOK</th>,
+              ])}
             </tr>
           </thead>
           <tbody>
@@ -1183,23 +1387,47 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
                 <td className="px-2 py-1.5">{cat}</td>
                 {FC_YEARS.map((y) => {
                   const row = get(cat, y);
-                  const v = Number((row?.adjustment_pct ?? 0)) * 100;
+                  const pct = Number((row?.adjustment_pct ?? 0)) * 100;
+                  const amt = Number(row?.adjustment_amount_tnok ?? 0);
                   return (
-                    <td key={y} className="px-1 py-1">
-                      <NumCell
-                        value={Number(v.toFixed(2))}
-                        suffix="%"
-                        min={-50}
-                        max={50}
-                        onCommit={(num) => upsert(cat, y, num / 100)}
-                      />
-                    </td>
+                    <>
+                      <td key={`${y}-p`} className="px-1 py-1 w-[90px]">
+                        <CellWithComment
+                          comment={row?.comment}
+                          updatedAt={row?.comment_updated_at}
+                          updatedBy={row?.comment_updated_by}
+                          onSaveComment={(next) => upsertComment(cat, y, next)}
+                          label={`${cat} ${y}`}
+                        >
+                          <NumCell
+                            value={Number(pct.toFixed(2))}
+                            suffix="%"
+                            min={-50}
+                            max={50}
+                            onCommit={(num) => upsertField(cat, y, "adjustment_pct", num / 100)}
+                          />
+                        </CellWithComment>
+                      </td>
+                      <td key={`${y}-a`} className="px-1 py-1 w-[110px]">
+                        <NumCell
+                          value={amt}
+                          step="10"
+                          min={-99999}
+                          max={99999}
+                          errorHint="Range -99 999 til +99 999 tNOK."
+                          onCommit={(num) => upsertField(cat, y, "adjustment_amount_tnok", num)}
+                        />
+                      </td>
+                    </>
                   );
                 })}
               </tr>
             ))}
           </tbody>
         </table>
+        <p className="text-[11px] text-muted-foreground mt-2">
+          Reduksjoner skrives som negative tall (f.eks. <code>-10</code>% eller <code>-500</code> tNOK). Klikk på en celle og bruk kommentar-ikonet i hjørnet for å dokumentere hvorfor tiltaket ble lagt inn.
+        </p>
       </div>
     </Section>
   );

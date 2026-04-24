@@ -686,6 +686,54 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   nsLine.monthly_2027 = Array(12).fill((nsLine.amounts[2027] ?? 0) / 12);
   lines.push(nsLine);
 
+  // ---------- VIRTUAL: Kategori-justering (absolutt beløp tNOK) ----------
+  // Per kategori: kumulativ sum av adjustment_amount_tnok fom 2027 tom N.
+  // Beløpet er PERMANENT: satt i ett år gjelder det samme år og alle påfølgende.
+  // Vokser IKKE med prisvekst (matcher hvordan konkrete tiltak ofte er kjent som fast beløp).
+  const scenarioAdj = category_adjustments.filter((a) => a.scenario_id === scenario_id);
+  const adjCategories = Array.from(
+    new Set(
+      scenarioAdj
+        .filter((a) => Number(a.adjustment_amount_tnok ?? 0) !== 0)
+        .map((a) => a.category)
+    )
+  );
+  for (const cat of adjCategories) {
+    const adjLine: ForecastLine = {
+      line_id: `virtual:cat_adj_amount:${cat}`,
+      source: "virtual",
+      category: cat,
+      project: "Kategori-justering (beløp)",
+      account: null,
+      account_name: `Kategori-justering ${cat} (fast beløp)`,
+      cost_type: "Local",
+      is_capex: false,
+      is_depreciation: false,
+      base_2026: 0,
+      amounts: {},
+      monthly_2027: [],
+      breakdown_source: {},
+    };
+    for (const N of YEARS) {
+      let amt = 0;
+      const parts: string[] = [];
+      for (let Y = 2027; Y <= N; Y++) {
+        const row = scenarioAdj.find((a) => a.category === cat && a.year === Y);
+        const v = Number(row?.adjustment_amount_tnok ?? 0);
+        if (v !== 0) {
+          amt += v;
+          parts.push(`Y${Y}: ${v} tNOK (permanent fra ${Y})`);
+        }
+      }
+      adjLine.amounts[N] = amt;
+      adjLine.breakdown_source[N] = parts.length
+        ? `${parts.join("\n")}\nSum aktivt år ${N} = ${round2(amt)} tNOK`
+        : "Ingen absolutt justering";
+    }
+    adjLine.monthly_2027 = Array(12).fill((adjLine.amounts[2027] ?? 0) / 12);
+    lines.push(adjLine);
+  }
+
   // ---------- TOTALS ----------
   const totals: ForecastTotals = {
     by_year: {},

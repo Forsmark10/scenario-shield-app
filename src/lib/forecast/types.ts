@@ -65,6 +65,8 @@ export interface CategoryAdjustment {
   category: string;
   year: number;
   adjustment_pct: number;
+  adjustment_amount_tnok?: number;
+  comment?: string | null;
 }
 
 export interface CapexPlan {

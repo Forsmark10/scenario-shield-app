@@ -72,6 +72,9 @@ export type Database = {
         Row: {
           amount: number
           capex_type: string
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
           created_at: string
           description: string | null
           id: string
@@ -82,6 +85,9 @@ export type Database = {
         Insert: {
           amount?: number
           capex_type: string
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -92,6 +98,9 @@ export type Database = {
         Update: {
           amount?: number
           capex_type?: string
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -111,8 +120,12 @@ export type Database = {
       }
       category_adjustments: {
         Row: {
+          adjustment_amount_tnok: number
           adjustment_pct: number
           category: string
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
           created_at: string
           id: string
           scenario_id: string
@@ -120,8 +133,12 @@ export type Database = {
           year: number
         }
         Insert: {
+          adjustment_amount_tnok?: number
           adjustment_pct?: number
           category: string
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           id?: string
           scenario_id: string
@@ -129,8 +146,12 @@ export type Database = {
           year: number
         }
         Update: {
+          adjustment_amount_tnok?: number
           adjustment_pct?: number
           category?: string
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           id?: string
           scenario_id?: string
@@ -152,6 +173,9 @@ export type Database = {
           central_price_increase_pct: number
           central_reduction_pct: number
           central_volume_increase_pct: number
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
           created_at: string
           id: string
           scenario_id: string
@@ -162,6 +186,9 @@ export type Database = {
           central_price_increase_pct?: number
           central_reduction_pct?: number
           central_volume_increase_pct?: number
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           id?: string
           scenario_id: string
@@ -172,6 +199,9 @@ export type Database = {
           central_price_increase_pct?: number
           central_reduction_pct?: number
           central_volume_increase_pct?: number
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           id?: string
           scenario_id?: string
@@ -190,6 +220,9 @@ export type Database = {
       }
       conversions: {
         Row: {
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
           count: number
           created_at: string
           external_level: string
@@ -201,6 +234,9 @@ export type Database = {
           year: number
         }
         Insert: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           count?: number
           created_at?: string
           external_level: string
@@ -212,6 +248,9 @@ export type Database = {
           year: number
         }
         Update: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           count?: number
           created_at?: string
           external_level?: string
@@ -363,6 +402,9 @@ export type Database = {
       }
       external_fte_changes: {
         Row: {
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
           created_at: string
           decrease: number
           id: string
@@ -373,6 +415,9 @@ export type Database = {
           year: number
         }
         Insert: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           decrease?: number
           id?: string
@@ -383,6 +428,9 @@ export type Database = {
           year: number
         }
         Update: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           decrease?: number
           id?: string
@@ -442,6 +490,9 @@ export type Database = {
       }
       global_assumptions: {
         Row: {
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
           created_at: string
           eur_nok_rate: number
           id: string
@@ -452,6 +503,9 @@ export type Database = {
           year: number
         }
         Insert: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           eur_nok_rate?: number
           id?: string
@@ -462,6 +516,9 @@ export type Database = {
           year: number
         }
         Update: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           eur_nok_rate?: number
           id?: string
@@ -507,6 +564,9 @@ export type Database = {
       }
       internal_fte_changes: {
         Row: {
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
           created_at: string
           decrease: number
           id: string
@@ -517,6 +577,9 @@ export type Database = {
           year: number
         }
         Insert: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           decrease?: number
           id?: string
@@ -527,6 +590,9 @@ export type Database = {
           year: number
         }
         Update: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           created_at?: string
           decrease?: number
           id?: string
@@ -548,6 +614,9 @@ export type Database = {
       }
       nearshoring_additions: {
         Row: {
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
           count: number
           created_at: string
           id: string
@@ -558,6 +627,9 @@ export type Database = {
           year: number
         }
         Insert: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           count?: number
           created_at?: string
           id?: string
@@ -568,6 +640,9 @@ export type Database = {
           year: number
         }
         Update: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
           count?: number
           created_at?: string
           id?: string
