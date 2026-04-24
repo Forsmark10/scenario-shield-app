@@ -1390,12 +1390,20 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
               {adds.map((r) => (
                 <tr key={r.id} className="border-b">
                   <td className="px-1 py-1">
-                    <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <CellWithComment
+                      comment={r.comment}
+                      updatedAt={r.comment_updated_at}
+                      updatedBy={r.comment_updated_by}
+                      onSaveComment={(next) => updateComment(r.id, next)}
+                      label={`Nearshoring ${r.year}`}
+                    >
+                      <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </CellWithComment>
                   </td>
                   <td className="px-1 py-1">
                     <Select value={r.replaces_external_level} onValueChange={(v) => updateField(r.id, "replaces_external_level", v)}>
