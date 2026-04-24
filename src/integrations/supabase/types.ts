@@ -124,6 +124,9 @@ export type Database = {
           adjustment_pct: number
           category: string
           comment: string | null
+          comment_amount: string | null
+          comment_amount_updated_at: string | null
+          comment_amount_updated_by: string | null
           comment_updated_at: string | null
           comment_updated_by: string | null
           created_at: string
@@ -137,6 +140,9 @@ export type Database = {
           adjustment_pct?: number
           category: string
           comment?: string | null
+          comment_amount?: string | null
+          comment_amount_updated_at?: string | null
+          comment_amount_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
@@ -150,6 +156,9 @@ export type Database = {
           adjustment_pct?: number
           category?: string
           comment?: string | null
+          comment_amount?: string | null
+          comment_amount_updated_at?: string | null
+          comment_amount_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
@@ -690,6 +699,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          executive_summary: string | null
           id: string
           is_active: boolean
           name: string
@@ -699,6 +709,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          executive_summary?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -708,6 +719,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          executive_summary?: string | null
           id?: string
           is_active?: boolean
           name?: string

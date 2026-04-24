@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ExecutiveSummary } from "@/components/ExecutiveSummary";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "PL" | "Spend";
@@ -273,6 +274,12 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Executive Summary (above scenario sections) */}
+      <ExecutiveSummary
+        scenarios={scenarios.map((b) => b.meta)}
+        colors={SCENARIO_COLOR}
+      />
 
       {/* Per-scenario sections */}
       {scenarios.map((bundle, i) => (
