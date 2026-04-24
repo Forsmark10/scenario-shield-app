@@ -30,10 +30,9 @@ const SECTION_LABEL: Record<string, string> = {
   capex_plan: "Capex-plan",
 };
 
-function describe(section: string, row: any): string {
+function describe(section: string, row: any, variant?: "pct" | "amt"): string {
   switch (section) {
     case "global_assumptions":
-      return `${row.year}`;
     case "central_assumptions":
       return `${row.year}`;
     case "internal_fte_changes":
@@ -43,14 +42,60 @@ function describe(section: string, row: any): string {
       return `${row.year} · ${row.external_level} → ${row.internal_level} (×${row.count})`;
     case "nearshoring_additions":
       return `${row.year} · erstatter ${row.replaces_external_level} (×${row.count})`;
-    case "category_adjustments":
-      return `${row.category} · ${row.year} · ${(Number(row.adjustment_pct) * 100).toFixed(1)}% / ${Number(row.adjustment_amount_tnok ?? 0)} tNOK`;
+    case "category_adjustments": {
+      const tag = variant === "amt" ? "tNOK" : "%";
+      const value =
+        variant === "amt"
+          ? `${Number(row.adjustment_amount_tnok ?? 0)} tNOK`
+          : `${(Number(row.adjustment_pct ?? 0) * 100).toFixed(1)}%`;
+      return `${row.category} · ${row.year} · ${tag} (${value})`;
+    }
     case "capex_plan":
       return `${row.year} · ${row.capex_type}${row.description ? " · " + row.description : ""} (${row.amount} tNOK)`;
     default:
       return JSON.stringify(row);
   }
 }
+
+/** Loads all comments for a scenario — also exported for use by Executive Summary on Dashboard. */
+export async function loadScenarioComments(scenarioId: string): Promise<CommentEntry[]> {
+  const tables = Object.keys(SECTION_LABEL);
+  const results = await Promise.all(
+    tables.map((t) =>
+      supabase
+        .from(t as any)
+        .select("*")
+        .eq("scenario_id", scenarioId),
+    ),
+  );
+  const list: CommentEntry[] = [];
+  results.forEach((res, idx) => {
+    const section = tables[idx];
+    for (const row of (res.data ?? []) as any[]) {
+      if (row.comment && String(row.comment).trim()) {
+        list.push({
+          section,
+          label: describe(section, row, section === "category_adjustments" ? "pct" : undefined),
+          comment: row.comment,
+          updatedAt: row.comment_updated_at ?? null,
+        });
+      }
+      // Category adjustments has a separate comment for the tNOK cell
+      if (section === "category_adjustments" && row.comment_amount && String(row.comment_amount).trim()) {
+        list.push({
+          section,
+          label: describe(section, row, "amt"),
+          comment: row.comment_amount,
+          updatedAt: row.comment_amount_updated_at ?? null,
+        });
+      }
+    }
+  });
+  return list;
+}
+
+export { SECTION_LABEL };
+export type { CommentEntry };
 
 export function CommentsOverviewPanel({ open, onOpenChange, scenarioId, scenarioName }: Props) {
   const [loading, setLoading] = useState(false);
@@ -61,29 +106,7 @@ export function CommentsOverviewPanel({ open, onOpenChange, scenarioId, scenario
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const tables = Object.keys(SECTION_LABEL);
-      const results = await Promise.all(
-        tables.map((t) =>
-          supabase
-            .from(t as any)
-            .select("*")
-            .eq("scenario_id", scenarioId)
-            .not("comment", "is", null),
-        ),
-      );
-      const list: CommentEntry[] = [];
-      results.forEach((res, idx) => {
-        const section = tables[idx];
-        for (const row of (res.data ?? []) as any[]) {
-          if (!row.comment || !String(row.comment).trim()) continue;
-          list.push({
-            section,
-            label: describe(section, row),
-            comment: row.comment,
-            updatedAt: row.comment_updated_at ?? null,
-          });
-        }
-      });
+      const list = await loadScenarioComments(scenarioId);
       if (!cancelled) {
         setEntries(list);
         setLoading(false);
