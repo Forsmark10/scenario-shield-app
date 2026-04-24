@@ -1753,10 +1753,18 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
                 {detailedRows.map((r) => (
                   <tr key={r.id} className="border-b">
                     <td className="px-1 py-1">
-                      <Select value={r.capex_type} onValueChange={(v) => updateDetailField(r.id, "capex_type", v)}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>{types.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <CellWithComment
+                        comment={r.comment}
+                        updatedAt={r.comment_updated_at}
+                        updatedBy={r.comment_updated_by}
+                        onSaveComment={(next) => updateDetailComment(r.id, next)}
+                        label={`Capex: ${r.description ?? r.capex_type}`}
+                      >
+                        <Select value={r.capex_type} onValueChange={(v) => updateDetailField(r.id, "capex_type", v)}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>{types.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </CellWithComment>
                     </td>
                     <td className="px-1 py-1">
                       <Input
