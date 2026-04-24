@@ -226,15 +226,26 @@ export default function Assumptions() {
             Globale drivere, FTE-endringer og capex-plan per scenario. Endringer lagres automatisk.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setHistoryOpen(true)}
-          disabled={!activeScenario}
-        >
-          <History className="h-4 w-4 mr-2" />
-          Historikk
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCommentsOpen(true)}
+            disabled={!activeScenario}
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Alle kommentarer
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setHistoryOpen(true)}
+            disabled={!activeScenario}
+          >
+            <History className="h-4 w-4 mr-2" />
+            Historikk
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
