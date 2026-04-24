@@ -1801,15 +1801,26 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
               {types.map((t) => (
                 <tr key={t} className="border-b">
                   <td className="px-2 py-1.5">{t}</td>
-                  {FC_YEARS.map((y) => (
-                    <td key={y} className="px-1 py-1">
-                      <NumCell
-                        value={Number(aggregatedLine.get(`${t}-${y}`)?.amount ?? 0)}
-                        step="100"
-                        onCommit={(v) => upsertAggregated(t, y, v)}
-                      />
-                    </td>
-                  ))}
+                  {FC_YEARS.map((y) => {
+                    const bucket = aggregatedLine.get(`${t}-${y}`);
+                    return (
+                      <td key={y} className="px-1 py-1">
+                        <CellWithComment
+                          comment={bucket?.comment}
+                          updatedAt={bucket?.comment_updated_at}
+                          updatedBy={bucket?.comment_updated_by}
+                          onSaveComment={(next) => upsertAggregatedComment(t, y, next)}
+                          label={`Capex ${t} ${y}`}
+                        >
+                          <NumCell
+                            value={Number(bucket?.amount ?? 0)}
+                            step="100"
+                            onCommit={(v) => upsertAggregated(t, y, v)}
+                          />
+                        </CellWithComment>
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
               <tr className="font-semibold">
