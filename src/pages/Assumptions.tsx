@@ -634,6 +634,35 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
     }
   };
 
+  const upsertComment = async (year: number, comment: string | null) => {
+    const existing = get(year);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({ type: "update", table: "central", id: existing.id, changes: { comment, comment_updated_at: ts } });
+      const { error } = await supabase
+        .from("central_assumptions")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("central_assumptions")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          central_price_increase_pct: 0.03,
+          central_volume_increase_pct: 0.02,
+          central_reduction_pct: 0,
+          comment,
+          comment_updated_at: ts,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "central", row: inserted });
+    }
+  };
+
   const drivers = [
     { key: "central_price_increase_pct", label: "Central pris %", default: 0.03 },
     { key: "central_volume_increase_pct", label: "Central volum %", default: 0.02 },
@@ -656,7 +685,7 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d) => {
+          {drivers.map((d, dIdx) => {
             const isReduction = d.key === "central_reduction_pct";
             return (
               <tr key={d.key} className="border-b">
@@ -671,19 +700,34 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
                 {FC_YEARS.map((y) => {
                   const row = get(y);
                   const v = ((row?.[d.key] ?? d.default) * 100);
+                  const cell = (
+                    <NumCell
+                      value={Number(v.toFixed(2))}
+                      suffix="%"
+                      max={isReduction ? 0 : undefined}
+                      errorHint={
+                        isReduction
+                          ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
+                          : undefined
+                      }
+                      onCommit={(num) => upsert(y, d.key, num / 100)}
+                    />
+                  );
                   return (
                     <td key={y} className="px-1 py-1 align-top">
-                      <NumCell
-                        value={Number(v.toFixed(2))}
-                        suffix="%"
-                        max={isReduction ? 0 : undefined}
-                        errorHint={
-                          isReduction
-                            ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
-                            : undefined
-                        }
-                        onCommit={(num) => upsert(y, d.key, num / 100)}
-                      />
+                      {dIdx === 0 ? (
+                        <CellWithComment
+                          comment={row?.comment}
+                          updatedAt={row?.comment_updated_at}
+                          updatedBy={row?.comment_updated_by}
+                          onSaveComment={(next) => upsertComment(y, next)}
+                          label={`Central drivere ${y}`}
+                        >
+                          {cell}
+                        </CellWithComment>
+                      ) : (
+                        cell
+                      )}
                     </td>
                   );
                 })}
