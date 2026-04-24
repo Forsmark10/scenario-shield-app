@@ -1049,23 +1049,38 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
                       const c = getChange(y, lvl);
                       const stored = Number(c?.[type] ?? 0);
                       const display = type === "decrease" ? -stored : stored;
+                      const cell = (
+                        <NumCell
+                          value={display}
+                          step="1"
+                          min={type === "increase" ? 0 : undefined}
+                          max={type === "decrease" ? 0 : undefined}
+                          errorHint={
+                            type === "increase"
+                              ? "Increase må være 0 eller positiv."
+                              : "Decrease må være 0 eller negativ. Skriv −2 for to færre FTE."
+                          }
+                          onCommit={(v) => {
+                            const stored = type === "decrease" ? Math.abs(Math.round(v)) : Math.round(v);
+                            return upsertChange(y, lvl, type, stored);
+                          }}
+                        />
+                      );
                       return (
                         <td key={y} className="px-1 py-1 align-top">
-                          <NumCell
-                            value={display}
-                            step="1"
-                            min={type === "increase" ? 0 : undefined}
-                            max={type === "decrease" ? 0 : undefined}
-                            errorHint={
-                              type === "increase"
-                                ? "Increase må være 0 eller positiv."
-                                : "Decrease må være 0 eller negativ. Skriv −2 for to færre FTE."
-                            }
-                            onCommit={(v) => {
-                              const stored = type === "decrease" ? Math.abs(Math.round(v)) : Math.round(v);
-                              return upsertChange(y, lvl, type, stored);
-                            }}
-                          />
+                          {type === "increase" ? (
+                            <CellWithComment
+                              comment={c?.comment}
+                              updatedAt={c?.comment_updated_at}
+                              updatedBy={c?.comment_updated_by}
+                              onSaveComment={(next) => upsertChangeComment(y, lvl, next)}
+                              label={`External ${lvl} ${y}`}
+                            >
+                              {cell}
+                            </CellWithComment>
+                          ) : (
+                            cell
+                          )}
                         </td>
                       );
                     })}
