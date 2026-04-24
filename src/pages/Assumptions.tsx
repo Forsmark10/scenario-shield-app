@@ -1122,6 +1122,21 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
     if (error) throw error;
   };
 
+  const updateComment = async (id: string, comment: string | null) => {
+    const ts = new Date().toISOString();
+    patch({
+      type: "update",
+      table: "conversions",
+      id,
+      changes: { comment, comment_updated_at: ts },
+    });
+    const { error } = await supabase
+      .from("conversions")
+      .update({ comment, comment_updated_at: ts } as any)
+      .eq("id", id);
+    if (error) throw error;
+  };
+
   const remove = async (id: string) => {
     patch({ type: "delete", table: "conversions", id });
     const { error } = await supabase.from("conversions").delete().eq("id", id);
