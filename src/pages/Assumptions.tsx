@@ -290,16 +290,24 @@ export default function Assumptions() {
       </Tabs>
 
       {activeScenario && (
-        <VersionHistoryPanel
-          open={historyOpen}
-          onOpenChange={setHistoryOpen}
-          scenarioId={activeScenario}
-          scenarioName={data.scenarios.find((s) => s.id === activeScenario)?.name ?? ""}
-          onRestored={() => {
-            autoVersion.resetWindow(activeScenario);
-            refresh();
-          }}
-        />
+        <>
+          <VersionHistoryPanel
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            scenarioId={activeScenario}
+            scenarioName={data.scenarios.find((s) => s.id === activeScenario)?.name ?? ""}
+            onRestored={() => {
+              autoVersion.resetWindow(activeScenario);
+              refresh();
+            }}
+          />
+          <CommentsOverviewPanel
+            open={commentsOpen}
+            onOpenChange={setCommentsOpen}
+            scenarioId={activeScenario}
+            scenarioName={data.scenarios.find((s) => s.id === activeScenario)?.name ?? ""}
+          />
+        </>
       )}
     </div>
   );
