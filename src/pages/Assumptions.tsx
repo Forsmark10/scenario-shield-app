@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, History, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, History, MessageSquare, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -13,6 +13,8 @@ import { toast as sonnerToast } from "sonner";
 import { InfoTip } from "@/components/InfoTip";
 import { VersionHistoryPanel } from "@/components/VersionHistoryPanel";
 import { GoalSeekPanel } from "@/components/GoalSeekPanel";
+import { CommentPopover } from "@/components/CommentPopover";
+import { CommentsOverviewPanel } from "@/components/CommentsOverviewPanel";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
 import { useActiveScenario } from "@/hooks/useActiveScenario";
 import { cn } from "@/lib/utils";
@@ -20,6 +22,39 @@ import { cn } from "@/lib/utils";
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
 const LEVELS = ["Low", "Medium", "High"] as const;
 type Level = (typeof LEVELS)[number];
+
+/**
+ * Wrap NumCell + a comment dot in the same relative container.
+ * Makes every editable cell discoverable for comments without changing the input footprint.
+ */
+function CellWithComment({
+  comment,
+  updatedAt,
+  updatedBy,
+  onSaveComment,
+  label,
+  children,
+}: {
+  comment: string | null | undefined;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+  onSaveComment: (next: string | null) => Promise<void> | void;
+  label?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative group">
+      {children}
+      <CommentPopover
+        value={comment}
+        updatedAt={updatedAt}
+        updatedBy={updatedBy}
+        onSave={onSaveComment}
+        label={label}
+      />
+    </div>
+  );
+}
 
 type Scenario = { id: string; name: string; sort_order: number };
 
