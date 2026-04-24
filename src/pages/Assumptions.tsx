@@ -1712,6 +1712,41 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
     if (error) throw error;
   };
 
+  // Save comment on aggregated bucket. Creates an empty bucket row if none exists yet.
+  const upsertAggregatedComment = async (type: string, year: number, comment: string | null) => {
+    const existing = aggregatedLine.get(`${type}-${year}`);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({
+        type: "update",
+        table: "capexPlan",
+        id: existing.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("capex_plan")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("capex_plan")
+        .insert({
+          scenario_id: scenario.id,
+          capex_type: type,
+          year,
+          amount: 0,
+          description: null,
+          comment,
+          comment_updated_at: ts,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "capexPlan", row: inserted });
+    }
+  };
+
   const addDetail = async () => {
     const { data: inserted, error } = await supabase
       .from("capex_plan")
