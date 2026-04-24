@@ -1495,6 +1495,40 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
+  const upsertAmountComment = async (cat: string, year: number, comment: string | null) => {
+    const r = get(cat, year);
+    const ts = new Date().toISOString();
+    if (r) {
+      patch({
+        type: "update",
+        table: "catAdj",
+        id: r.id,
+        changes: { comment_amount: comment, comment_amount_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("category_adjustments")
+        .update({ comment_amount: comment, comment_amount_updated_at: ts } as any)
+        .eq("id", r.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("category_adjustments")
+        .insert({
+          scenario_id: scenario.id,
+          category: cat,
+          year,
+          adjustment_pct: 0,
+          adjustment_amount_tnok: 0,
+          comment_amount: comment,
+          comment_amount_updated_at: ts,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "catAdj", row: inserted });
+    }
+  };
+
   return (
     <Section
       title="Kategori-justeringer"
@@ -1502,49 +1536,85 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
       tooltip="Prosent: -10% i 2027 gjelder 2027-2031 og multipliseres. Beløp: -500 tNOK i 2027 reduserer kategori-totalen med 500 tNOK hvert år fra 2027. Begge kan settes samtidig."
     >
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-xs border-separate border-spacing-0">
           <thead>
-            <tr className="border-b">
-              <th className="text-left font-medium px-2 py-2 w-[160px]" rowSpan={2}>Kategori</th>
-              {FC_YEARS.map((y) => (
-                <th key={y} className="text-center font-medium px-2 py-2" colSpan={2}>{y}</th>
+            <tr>
+              <th
+                className="text-left font-medium px-2 py-2 w-[160px] border-b align-bottom"
+                rowSpan={2}
+              >
+                Kategori
+              </th>
+              {FC_YEARS.map((y, i) => (
+                <th
+                  key={y}
+                  className={cn(
+                    "text-center font-semibold px-2 py-2 border-b",
+                    i > 0 && "border-l",
+                  )}
+                  colSpan={2}
+                >
+                  {y}
+                </th>
               ))}
             </tr>
-            <tr className="border-b">
-              {FC_YEARS.flatMap((y) => [
-                <th key={`${y}-p`} className="text-right font-normal text-[10px] text-muted-foreground px-1 py-1">%</th>,
-                <th key={`${y}-a`} className="text-right font-normal text-[10px] text-muted-foreground px-1 py-1">tNOK</th>,
+            <tr>
+              {FC_YEARS.flatMap((y, i) => [
+                <th
+                  key={`${y}-p`}
+                  className={cn(
+                    "text-center font-normal text-[10px] text-muted-foreground px-1 py-1 border-b w-[90px]",
+                    i > 0 && "border-l",
+                  )}
+                >
+                  %
+                </th>,
+                <th
+                  key={`${y}-a`}
+                  className="text-center font-normal text-[10px] text-muted-foreground px-1 py-1 border-b w-[110px]"
+                >
+                  tNOK
+                </th>,
               ])}
             </tr>
           </thead>
           <tbody>
             {data.categories.map((cat) => (
               <tr key={cat} className="border-b">
-                <td className="px-2 py-1.5">{cat}</td>
-                {FC_YEARS.map((y) => {
+                <td className="px-2 py-1.5 border-b">{cat}</td>
+                {FC_YEARS.flatMap((y, i) => {
                   const row = get(cat, y);
                   const pct = Number((row?.adjustment_pct ?? 0)) * 100;
                   const amt = Number(row?.adjustment_amount_tnok ?? 0);
-                  return (
-                    <>
-                      <td key={`${y}-p`} className="px-1 py-1 w-[90px]">
-                        <CellWithComment
-                          comment={row?.comment}
-                          updatedAt={row?.comment_updated_at}
-                          updatedBy={row?.comment_updated_by}
-                          onSaveComment={(next) => upsertComment(cat, y, next)}
-                          label={`${cat} ${y}`}
-                        >
-                          <NumCell
-                            value={Number(pct.toFixed(2))}
-                            suffix="%"
-                            min={-50}
-                            max={50}
-                            onCommit={(num) => upsertField(cat, y, "adjustment_pct", num / 100)}
-                          />
-                        </CellWithComment>
-                      </td>
-                      <td key={`${y}-a`} className="px-1 py-1 w-[110px]">
+                  return [
+                    <td
+                      key={`${y}-p`}
+                      className={cn("px-1 py-1 w-[90px] border-b text-right", i > 0 && "border-l")}
+                    >
+                      <CellWithComment
+                        comment={row?.comment}
+                        updatedAt={row?.comment_updated_at}
+                        updatedBy={row?.comment_updated_by}
+                        onSaveComment={(next) => upsertComment(cat, y, next)}
+                        label={`${cat} ${y} · %`}
+                      >
+                        <NumCell
+                          value={Number(pct.toFixed(2))}
+                          suffix="%"
+                          min={-50}
+                          max={50}
+                          onCommit={(num) => upsertField(cat, y, "adjustment_pct", num / 100)}
+                        />
+                      </CellWithComment>
+                    </td>,
+                    <td key={`${y}-a`} className="px-1 py-1 w-[110px] border-b text-right">
+                      <CellWithComment
+                        comment={row?.comment_amount}
+                        updatedAt={row?.comment_amount_updated_at}
+                        updatedBy={row?.comment_amount_updated_by}
+                        onSaveComment={(next) => upsertAmountComment(cat, y, next)}
+                        label={`${cat} ${y} · tNOK`}
+                      >
                         <NumCell
                           value={amt}
                           step="10"
@@ -1553,16 +1623,16 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
                           errorHint="Range -99 999 til +99 999 tNOK."
                           onCommit={(num) => upsertField(cat, y, "adjustment_amount_tnok", num)}
                         />
-                      </td>
-                    </>
-                  );
+                      </CellWithComment>
+                    </td>,
+                  ];
                 })}
               </tr>
             ))}
           </tbody>
         </table>
         <p className="text-[11px] text-muted-foreground mt-2">
-          Reduksjoner skrives som negative tall (f.eks. <code>-10</code>% eller <code>-500</code> tNOK). Klikk på en celle og bruk kommentar-ikonet i hjørnet for å dokumentere hvorfor tiltaket ble lagt inn.
+          Reduksjoner skrives som negative tall (f.eks. <code>-10</code>% eller <code>-500</code> tNOK). %-cellen og tNOK-cellen kan ha hver sin kommentar – klikk på prikken i hjørnet for å dokumentere tiltaket.
         </p>
       </div>
     </Section>
