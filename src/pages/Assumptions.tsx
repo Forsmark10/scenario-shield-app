@@ -1635,6 +1635,21 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
     if (error) throw error;
   };
 
+  const updateDetailComment = async (id: string, comment: string | null) => {
+    const ts = new Date().toISOString();
+    patch({
+      type: "update",
+      table: "capexPlan",
+      id,
+      changes: { comment, comment_updated_at: ts },
+    });
+    const { error } = await supabase
+      .from("capex_plan")
+      .update({ comment, comment_updated_at: ts } as any)
+      .eq("id", id);
+    if (error) throw error;
+  };
+
   const addDetail = async () => {
     const { data: inserted, error } = await supabase
       .from("capex_plan")
