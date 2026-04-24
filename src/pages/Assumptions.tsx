@@ -1284,6 +1284,21 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
     if (error) throw error;
   };
 
+  const updateComment = async (id: string, comment: string | null) => {
+    const ts = new Date().toISOString();
+    patch({
+      type: "update",
+      table: "nearshoringAdds",
+      id,
+      changes: { comment, comment_updated_at: ts },
+    });
+    const { error } = await supabase
+      .from("nearshoring_additions")
+      .update({ comment, comment_updated_at: ts } as any)
+      .eq("id", id);
+    if (error) throw error;
+  };
+
   const remove = async (id: string) => {
     patch({ type: "delete", table: "nearshoringAdds", id });
     const { error } = await supabase.from("nearshoring_additions").delete().eq("id", id);
