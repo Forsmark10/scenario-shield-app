@@ -1166,7 +1166,15 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
                   </Select>
                 </td>
                 <td className="px-1 py-1">
-                  <NumCell value={Number(r.count)} step="1" min={0} errorHint="Antall må være 0 eller positivt." onCommit={(v) => updateField(r.id, "count", Math.max(0, Math.round(v)))} />
+                  <CellWithComment
+                    comment={r.comment}
+                    updatedAt={r.comment_updated_at}
+                    updatedBy={r.comment_updated_by}
+                    onSaveComment={(next) => updateComment(r.id, next)}
+                    label={`Konvertering ${r.year} · Antall`}
+                  >
+                    <NumCell value={Number(r.count)} step="1" min={0} errorHint="Antall må være 0 eller positivt." onCommit={(v) => updateField(r.id, "count", Math.max(0, Math.round(v)))} />
+                  </CellWithComment>
                 </td>
                 <td className="px-1 py-1">
                   <Select value={r.internal_level} onValueChange={(v) => updateField(r.id, "internal_level", v)}>
