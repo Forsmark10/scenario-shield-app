@@ -282,7 +282,7 @@ export default function Assumptions() {
                       const steps: Array<[string, () => any]> = [
                         ["global_assumptions", () =>
                           supabase.from("global_assumptions").update({
-                            salary_increase_pct: 0, price_increase_pct: 0,
+                            salary_increase_pct: 0, price_increase_pct: 0, eur_nok_rate: 11.3,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["central_assumptions", () =>
                           supabase.from("central_assumptions").update({
