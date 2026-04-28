@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Download, Upload, Loader2, HelpCircle, Save } from "lucide-react";
+import { Download, Loader2, HelpCircle, Save } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -85,14 +85,6 @@ export default function AppLayout() {
                   <span className="hidden md:inline">Lagre snapshot</span>
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setImportOpen(true)}
-              >
-                <Upload className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden md:inline">Importer / Oppdater fra Excel</span>
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
