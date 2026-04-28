@@ -699,6 +699,50 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     lines.push(adjLine);
   }
 
+  // ---------- VIRTUAL: Sentral reduksjon (fast beløp tNOK) ----------
+  // Permanent reforhandling i fast beløp: satt i år Y gjelder fom Y og alle påfølgende år.
+  // Akkumuleres additivt (samme prinsipp som kategori-justering tNOK).
+  // Vises som ÉN samlet virtuell linje under cost_type=Central.
+  {
+    const scenarioCentral = central_assumptions.filter((a) => a.scenario_id === scenario_id);
+    const hasAny = scenarioCentral.some((a) => Number(a.central_reduction_amount_tnok ?? 0) !== 0);
+    if (hasAny) {
+      const cRedLine: ForecastLine = {
+        line_id: `virtual:central_reduction_amount`,
+        source: "virtual",
+        category: "Central",
+        project: "Sentral reduksjon (fast beløp)",
+        account: null,
+        account_name: "Sentral reduksjon (fast beløp)",
+        cost_type: "Central",
+        is_capex: false,
+        is_depreciation: false,
+        base_2026: 0,
+        amounts: {},
+        monthly_2027: [],
+        breakdown_source: {},
+      };
+      for (const N of YEARS) {
+        let amt = 0;
+        const parts: string[] = [];
+        for (let Y = 2027; Y <= N; Y++) {
+          const row = scenarioCentral.find((a) => a.year === Y);
+          const v = Number(row?.central_reduction_amount_tnok ?? 0);
+          if (v !== 0) {
+            amt += v;
+            parts.push(`Y${Y}: ${v} tNOK (permanent fra ${Y})`);
+          }
+        }
+        cRedLine.amounts[N] = amt;
+        cRedLine.breakdown_source[N] = parts.length
+          ? `${parts.join("\n")}\nSum aktivt år ${N} = ${round2(amt)} tNOK`
+          : "Ingen sentral fast-beløpsreduksjon";
+      }
+      cRedLine.monthly_2027 = Array(12).fill((cRedLine.amounts[2027] ?? 0) / 12);
+      lines.push(cRedLine);
+    }
+  }
+
   // ---------- TOTALS ----------
   const totals: ForecastTotals = {
     by_year: {},
