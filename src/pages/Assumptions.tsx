@@ -565,7 +565,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d, dIdx) => (
+          {drivers.map((d) => (
             <tr key={d.key} className="border-b">
               <td className="px-2 py-2">{d.label}</td>
               {FC_YEARS.map((y) => {
@@ -573,27 +573,19 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
                 const v = (row?.[d.key] ?? (d.key === "salary_increase_pct" ? 0.04 : 0.05)) * d.scale;
                 return (
                   <td key={y} className="px-1 py-1">
-                    {dIdx === 0 ? (
-                      <CellWithComment
-                        comment={row?.comment}
-                        updatedAt={row?.comment_updated_at}
-                        updatedBy={row?.comment_updated_by}
-                        onSaveComment={(next) => upsertComment(y, next)}
-                        label={`Globale drivere ${y}`}
-                      >
-                        <NumCell
-                          value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
-                          suffix={d.suffix}
-                          onCommit={(num) => upsert(y, d.key, num / d.scale)}
-                        />
-                      </CellWithComment>
-                    ) : (
+                    <CellWithComment
+                      comment={row?.comment}
+                      updatedAt={row?.comment_updated_at}
+                      updatedBy={row?.comment_updated_by}
+                      onSaveComment={(next) => upsertComment(y, next)}
+                      label={`Globale drivere ${y} · ${d.label}`}
+                    >
                       <NumCell
                         value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
                         suffix={d.suffix}
                         onCommit={(num) => upsert(y, d.key, num / d.scale)}
                       />
-                    )}
+                    </CellWithComment>
                   </td>
                 );
               })}
@@ -685,7 +677,7 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d, dIdx) => {
+          {drivers.map((d) => {
             const isReduction = d.key === "central_reduction_pct";
             return (
               <tr key={d.key} className="border-b">
@@ -700,34 +692,27 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
                 {FC_YEARS.map((y) => {
                   const row = get(y);
                   const v = ((row?.[d.key] ?? d.default) * 100);
-                  const cell = (
-                    <NumCell
-                      value={Number(v.toFixed(2))}
-                      suffix="%"
-                      max={isReduction ? 0 : undefined}
-                      errorHint={
-                        isReduction
-                          ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
-                          : undefined
-                      }
-                      onCommit={(num) => upsert(y, d.key, num / 100)}
-                    />
-                  );
                   return (
                     <td key={y} className="px-1 py-1 align-top">
-                      {dIdx === 0 ? (
-                        <CellWithComment
-                          comment={row?.comment}
-                          updatedAt={row?.comment_updated_at}
-                          updatedBy={row?.comment_updated_by}
-                          onSaveComment={(next) => upsertComment(y, next)}
-                          label={`Central drivere ${y}`}
-                        >
-                          {cell}
-                        </CellWithComment>
-                      ) : (
-                        cell
-                      )}
+                      <CellWithComment
+                        comment={row?.comment}
+                        updatedAt={row?.comment_updated_at}
+                        updatedBy={row?.comment_updated_by}
+                        onSaveComment={(next) => upsertComment(y, next)}
+                        label={`Central drivere ${y} · ${d.label}`}
+                      >
+                        <NumCell
+                          value={Number(v.toFixed(2))}
+                          suffix="%"
+                          max={isReduction ? 0 : undefined}
+                          errorHint={
+                            isReduction
+                              ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
+                              : undefined
+                          }
+                          onCommit={(num) => upsert(y, d.key, num / 100)}
+                        />
+                      </CellWithComment>
                     </td>
                   );
                 })}
