@@ -69,6 +69,7 @@ interface AllData {
   conversions: any[];
   nearshoringBase: any | null;
   nearshoringAdds: any[];
+  nearshoringChanges: any[];
   catAdj: any[];
   capexPlan: any[];
   depRules: any[];
@@ -85,6 +86,7 @@ type TableKey =
   | "conversions"
   | "nearshoringBase"
   | "nearshoringAdds"
+  | "nearshoringChanges"
   | "catAdj"
   | "capexPlan";
 
@@ -113,7 +115,7 @@ export default function Assumptions() {
     (async () => {
       setLoading(true);
       const [
-        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, caRes, capRes, drRes, clRes,
+        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, ncRes, caRes, capRes, drRes, clRes,
       ] = await Promise.all([
         supabase.from("scenarios").select("*").eq("is_active", true).order("sort_order"),
         supabase.from("global_assumptions").select("*"),
@@ -125,6 +127,7 @@ export default function Assumptions() {
         supabase.from("conversions").select("*"),
         supabase.from("nearshoring_base").select("*").limit(1).maybeSingle(),
         supabase.from("nearshoring_additions").select("*"),
+        supabase.from("nearshoring_changes").select("*"),
         supabase.from("category_adjustments").select("*"),
         supabase.from("capex_plan").select("*"),
         supabase.from("depreciation_rules").select("*"),
@@ -143,6 +146,7 @@ export default function Assumptions() {
         conversions: convRes.data ?? [],
         nearshoringBase: nbRes.data ?? null,
         nearshoringAdds: naRes.data ?? [],
+        nearshoringChanges: ncRes.data ?? [],
         catAdj: caRes.data ?? [],
         capexPlan: capRes.data ?? [],
         depRules: drRes.data ?? [],
