@@ -197,6 +197,7 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     external_fte_changes,
     conversions,
     nearshoring_additions,
+    nearshoring_changes,
     category_adjustments,
     capex_plan,
     depreciation_rules,
@@ -216,7 +217,9 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
 
   const scenarioCapex = capex_plan.filter((c) => c.scenario_id === scenario_id);
   const scenarioConversions = conversions.filter((c) => c.scenario_id === scenario_id);
-  const scenarioNearshoring = nearshoring_additions.filter(
+  // Old (overlap-based) nearshoring_additions kept around only for legacy version restores.
+  // The active model is nearshoring_changes (independent FTE-like resource).
+  const scenarioNearshoringChanges = (nearshoring_changes ?? []).filter(
     (n) => n.scenario_id === scenario_id
   );
   const scenarioIntChanges = internal_fte_changes.filter(
