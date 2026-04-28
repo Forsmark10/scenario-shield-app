@@ -21,7 +21,7 @@ interface CommentEntry {
 
 const SECTION_LABEL: Record<string, string> = {
   global_assumptions: "Globale drivere",
-  central_assumptions: "Central drivere",
+  central_assumptions: "Sentrale drivere",
   internal_fte_changes: "Interne FTE",
   external_fte_changes: "Eksterne FTE",
   conversions: "Konverteringer",
