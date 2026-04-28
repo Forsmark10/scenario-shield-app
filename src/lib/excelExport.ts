@@ -182,17 +182,18 @@ function buildAssumptionsSheet(bundle: ScenarioBundle): XLSX.WorkSheet {
       aoa.push([g.year, g.salary_increase_pct, g.price_increase_pct, g.eur_nok_rate]),
     );
 
-  // 2. Central
-  section("Central-drivere (per år)");
-  aoa.push(["År", "Prisvekst", "Volumvekst", "Reduksjon"]);
+  // 2. Sentrale drivere
+  section("Sentrale drivere (per år)");
+  aoa.push(["År", "Prisvekst", "Reduksjon %", "Reduksjon tNOK", "EUR/NOK-kurs"]);
   [...i.central_assumptions]
     .sort((a, b) => a.year - b.year)
-    .forEach((c) =>
+    .forEach((c: any) =>
       aoa.push([
         c.year,
         c.central_price_increase_pct,
-        c.central_volume_increase_pct,
         c.central_reduction_pct,
+        c.central_reduction_amount_tnok ?? 0,
+        c.central_eur_nok_rate ?? 11.3,
       ]),
     );
 
