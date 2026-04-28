@@ -289,6 +289,8 @@ export default function Assumptions() {
                             central_price_increase_pct: 0,
                             central_volume_increase_pct: 0,
                             central_reduction_pct: 0,
+                            central_reduction_amount_tnok: 0,
+                            central_eur_nok_rate: 11.3,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["internal_fte_changes", () =>
                           supabase.from("internal_fte_changes").update({
