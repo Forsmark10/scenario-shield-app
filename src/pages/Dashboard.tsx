@@ -22,6 +22,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { ExecutiveSummary } from "@/components/ExecutiveSummary";
 import { cn } from "@/lib/utils";
 
@@ -253,27 +257,72 @@ export default function Dashboard() {
             </Select>
           </div>
           {breakdown === "Total" && (
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">Kategorier</span>
-              {allCategories.map((c) => {
-                const active = !excludedCats.has(c);
-                return (
-                  <button
-                    key={c}
-                    onClick={() => {
-                      const next = new Set(excludedCats);
-                      if (active) next.add(c); else next.delete(c);
-                      setExcludedCats(next);
-                    }}
-                    className={cn(
-                      "text-xs px-2 py-1 rounded border transition-colors",
-                      active ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-muted-foreground border-border",
-                    )}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                    {(() => {
+                      const included = allCategories.filter((c) => !excludedCats.has(c)).length;
+                      const total = allCategories.length;
+                      if (total === 0) return "Ingen kategorier";
+                      if (included === total) return "Alle kategorier";
+                      if (included === 0) return "Ingen valgt";
+                      return `${included} av ${total} valgt`;
+                    })()}
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-64 p-2">
+                  {(() => {
+                    const allSelected = allCategories.length > 0 && allCategories.every((c) => !excludedCats.has(c));
+                    const someSelected = allCategories.some((c) => !excludedCats.has(c));
+                    return (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (allSelected) {
+                              setExcludedCats(new Set(allCategories));
+                            } else {
+                              setExcludedCats(new Set());
+                            }
+                          }}
+                          className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-accent text-sm"
+                        >
+                          <Checkbox
+                            checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                            className="pointer-events-none"
+                          />
+                          <span className="font-medium">Velg alle</span>
+                        </button>
+                        <Separator className="my-1" />
+                        <div className="max-h-72 overflow-y-auto">
+                          {allCategories.map((c) => {
+                            const active = !excludedCats.has(c);
+                            return (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => {
+                                  const next = new Set(excludedCats);
+                                  if (active) next.add(c);
+                                  else next.delete(c);
+                                  setExcludedCats(next);
+                                }}
+                                className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-accent text-sm text-left"
+                              >
+                                <Checkbox checked={active} className="pointer-events-none" />
+                                <span>{c}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </PopoverContent>
+              </Popover>
             </div>
           )}
         </div>

@@ -1,25 +1,24 @@
-# Fiks: "Other operating income" vises i Spend
+# Kategori-filter som sjekkliste med "Velg alle"
 
 ## Problem
-I Dashboard skiller `Spend`/`PL`-visningen kun mellom `Capex` og `Depreciation`. Kategorien `Other operating income` (inntekt) tas derfor med i Spend, men skal kun vises i `P&L`.
+Dagens filter er en rad med klikkbare knapper – tar mye plass og mangler "Velg alle".
 
-## Endring
-I `src/pages/Dashboard.tsx`, på alle steder der filterregelen `if (view === "Spend" && c.category === "Depreciation") return false;` finnes, legg til en parallell regel:
+## Løsning
+Erstatt knappe-raden i `src/pages/Dashboard.tsx` (rundt linje 255–278) med en kompakt `Popover`-knapp som åpner en avkrysningsliste.
 
-```ts
-if (view === "Spend" && c.category === "Other operating income") return false;
-```
+### Knapp-tekst (dynamisk)
+- Alle valgt → "Alle kategorier"
+- Ingen valgt → "Ingen valgt"
+- Ellers → "X av Y valgt"
 
-Tilsvarende for `lines`-filteret (bruker `l.category`).
+### Popover-innhold
+1. **"Velg alle"** øverst med Checkbox (tri-state: checked / indeterminate / unchecked).
+   - Klikk når alle er valgt → fjern alle (`setExcludedCats(new Set(allCategories))`)
+   - Klikk ellers → velg alle (`setExcludedCats(new Set())`)
+2. `Separator`
+3. Scrollbar liste (`max-h-72 overflow-y-auto`) med én rad per kategori: Checkbox + navn. Klikk toggler `excludedCats`.
 
-## Berørte steder (filtrering)
-- `computeYearTotals` – cost_lines + forecast lines
-- `computeStackedYearly` – cost_lines + forecast lines
-- Stacked-by-category-funksjonen rundt linje 700–717
-- `computeScenarioYearByCategory` (linje ~787–795)
+### Komponenter som brukes
+Eksisterende shadcn-komponenter: `Popover`, `Button`, `Checkbox`, `Separator` (legges til i imports).
 
-## Resultat
-- **P&L-visning**: uendret (inkluderer Other operating income, ekskluderer Capex)
-- **Spend-visning**: ekskluderer både Depreciation **og** Other operating income (inkluderer Capex)
-
-Ingen endringer i datamodell, engine eller andre sider.
+Ingen endringer i filtrerings-state (`excludedCats: Set<string>`) eller datamodell – kun UI-bytte.
