@@ -56,9 +56,9 @@ Hver kostnadstype har sin egen logikk. Lønn vokser med lønnsvekst, eksterne kj
 
 ## Nøkkelbegreper
 
-### Local vs Central
+### Local vs Sentral
 - **Local** er kostnader dere selv styrer og kan påvirke. Dette er det meste av kostnadssenterets kostnader.
-- **Central** er allokeringer fra morselskap (f.eks. Phoenix IT-services). Dere kan ikke kutte disse direkte, kun forhandle. Central har derfor egne drivere: pris, volum og reduksjon.
+- **Sentral** er allokeringer fra morselskap (f.eks. Phoenix IT-services). Dere kan ikke kutte disse direkte, kun forhandle. Sentrale kostnader faktureres i EUR og har egne drivere: prisvekst, reduksjon (% og fast beløp), samt EUR/NOK-kurs per år.
 
 ### P&L-view vs Spend-view
 To måter å se totalkostnaden på:
