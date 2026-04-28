@@ -276,42 +276,66 @@ export default function Assumptions() {
                   onClick={async () => {
                     if (!activeScenario) return;
                     const sid = activeScenario;
+                    console.log("[Reset] Start nullstilling for scenario:", sid);
                     try {
-                      // Verdier som nullstilles, men kommentarer beholdes:
-                      await Promise.all([
-                        supabase.from("global_assumptions").update({
-                          salary_increase_pct: 0, price_increase_pct: 0,
-                        } as any).eq("scenario_id", sid),
-                        supabase.from("central_assumptions").update({
-                          central_price_increase_pct: 0,
-                          central_volume_increase_pct: 0,
-                          central_reduction_pct: 0,
-                        } as any).eq("scenario_id", sid),
-                        supabase.from("internal_fte_changes").update({
-                          increase: 0, decrease: 0,
-                        } as any).eq("scenario_id", sid),
-                        supabase.from("external_fte_changes").update({
-                          increase: 0, decrease: 0,
-                        } as any).eq("scenario_id", sid),
-                        supabase.from("nearshoring_changes").update({
-                          increase: 0, decrease: 0,
-                        } as any).eq("scenario_id", sid),
-                        supabase.from("category_adjustments").update({
-                          adjustment_pct: 0, adjustment_amount_tnok: 0,
-                        } as any).eq("scenario_id", sid),
-                        // Aggregerte capex-bøtter (uten description) → amount = 0,
-                        // kommentarer beholdes.
-                        supabase.from("capex_plan").update({ amount: 0 } as any)
-                          .eq("scenario_id", sid).is("description", null),
-                      ]);
-                      // Slett rader som spesifisert: konverteringer, legacy nearshoring,
-                      // og detaljerte capex-investeringer.
-                      await Promise.all([
-                        supabase.from("conversions").delete().eq("scenario_id", sid),
-                        supabase.from("nearshoring_additions").delete().eq("scenario_id", sid),
-                        supabase.from("capex_plan").delete()
-                          .eq("scenario_id", sid).not("description", "is", null),
-                      ]);
+                      // Sekvensielle update-calls med .select() for å verifisere antall rader.
+                      const steps: Array<[string, () => Promise<{ data: any; error: any }>]> = [
+                        ["global_assumptions", () =>
+                          supabase.from("global_assumptions").update({
+                            salary_increase_pct: 0, price_increase_pct: 0,
+                          } as any).eq("scenario_id", sid).select("id")],
+                        ["central_assumptions", () =>
+                          supabase.from("central_assumptions").update({
+                            central_price_increase_pct: 0,
+                            central_volume_increase_pct: 0,
+                            central_reduction_pct: 0,
+                          } as any).eq("scenario_id", sid).select("id")],
+                        ["internal_fte_changes", () =>
+                          supabase.from("internal_fte_changes").update({
+                            increase: 0, decrease: 0,
+                          } as any).eq("scenario_id", sid).select("id")],
+                        ["external_fte_changes", () =>
+                          supabase.from("external_fte_changes").update({
+                            increase: 0, decrease: 0,
+                          } as any).eq("scenario_id", sid).select("id")],
+                        ["nearshoring_changes", () =>
+                          supabase.from("nearshoring_changes").update({
+                            increase: 0, decrease: 0,
+                          } as any).eq("scenario_id", sid).select("id")],
+                        ["category_adjustments", () =>
+                          supabase.from("category_adjustments").update({
+                            adjustment_pct: 0, adjustment_amount_tnok: 0,
+                          } as any).eq("scenario_id", sid).select("id")],
+                        ["capex_plan (aggregert, amount=0)", () =>
+                          supabase.from("capex_plan").update({ amount: 0 } as any)
+                            .eq("scenario_id", sid).is("description", null).select("id")],
+                      ];
+                      for (const [label, fn] of steps) {
+                        const { data: rows, error } = await fn();
+                        if (error) {
+                          console.error(`[Reset] FEIL i ${label}:`, error);
+                          throw new Error(`${label}: ${error.message}`);
+                        }
+                        console.log(`[Reset] ${label} → ${rows?.length ?? 0} rader oppdatert`);
+                      }
+                      // Slett rader som skal fjernes.
+                      const deletes: Array<[string, () => Promise<{ error: any }>]> = [
+                        ["conversions", () =>
+                          supabase.from("conversions").delete().eq("scenario_id", sid)],
+                        ["nearshoring_additions (legacy)", () =>
+                          supabase.from("nearshoring_additions").delete().eq("scenario_id", sid)],
+                        ["capex_plan (detaljerte)", () =>
+                          supabase.from("capex_plan").delete()
+                            .eq("scenario_id", sid).not("description", "is", null)],
+                      ];
+                      for (const [label, fn] of deletes) {
+                        const { error } = await fn();
+                        if (error) {
+                          console.error(`[Reset] FEIL i delete ${label}:`, error);
+                          throw new Error(`${label}: ${error.message}`);
+                        }
+                        console.log(`[Reset] ${label} slettet`);
+                      }
                       // Lag eksplisitt auto-versjon for sporbarhet.
                       try {
                         const snap = await captureAssumptionsSnapshot(sid);
@@ -323,11 +347,43 @@ export default function Assumptions() {
                         } as any);
                         autoVersion.resetWindow(sid);
                       } catch (verr) {
-                        console.warn("auto-version (reset) failed", verr);
+                        console.warn("[Reset] auto-version failed", verr);
                       }
+                      // Direkte local-state mutering: nullstill alle relevante felt for dette
+                      // scenarioet umiddelbart, slik at UI ikke avhenger av re-fetch.
+                      setData((prev) => {
+                        if (!prev) return prev;
+                        const zeroIfScenario = <T extends { scenario_id: string }>(
+                          rows: T[],
+                          fields: (keyof T)[],
+                        ): T[] =>
+                          rows.map((r) =>
+                            r.scenario_id === sid
+                              ? ({ ...r, ...Object.fromEntries(fields.map((f) => [f, 0])) } as T)
+                              : r,
+                          );
+                        return {
+                          ...prev,
+                          global: zeroIfScenario(prev.global as any, ["salary_increase_pct", "price_increase_pct"] as any),
+                          central: zeroIfScenario(prev.central as any, ["central_price_increase_pct", "central_volume_increase_pct", "central_reduction_pct"] as any),
+                          intChanges: zeroIfScenario(prev.intChanges as any, ["increase", "decrease"] as any),
+                          extChanges: zeroIfScenario(prev.extChanges as any, ["increase", "decrease"] as any),
+                          nearshoringChanges: zeroIfScenario(prev.nearshoringChanges as any, ["increase", "decrease"] as any),
+                          catAdj: zeroIfScenario(prev.catAdj as any, ["adjustment_pct", "adjustment_amount_tnok"] as any),
+                          capexPlan: (prev.capexPlan as any[])
+                            .filter((r) => !(r.scenario_id === sid && r.description != null))
+                            .map((r) =>
+                              r.scenario_id === sid && r.description == null ? { ...r, amount: 0 } : r,
+                            ),
+                          conversions: (prev.conversions as any[]).filter((r) => r.scenario_id !== sid),
+                          nearshoringAdds: (prev.nearshoringAdds as any[]).filter((r) => r.scenario_id !== sid),
+                        };
+                      });
+                      console.log("[Reset] Lokal state nullstilt – starter refresh()");
                       sonnerToast.success("Scenario nullstilt");
                       refresh();
                     } catch (e: any) {
+                      console.error("[Reset] Avbrutt:", e);
                       sonnerToast.error("Kunne ikke nullstille", { description: e?.message ?? String(e) });
                     }
                   }}
