@@ -298,10 +298,11 @@ function buildAssumptionsSheet(bundle: ScenarioBundle): XLSX.WorkSheet {
         rr++;
       }
     }
-    if (row[0] === "År" && row[1] === "Prisvekst" && row[2] === "Volumvekst") {
+    if (row[0] === "År" && row[1] === "Prisvekst" && row[2] === "Reduksjon %") {
       let rr = r + 1;
       while (rr < aoa.length && aoa[rr] && aoa[rr].length) {
-        applyNumberFormat(ws, rr, rr, 1, 3, PCT_FMT);
+        // Kolonner 1 (prisvekst) og 2 (reduksjon %) er prosent. Kolonne 3 (tNOK) og 4 (kurs) er rene tall.
+        applyNumberFormat(ws, rr, rr, 1, 2, PCT_FMT);
         rr++;
       }
     }
