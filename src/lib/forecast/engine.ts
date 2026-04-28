@@ -702,7 +702,7 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   // ---------- VIRTUAL: Sentral reduksjon (fast beløp tNOK) ----------
   // Permanent reforhandling i fast beløp: satt i år Y gjelder fom Y og alle påfølgende år.
   // Akkumuleres additivt (samme prinsipp som kategori-justering tNOK).
-  // Vises som ÉN samlet virtuell linje under cost_type=Central.
+  // Vises som ÉN samlet virtuell linje under IT Costs (reforhandling av intracharges).
   {
     const scenarioCentral = central_assumptions.filter((a) => a.scenario_id === scenario_id);
     const hasAny = scenarioCentral.some((a) => Number(a.central_reduction_amount_tnok ?? 0) !== 0);
@@ -710,7 +710,7 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       const cRedLine: ForecastLine = {
         line_id: `virtual:central_reduction_amount`,
         source: "virtual",
-        category: "Central",
+        category: "IT Costs",
         project: "Sentral reduksjon (fast beløp)",
         account: null,
         account_name: "Sentral reduksjon (fast beløp)",
