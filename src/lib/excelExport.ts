@@ -182,17 +182,18 @@ function buildAssumptionsSheet(bundle: ScenarioBundle): XLSX.WorkSheet {
       aoa.push([g.year, g.salary_increase_pct, g.price_increase_pct, g.eur_nok_rate]),
     );
 
-  // 2. Central
-  section("Central-drivere (per år)");
-  aoa.push(["År", "Prisvekst", "Volumvekst", "Reduksjon"]);
+  // 2. Sentrale drivere
+  section("Sentrale drivere (per år)");
+  aoa.push(["År", "Prisvekst", "Reduksjon %", "Reduksjon tNOK", "EUR/NOK-kurs"]);
   [...i.central_assumptions]
     .sort((a, b) => a.year - b.year)
-    .forEach((c) =>
+    .forEach((c: any) =>
       aoa.push([
         c.year,
         c.central_price_increase_pct,
-        c.central_volume_increase_pct,
         c.central_reduction_pct,
+        c.central_reduction_amount_tnok ?? 0,
+        c.central_eur_nok_rate ?? 11.3,
       ]),
     );
 
@@ -297,10 +298,11 @@ function buildAssumptionsSheet(bundle: ScenarioBundle): XLSX.WorkSheet {
         rr++;
       }
     }
-    if (row[0] === "År" && row[1] === "Prisvekst" && row[2] === "Volumvekst") {
+    if (row[0] === "År" && row[1] === "Prisvekst" && row[2] === "Reduksjon %") {
       let rr = r + 1;
       while (rr < aoa.length && aoa[rr] && aoa[rr].length) {
-        applyNumberFormat(ws, rr, rr, 1, 3, PCT_FMT);
+        // Kolonner 1 (prisvekst) og 2 (reduksjon %) er prosent. Kolonne 3 (tNOK) og 4 (kurs) er rene tall.
+        applyNumberFormat(ws, rr, rr, 1, 2, PCT_FMT);
         rr++;
       }
     }

@@ -21,7 +21,7 @@ interface CommentEntry {
 
 const SECTION_LABEL: Record<string, string> = {
   global_assumptions: "Globale drivere",
-  central_assumptions: "Central drivere",
+  central_assumptions: "Sentrale drivere",
   internal_fte_changes: "Interne FTE",
   external_fte_changes: "Eksterne FTE",
   conversions: "Konverteringer",
@@ -30,11 +30,15 @@ const SECTION_LABEL: Record<string, string> = {
   capex_plan: "Capex-plan",
 };
 
-function describe(section: string, row: any, variant?: "pct" | "amt"): string {
+function describe(section: string, row: any, variant?: "pct" | "amt" | "rate" | "central_pct" | "central_amt" | "central_rate"): string {
   switch (section) {
     case "global_assumptions":
-    case "central_assumptions":
       return `${row.year}`;
+    case "central_assumptions": {
+      if (variant === "central_amt") return `${row.year} · Sentral reduksjon tNOK`;
+      if (variant === "central_rate") return `${row.year} · EUR/NOK-kurs`;
+      return `${row.year} · Sentral pris/reduksjon %`;
+    }
     case "internal_fte_changes":
     case "external_fte_changes":
       return `${row.year} · ${row.level} · inc ${row.increase} / dec ${row.decrease}`;
@@ -88,6 +92,25 @@ export async function loadScenarioComments(scenarioId: string): Promise<CommentE
           comment: row.comment_amount,
           updatedAt: row.comment_amount_updated_at ?? null,
         });
+      }
+      // Central assumptions: separate comments for tNOK-reduksjon and EUR/NOK-kurs
+      if (section === "central_assumptions") {
+        if (row.comment_amount && String(row.comment_amount).trim()) {
+          list.push({
+            section,
+            label: describe(section, row, "central_amt"),
+            comment: row.comment_amount,
+            updatedAt: row.comment_amount_updated_at ?? null,
+          });
+        }
+        if (row.comment_rate && String(row.comment_rate).trim()) {
+          list.push({
+            section,
+            label: describe(section, row, "central_rate"),
+            comment: row.comment_rate,
+            updatedAt: row.comment_rate_updated_at ?? null,
+          });
+        }
       }
     }
   });

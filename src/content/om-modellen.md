@@ -27,7 +27,7 @@ Visuell oversikt med søylediagrammer for alle tre scenarioer, årlig vekst, sce
 Rådata per kostnadslinje med beregnede prognoser for 2027-2031. Ekspanderbar tabell med drilldown per kategori, prosjekt og konto. Filtrer på kategori, type eller søk i kontonavn.
 
 ### Assumptions
-Her endrer du forutsetningene per scenario. Åtte seksjoner: AI-assistert forutsetning, globale drivere, central drivere, internal FTE, external FTE, ekstern→intern konvertering, nearshoring, kategori-justeringer og Capex-plan.
+Her endrer du forutsetningene per scenario. Åtte seksjoner: AI-assistert forutsetning, globale drivere, sentrale drivere, internal FTE, external FTE, ekstern→intern konvertering, nearshoring, kategori-justeringer og Capex-plan.
 
 ### Scenario Comparison
 Detaljert pivottabell med alle tre scenarioer side om side. Toggle mellom Absolute (absolutte beløp) og Delta vs Steady (forskjell fra Steady State).
@@ -56,9 +56,9 @@ Hver kostnadstype har sin egen logikk. Lønn vokser med lønnsvekst, eksterne kj
 
 ## Nøkkelbegreper
 
-### Local vs Central
+### Local vs Sentral
 - **Local** er kostnader dere selv styrer og kan påvirke. Dette er det meste av kostnadssenterets kostnader.
-- **Central** er allokeringer fra morselskap (f.eks. Phoenix IT-services). Dere kan ikke kutte disse direkte, kun forhandle. Central har derfor egne drivere: pris, volum og reduksjon.
+- **Sentral** er allokeringer fra morselskap (f.eks. Phoenix IT-services). Dere kan ikke kutte disse direkte, kun forhandle. Sentrale kostnader faktureres i EUR og har egne drivere: prisvekst, reduksjon (% og fast beløp), samt EUR/NOK-kurs per år.
 
 ### P&L-view vs Spend-view
 To måter å se totalkostnaden på:
@@ -152,15 +152,25 @@ Når du legger til nearshoring-ressurser, erstatter de eksisterende eksterne på
 
 EUR/NOK-kursen settes per år under Nearshoring-seksjonen og kan variere over tid.
 
-### Central-kostnader
+### Sentrale kostnader
 
-Central (allokeringer fra morselskap) har egen beregning:
+Sentrale kostnader (allokeringer fra morselskap) faktureres i EUR og har en egen, EUR-basert beregning:
 
 ```
-Central år N = Base × (1 + pris)^år × (1 + volum)^år × PRODUCT(1 - reduksjon_Y)
+EUR-basis        = FC2026 / 11,3
+EUR med prisvekst = EUR-basis × PRODUCT(1 + prisvekst_Y) for Y fra 2027 til N
+NOK før reduksjon = EUR med prisvekst × EUR/NOK-kurs(N)
+NOK etter %-red.  = NOK før reduksjon × PRODUCT(1 + reduksjon%_Y)
+Sentral kost(N)   = NOK etter %-red. + SUM(reduksjon_tNOK_Y) for Y ≤ N
 ```
 
-**Viktig om reduksjon:** Central reduksjon er **permanent reforhandling**. Når du setter -5% i 2027, gjelder den også 2028-2031. Hvis du legger til ytterligere -3% i 2029, kombineres de multiplikativt.
+**De fire sentrale driverne:**
+- **Sentral prisvekst %** – underliggende EUR-prisøkning, kumulativ år for år (kan være negativ)
+- **Sentral reduksjon %** – permanent reforhandling i prosent. Skrives som negativt tall (−5 = 5% rabatt). Multiplikativ.
+- **Sentral reduksjon tNOK** – permanent fast beløpsreduksjon. Skrives som negativt tall. Additivt: −500 i 2027 og −200 i 2029 gir −700 fra 2029. Vises som egen virtuell linje.
+- **EUR/NOK-kurs** – valutakurs for året. Default 11,3 (matcher EUR-basis i FC 2026). Settes per år, påvirker NOK-kostnaden direkte.
+
+**Viktig om reduksjon:** Begge reduksjonene er **permanente reforhandlinger**. Når satt i ett år gjelder de alle påfølgende år.
 
 ### Kategori-justeringer (Local)
 
@@ -269,7 +279,7 @@ Steady State brukes som sammenligningsgrunnlag for alt: Scenario Comparison (Del
 Endringen gjelder fra det året og fremover, og påvirker alle påfølgende år fordi veksten er kumulativ.
 
 ### Kan jeg ha ulike lønnsveksttall per år?
-Ja. Hvert år (2027-2031) har sin egen lønnsvekst, prisvekst og EUR/NOK-kurs. Default er lik vekst alle år, men du kan fritt overstyre.
+Ja. Hvert år (2027-2031) har sin egen lønnsvekst og prisvekst. EUR/NOK-kurs settes per år både for sentrale kostnader (Sentrale drivere) og for nearshoring. Default er lik vekst alle år, men du kan fritt overstyre.
 
 ### Hva er forskjellen på FTE increase og decrease?
 - **Increase:** Antall nye ansettelser det året (positivt tall)
@@ -284,7 +294,7 @@ Appen overstyrer alle FC 2027-tall fra Excel og beregner dem på nytt ut fra Ass
 Hvis du setter -10% på Consultancy i 2027, gjelder det også 2028-2031 (permanent reforhandling). Dette brukes til å modellere reforhandlede priser eller generelle kostnadskutt.
 
 ### Er valutakursen lik hele perioden?
-Nei – du setter EUR/NOK-kurs per år under Nearshoring-seksjonen. Dette lar deg modellere valutasensitivitet.
+Nei – du setter EUR/NOK-kurs per år. Sentrale kostnader bruker kursen som ligger under Sentrale drivere, og Nearshoring bruker kursen i Nearshoring-seksjonen. Dette lar deg modellere valutasensitivitet.
 
 ### Hvor mye overlapp er det ved nearshoring?
 Når en ekstern erstattes av en nearshoring-ressurs, er det 3 måneders overlapp. Etter det er kun nearshoring-kost igjen.

@@ -33,6 +33,8 @@ export interface CentralAssumption {
   central_price_increase_pct: number;
   central_volume_increase_pct: number;
   central_reduction_pct: number;
+  central_reduction_amount_tnok?: number;
+  central_eur_nok_rate?: number;
 }
 
 export interface FteChange {

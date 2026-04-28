@@ -179,10 +179,18 @@ export type Database = {
       }
       central_assumptions: {
         Row: {
+          central_eur_nok_rate: number
           central_price_increase_pct: number
+          central_reduction_amount_tnok: number
           central_reduction_pct: number
           central_volume_increase_pct: number
           comment: string | null
+          comment_amount: string | null
+          comment_amount_updated_at: string | null
+          comment_amount_updated_by: string | null
+          comment_rate: string | null
+          comment_rate_updated_at: string | null
+          comment_rate_updated_by: string | null
           comment_updated_at: string | null
           comment_updated_by: string | null
           created_at: string
@@ -192,10 +200,18 @@ export type Database = {
           year: number
         }
         Insert: {
+          central_eur_nok_rate?: number
           central_price_increase_pct?: number
+          central_reduction_amount_tnok?: number
           central_reduction_pct?: number
           central_volume_increase_pct?: number
           comment?: string | null
+          comment_amount?: string | null
+          comment_amount_updated_at?: string | null
+          comment_amount_updated_by?: string | null
+          comment_rate?: string | null
+          comment_rate_updated_at?: string | null
+          comment_rate_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
@@ -205,10 +221,18 @@ export type Database = {
           year: number
         }
         Update: {
+          central_eur_nok_rate?: number
           central_price_increase_pct?: number
+          central_reduction_amount_tnok?: number
           central_reduction_pct?: number
           central_volume_increase_pct?: number
           comment?: string | null
+          comment_amount?: string | null
+          comment_amount_updated_at?: string | null
+          comment_amount_updated_by?: string | null
+          comment_rate?: string | null
+          comment_rate_updated_at?: string | null
+          comment_rate_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string

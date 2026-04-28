@@ -289,6 +289,8 @@ export default function Assumptions() {
                             central_price_increase_pct: 0,
                             central_volume_increase_pct: 0,
                             central_reduction_pct: 0,
+                            central_reduction_amount_tnok: 0,
+                            central_eur_nok_rate: 11.3,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["internal_fte_changes", () =>
                           supabase.from("internal_fte_changes").update({
@@ -365,7 +367,18 @@ export default function Assumptions() {
                         return {
                           ...prev,
                           global: zeroIfScenario(prev.global as any, ["salary_increase_pct", "price_increase_pct"] as any),
-                          central: zeroIfScenario(prev.central as any, ["central_price_increase_pct", "central_volume_increase_pct", "central_reduction_pct"] as any),
+                          central: (prev.central as any[]).map((r) =>
+                            r.scenario_id === sid
+                              ? {
+                                  ...r,
+                                  central_price_increase_pct: 0,
+                                  central_volume_increase_pct: 0,
+                                  central_reduction_pct: 0,
+                                  central_reduction_amount_tnok: 0,
+                                  central_eur_nok_rate: 11.3,
+                                }
+                              : r,
+                          ),
                           intChanges: zeroIfScenario(prev.intChanges as any, ["increase", "decrease"] as any),
                           extChanges: zeroIfScenario(prev.extChanges as any, ["increase", "decrease"] as any),
                           nearshoringChanges: zeroIfScenario(prev.nearshoringChanges as any, ["increase", "decrease"] as any),
@@ -737,10 +750,19 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
   );
 }
 
-// ---------------------- 2. Central drivers ----------------------
+// ---------------------- 2. Sentrale drivere ----------------------
 function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const get = (year: number) =>
     data.central.find((g) => g.scenario_id === scenario.id && g.year === year) ?? null;
+
+  // Defaults brukes ved opprettelse av ny rad. Vi seeder volum=0 (utgått driver) og bruker 11.3 som default-kurs.
+  const insertDefaults = {
+    central_price_increase_pct: 0,
+    central_volume_increase_pct: 0,
+    central_reduction_pct: 0,
+    central_reduction_amount_tnok: 0,
+    central_eur_nok_rate: 11.3,
+  };
 
   const upsert = async (year: number, field: string, value: number) => {
     const existing = get(year);
@@ -751,14 +773,7 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
     } else {
       const { data: inserted, error } = await supabase
         .from("central_assumptions")
-        .insert({
-          scenario_id: scenario.id,
-          year,
-          central_price_increase_pct: 0.03,
-          central_volume_increase_pct: 0.02,
-          central_reduction_pct: 0,
-          [field]: value,
-        } as any)
+        .insert({ scenario_id: scenario.id, year, ...insertDefaults, [field]: value } as any)
         .select()
         .single();
       if (error) throw error;
@@ -766,28 +781,23 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
     }
   };
 
-  const upsertComment = async (year: number, comment: string | null) => {
+  const upsertCommentField = async (
+    year: number,
+    commentField: "comment" | "comment_amount" | "comment_rate",
+    atField: "comment_updated_at" | "comment_amount_updated_at" | "comment_rate_updated_at",
+    value: string | null,
+  ) => {
     const existing = get(year);
     const ts = new Date().toISOString();
+    const changes = { [commentField]: value, [atField]: ts } as any;
     if (existing) {
-      patch({ type: "update", table: "central", id: existing.id, changes: { comment, comment_updated_at: ts } });
-      const { error } = await supabase
-        .from("central_assumptions")
-        .update({ comment, comment_updated_at: ts } as any)
-        .eq("id", existing.id);
+      patch({ type: "update", table: "central", id: existing.id, changes });
+      const { error } = await supabase.from("central_assumptions").update(changes).eq("id", existing.id);
       if (error) throw error;
     } else {
       const { data: inserted, error } = await supabase
         .from("central_assumptions")
-        .insert({
-          scenario_id: scenario.id,
-          year,
-          central_price_increase_pct: 0.03,
-          central_volume_increase_pct: 0.02,
-          central_reduction_pct: 0,
-          comment,
-          comment_updated_at: ts,
-        } as any)
+        .insert({ scenario_id: scenario.id, year, ...insertDefaults, ...changes } as any)
         .select()
         .single();
       if (error) throw error;
@@ -795,70 +805,119 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
     }
   };
 
-  const drivers = [
-    { key: "central_price_increase_pct", label: "Central pris %", default: 0.03 },
-    { key: "central_volume_increase_pct", label: "Central volum %", default: 0.02 },
-    { key: "central_reduction_pct", label: "Central reduksjon %", default: 0 },
+  type DriverDef = {
+    key: string;
+    label: string;
+    kind: "pct" | "tnok" | "rate";
+    min?: number;
+    max?: number;
+    errorHint?: string;
+    info?: string;
+    commentField: "comment" | "comment_amount" | "comment_rate";
+    atField: "comment_updated_at" | "comment_amount_updated_at" | "comment_rate_updated_at";
+    byField: "comment_updated_by" | "comment_amount_updated_by" | "comment_rate_updated_by";
+  };
+
+  const drivers: DriverDef[] = [
+    {
+      key: "central_price_increase_pct",
+      label: "Sentral prisvekst %",
+      kind: "pct",
+      info: "Underliggende prisøkning i EUR-avtalen, kumulativt år for år. Negativ verdi tillatt (deflasjon).",
+      commentField: "comment", atField: "comment_updated_at", byField: "comment_updated_by",
+    },
+    {
+      key: "central_reduction_pct",
+      label: "Sentral reduksjon %",
+      kind: "pct",
+      max: 0,
+      errorHint: "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt.",
+      info: "Permanent reforhandling i prosent. Multiplikativt: satt i år Y gjelder fra og med Y. Skriv som negativt tall.",
+      commentField: "comment", atField: "comment_updated_at", byField: "comment_updated_by",
+    },
+    {
+      key: "central_reduction_amount_tnok",
+      label: "Sentral reduksjon tNOK",
+      kind: "tnok",
+      max: 0,
+      errorHint: "Reduksjon må være 0 eller negativ (tNOK).",
+      info: "Permanent fast beløpsreduksjon i tNOK. Additivt: −500 i 2027 og −200 i 2029 gir −700 fra 2029.",
+      commentField: "comment_amount", atField: "comment_amount_updated_at", byField: "comment_amount_updated_by",
+    },
+    {
+      key: "central_eur_nok_rate",
+      label: "EUR/NOK-kurs",
+      kind: "rate",
+      min: 5,
+      max: 20,
+      errorHint: "Valutakurs må være positiv og innenfor rimelig range (5–20).",
+      info: "Valutakurs for året. Påvirker NOK-kostnaden direkte. Default = 11,3 (matcher EUR-basis i FC 2026).",
+      commentField: "comment_rate", atField: "comment_rate_updated_at", byField: "comment_rate_updated_by",
+    },
   ];
 
   return (
     <Section
-      title="Central drivere"
-      description="Pris og volum vokser kumulativt år for år. Reduksjon representerer permanent reforhandling – satt i ett år gjelder den alle påfølgende år, og flere reduksjoner over år multipliseres sammen. Reduksjoner skrives som negative tall (f.eks. −5 for 5% rabatt)."
-      tooltip="Pris og volum multipliseres år-for-år (kumulativt). Reduksjon er permanent reforhandling: satt i år Y gjelder den fom Y og alle påfølgende år, og flere reduksjoner multipliseres sammen. Konvensjon: skriv reduksjon som negativ verdi (−5 = 5% rabatt)."
+      title="Sentrale drivere"
+      description="Sentrale kostnader er fakturert i EUR. EUR-basis beregnes fra FC 2026 ved kurs 11,3. Prisvekst er kumulativ år for år. Reduksjoner (% og tNOK) er permanente reforhandlinger – satt i ett år gjelder de alle påfølgende år. EUR/NOK-kurs settes per år og påvirker NOK-kostnaden direkte."
+      tooltip="Beregning per år N: EUR-basis (FC2026 / 11,3) × kumulativ prisvekst × FX(N) × kumulativ reduksjon%. tNOK-reduksjon legges på som egen virtuell linje (additivt, permanent)."
     >
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b">
-            <th className="text-left font-medium px-2 py-2 w-[180px]">Driver</th>
+            <th className="text-left font-medium px-2 py-2 w-[220px]">Driver</th>
             {FC_YEARS.map((y) => (
               <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d) => {
-            const isReduction = d.key === "central_reduction_pct";
-            return (
-              <tr key={d.key} className="border-b">
-                <td className="px-2 py-2">
-                  <div className="flex items-center gap-1.5">
-                    <span>{d.label}</span>
-                    {isReduction && (
-                      <InfoTip text="Skriv reduksjoner som negative tall. Eksempel: −5 betyr 5% permanent rabatt fra og med dette året." />
-                    )}
-                  </div>
-                </td>
-                {FC_YEARS.map((y) => {
-                  const row = get(y);
-                  const v = ((row?.[d.key] ?? d.default) * 100);
-                  return (
-                    <td key={y} className="px-1 py-1 align-top">
-                      <CellWithComment
-                        comment={row?.comment}
-                        updatedAt={row?.comment_updated_at}
-                        updatedBy={row?.comment_updated_by}
-                        onSaveComment={(next) => upsertComment(y, next)}
-                        label={`Central drivere ${y} · ${d.label}`}
-                      >
-                        <NumCell
-                          value={Number(v.toFixed(2))}
-                          suffix="%"
-                          max={isReduction ? 0 : undefined}
-                          errorHint={
-                            isReduction
-                              ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
-                              : undefined
-                          }
-                          onCommit={(num) => upsert(y, d.key, num / 100)}
-                        />
-                      </CellWithComment>
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
+          {drivers.map((d) => (
+            <tr key={d.key} className="border-b">
+              <td className="px-2 py-2">
+                <div className="flex items-center gap-1.5">
+                  <span>{d.label}</span>
+                  {d.info && <InfoTip text={d.info} />}
+                </div>
+              </td>
+              {FC_YEARS.map((y) => {
+                const row = get(y);
+                let displayValue: number;
+                let suffix: string | undefined;
+                if (d.kind === "pct") {
+                  const raw = row?.[d.key] ?? 0;
+                  displayValue = Number((raw * 100).toFixed(2));
+                  suffix = "%";
+                } else if (d.kind === "rate") {
+                  displayValue = Number(row?.[d.key] ?? 11.3);
+                  suffix = undefined;
+                } else {
+                  displayValue = Number(row?.[d.key] ?? 0);
+                  suffix = "tNOK";
+                }
+                return (
+                  <td key={y} className="px-1 py-1 align-top">
+                    <CellWithComment
+                      comment={row?.[d.commentField]}
+                      updatedAt={row?.[d.atField]}
+                      updatedBy={row?.[d.byField]}
+                      onSaveComment={(next) => upsertCommentField(y, d.commentField, d.atField, next)}
+                      label={`Sentrale drivere ${y} · ${d.label}`}
+                    >
+                      <NumCell
+                        value={displayValue}
+                        suffix={suffix}
+                        min={d.min}
+                        max={d.max}
+                        errorHint={d.errorHint}
+                        onCommit={(num) => upsert(y, d.key, d.kind === "pct" ? num / 100 : num)}
+                      />
+                    </CellWithComment>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
         </tbody>
       </table>
     </Section>

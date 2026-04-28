@@ -59,12 +59,17 @@ function getCentral(
     assumptions.find((a) => a.scenario_id === scenarioId && a.year === year) ?? {
       scenario_id: scenarioId,
       year,
-      central_price_increase_pct: 0.03,
-      central_volume_increase_pct: 0.02,
+      central_price_increase_pct: 0,
+      central_volume_increase_pct: 0,
       central_reduction_pct: 0,
+      central_reduction_amount_tnok: 0,
+      central_eur_nok_rate: 11.3,
     }
   );
 }
+
+/** Default EUR-basis rate that 2026 FC is assumed to be priced at. */
+const CENTRAL_BASE_EUR_NOK_RATE = 11.3;
 
 function getCatAdj(
   adjustments: CategoryAdjustment[],
@@ -328,7 +333,6 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
 
     for (const N of YEARS) {
       const g = getGlobal(global_assumptions, scenario_id, N);
-      const c = getCentral(central_assumptions, scenario_id, N);
       const yearOffset = N - 2026;
       let amount = 0;
       let bd = "";
@@ -339,17 +343,18 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
         getGlobal(global_assumptions, scenario_id, Y).price_increase_pct;
       const cPriceRate = (Y: number) =>
         getCentral(central_assumptions, scenario_id, Y).central_price_increase_pct;
-      const cVolRate = (Y: number) =>
-        getCentral(central_assumptions, scenario_id, Y).central_volume_increase_pct;
 
       // ===== CENTRAL =====
       if (cl.cost_type === "Central") {
+        // Steg 1: EUR-basis fra FC 2026 (forutsatt priset til 11.3 NOK/EUR)
+        const eurBasis = base / CENTRAL_BASE_EUR_NOK_RATE;
+        // Steg 2: Kumulativ prisvekst i EUR
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, cPriceRate);
-        const volumeFactor = cumulativeFactor(scenario_id, 2027, N, cVolRate);
-        // Reduksjon = permanent reforhandling. En reduksjon satt i år Y gjelder fom Y og alle påfølgende år.
-        // KONVENSJON: reduction_pct lagres med fortegn som matcher betydningen.
-        // Negativ verdi (f.eks. -0.05) = 5% rabatt. Positiv verdi = økning (sjelden, men tillatt).
-        // Formel: PRODUCT((1 + red_Y) for Y from 2027 to N).
+        const eurAfterPrice = eurBasis * priceFactor;
+        // Steg 3: Konverter til NOK med kursen for år N
+        const fxN = Number(getCentral(central_assumptions, scenario_id, N).central_eur_nok_rate ?? CENTRAL_BASE_EUR_NOK_RATE);
+        const nokBeforeReduction = eurAfterPrice * fxN;
+        // Steg 4: Permanent multiplikativ reduksjon (negative tall = rabatt)
         const reductionParts: string[] = [];
         let reductionFactor = 1;
         for (let Y = 2027; Y <= N; Y++) {
@@ -359,9 +364,10 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
             reductionParts.push(`(1${redY >= 0 ? "+" : ""}${redY}@Y${Y})`);
           }
         }
-        amount = base * reductionFactor * priceFactor * volumeFactor;
+        amount = nokBeforeReduction * reductionFactor;
+        // Steg 5: tNOK-reduksjon legges som AGGREGERT virtuell linje under (ikke per cost_line).
         const redDesc = reductionParts.length ? reductionParts.join("×") : "1";
-        bd = `Central: base=${round2(base)} × cum_red(2027..${N})=${redDesc}=${round2(reductionFactor)} × cum_price=${round2(priceFactor)} × cum_vol=${round2(volumeFactor)} = ${round2(amount)}`;
+        bd = `Sentral: EUR-basis=${round2(eurBasis)} (base=${round2(base)} / ${CENTRAL_BASE_EUR_NOK_RATE}) × cum_price(2027..${N})=${round2(priceFactor)} = ${round2(eurAfterPrice)} EUR × FX(${N})=${fxN} = ${round2(nokBeforeReduction)} × cum_red=${redDesc}=${round2(reductionFactor)} = ${round2(amount)}`;
       } else if (cl.category === "Internal FTE") {
         // ===== INTERNAL FTE =====
         if (cl.is_fte_master) {
@@ -691,6 +697,50 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     }
     adjLine.monthly_2027 = Array(12).fill((adjLine.amounts[2027] ?? 0) / 12);
     lines.push(adjLine);
+  }
+
+  // ---------- VIRTUAL: Sentral reduksjon (fast beløp tNOK) ----------
+  // Permanent reforhandling i fast beløp: satt i år Y gjelder fom Y og alle påfølgende år.
+  // Akkumuleres additivt (samme prinsipp som kategori-justering tNOK).
+  // Vises som ÉN samlet virtuell linje under cost_type=Central.
+  {
+    const scenarioCentral = central_assumptions.filter((a) => a.scenario_id === scenario_id);
+    const hasAny = scenarioCentral.some((a) => Number(a.central_reduction_amount_tnok ?? 0) !== 0);
+    if (hasAny) {
+      const cRedLine: ForecastLine = {
+        line_id: `virtual:central_reduction_amount`,
+        source: "virtual",
+        category: "Central",
+        project: "Sentral reduksjon (fast beløp)",
+        account: null,
+        account_name: "Sentral reduksjon (fast beløp)",
+        cost_type: "Central",
+        is_capex: false,
+        is_depreciation: false,
+        base_2026: 0,
+        amounts: {},
+        monthly_2027: [],
+        breakdown_source: {},
+      };
+      for (const N of YEARS) {
+        let amt = 0;
+        const parts: string[] = [];
+        for (let Y = 2027; Y <= N; Y++) {
+          const row = scenarioCentral.find((a) => a.year === Y);
+          const v = Number(row?.central_reduction_amount_tnok ?? 0);
+          if (v !== 0) {
+            amt += v;
+            parts.push(`Y${Y}: ${v} tNOK (permanent fra ${Y})`);
+          }
+        }
+        cRedLine.amounts[N] = amt;
+        cRedLine.breakdown_source[N] = parts.length
+          ? `${parts.join("\n")}\nSum aktivt år ${N} = ${round2(amt)} tNOK`
+          : "Ingen sentral fast-beløpsreduksjon";
+      }
+      cRedLine.monthly_2027 = Array(12).fill((cRedLine.amounts[2027] ?? 0) / 12);
+      lines.push(cRedLine);
+    }
   }
 
   // ---------- TOTALS ----------
