@@ -714,7 +714,7 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
         project: "Sentral reduksjon (fast beløp)",
         account: null,
         account_name: "Sentral reduksjon (fast beløp)",
-        cost_type: "IT Costs",
+        cost_type: "Central",
         is_capex: false,
         is_depreciation: false,
         base_2026: 0,
