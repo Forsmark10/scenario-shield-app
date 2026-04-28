@@ -366,7 +366,11 @@ export default function Assumptions() {
                           );
                         return {
                           ...prev,
-                          global: zeroIfScenario(prev.global as any, ["salary_increase_pct", "price_increase_pct"] as any),
+                          global: (prev.global as any[]).map((r) =>
+                            r.scenario_id === sid
+                              ? { ...r, salary_increase_pct: 0, price_increase_pct: 0, eur_nok_rate: 11.3 }
+                              : r,
+                          ),
                           central: (prev.central as any[]).map((r) =>
                             r.scenario_id === sid
                               ? {
