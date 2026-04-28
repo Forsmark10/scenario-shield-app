@@ -69,34 +69,30 @@ const Index = () => {
             <div>
               <CardTitle>Import av cost_lines</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Last opp <code>ltp_import.csv</code>. Eksisterende rader slettes
-                før import.
+                Last opp Excel/CSV. Du får forhåndsvisning av endringer (nye, endrede, slettede rader)
+                og en auto-backup lagres før endringene utføres.
               </p>
             </div>
             <div className="flex gap-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={handleImport}
-                className="hidden"
-              />
-              <Button
-                onClick={() => fileRef.current?.click()}
-                disabled={importing}
-              >
-                {importing ? "Importerer…" : "Velg CSV-fil"}
+              <Button onClick={() => setImportOpen(true)}>
+                Importer / Oppdater fra fil
               </Button>
               <Button
                 variant="outline"
                 onClick={loadCounts}
-                disabled={loading || importing}
+                disabled={loading}
               >
-                Oppdater
+                Oppdater tellere
               </Button>
             </div>
           </CardHeader>
         </Card>
+
+        <ImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onImported={loadCounts}
+        />
 
         <Card>
           <CardHeader>
