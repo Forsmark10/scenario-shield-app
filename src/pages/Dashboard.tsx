@@ -244,7 +244,7 @@ export default function Dashboard() {
               <SelectContent>
                 <SelectItem value="all">Alle</SelectItem>
                 <SelectItem value="Local">Local</SelectItem>
-                <SelectItem value="Central">Central</SelectItem>
+                <SelectItem value="Central">Sentral</SelectItem>
               </SelectContent>
             </Select>
           </div>
