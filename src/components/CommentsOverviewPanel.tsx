@@ -93,6 +93,25 @@ export async function loadScenarioComments(scenarioId: string): Promise<CommentE
           updatedAt: row.comment_amount_updated_at ?? null,
         });
       }
+      // Central assumptions: separate comments for tNOK-reduksjon and EUR/NOK-kurs
+      if (section === "central_assumptions") {
+        if (row.comment_amount && String(row.comment_amount).trim()) {
+          list.push({
+            section,
+            label: describe(section, row, "central_amt"),
+            comment: row.comment_amount,
+            updatedAt: row.comment_amount_updated_at ?? null,
+          });
+        }
+        if (row.comment_rate && String(row.comment_rate).trim()) {
+          list.push({
+            section,
+            label: describe(section, row, "central_rate"),
+            comment: row.comment_rate,
+            updatedAt: row.comment_rate_updated_at ?? null,
+          });
+        }
+      }
     }
   });
   return list;
