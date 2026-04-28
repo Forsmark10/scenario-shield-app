@@ -156,6 +156,29 @@ function buildRow(
       });
     }
   }
+  // Validate annual fallback columns too
+  for (const c of ["BU 2026", "BU_2026", "FC 2026", "FC_2026"]) {
+    const v = raw[c];
+    if (v !== undefined && v !== "" && !isNumericLike(v)) {
+      issues.push({
+        row: sourceRow,
+        field: c,
+        message: `Ikke-numerisk verdi i ${c}: "${v}"`,
+        severity: "error",
+      });
+    }
+  }
+
+  // Read monthly arrays. If month-columns (BU_2026_01..12) exist, use them.
+  // Otherwise fall back to a single annual column ("BU 2026") spread evenly across 12 months.
+  const readMonthly = (prefix: string, ...annualKeys: string[]): number[] => {
+    const monthlyVals = monthCols(prefix).map((c) => raw[c]);
+    const hasMonthly = monthlyVals.some((v) => v !== undefined && v !== "");
+    if (hasMonthly) return monthlyVals.map(num);
+    const annual = num(pick(raw, ...annualKeys));
+    if (annual === 0) return Array(12).fill(0);
+    return Array(12).fill(annual / 12);
+  };
 
   const isFteMaster = account === 50000;
   let driver: number | null = null;
@@ -175,8 +198,8 @@ function buildRow(
     account_name: accountName,
     cost_type: typeRaw === "Central" ? "Central" : "Local",
     ac_2025: num(ac2025raw),
-    bu_2026_monthly: buCols.map((c) => num(raw[c])),
-    fc_2026_monthly: fcCols.map((c) => num(raw[c])),
+    bu_2026_monthly: readMonthly("BU_2026", "BU 2026", "BU_2026"),
+    fc_2026_monthly: readMonthly("FC_2026", "FC 2026", "FC_2026"),
     is_fte_master: isFteMaster,
     fte_driver_pct: driver,
     is_existing_depreciation_alfa: isAlfa,
@@ -204,6 +227,23 @@ export async function parseImportFile(file: File): Promise<ParseResult> {
 
   const rows: ParsedRow[] = [];
   const issues: RowIssue[] = [];
+
+  // Detect future-year columns (FC 2027–2031). These are not stored in cost_lines –
+  // the engine forecasts them from FC 2026 + drivers. Warn the user once.
+  const futureFcCols = ["FC 2027", "FC 2028", "FC 2029", "FC 2030", "FC 2031"];
+  const hasFutureFc = raw.some((r) =>
+    futureFcCols.some((c) => r[c] !== undefined && r[c] !== "" && r[c] !== null),
+  );
+  if (hasFutureFc) {
+    issues.push({
+      row: 0,
+      field: "FC 2027–2031",
+      message:
+        "FC 2027–2031 ignoreres ved import. Disse framskrives av modellen fra FC 2026 og driverne i Forutsetninger.",
+      severity: "warning",
+    });
+  }
+
   raw.forEach((r, idx) => {
     const { row, issues: rowIssues } = buildRow(r, idx, knownCategories);
     if (row) rows.push(row);
