@@ -1,0 +1,1 @@
+ALTER TABLE public.global_assumptions ALTER COLUMN eur_nok_rate SET DEFAULT 11.3;
