@@ -28,9 +28,7 @@ type TableName = (typeof TABLES)[number];
 const Index = () => {
   const [counts, setCounts] = useState<Record<string, number | null>>({});
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+  const [importOpen, setImportOpen] = useState(false);
 
   const loadCounts = async () => {
     setLoading(true);
@@ -50,37 +48,6 @@ const Index = () => {
   useEffect(() => {
     loadCounts();
   }, []);
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    try {
-      const res = await importCostLinesFromCsv(file);
-      if (res.errors.length) {
-        toast({
-          title: `Importert ${res.inserted} rader med advarsler`,
-          description: res.errors.slice(0, 3).join(" • "),
-          variant: res.inserted === 0 ? "destructive" : "default",
-        });
-      } else {
-        toast({
-          title: "Import fullført",
-          description: `${formatNumberNO(res.inserted)} rader lagt til i cost_lines.`,
-        });
-      }
-      await loadCounts();
-    } catch (err) {
-      toast({
-        title: "Import feilet",
-        description: err instanceof Error ? err.message : String(err),
-        variant: "destructive",
-      });
-    } finally {
-      setImporting(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  };
 
   return (
     <div className="p-6 space-y-6">
