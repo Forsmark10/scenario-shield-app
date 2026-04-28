@@ -45,6 +45,7 @@ export function useAllScenarios(reloadKey = 0): UseAllScenariosState {
           ecRes,
           convRes,
           nsRes,
+          ncRes,
           adjRes,
           capRes,
           drRes,
