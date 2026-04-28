@@ -12,13 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import type { ScenarioBundle } from "@/hooks/useAllScenarios";
 
@@ -33,13 +26,11 @@ export function SaveSnapshotDialog({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [scenarioId, setScenarioId] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   const reset = () => {
     setName("");
     setDescription("");
-    setScenarioId("");
   };
 
   const handleSave = async () => {
@@ -47,33 +38,29 @@ export function SaveSnapshotDialog({
       toast.error("Navn er påkrevd");
       return;
     }
-    if (!scenarioId) {
-      toast.error("Velg et scenario");
-      return;
-    }
-    const bundle = scenarios.find((s) => s.meta.id === scenarioId);
-    if (!bundle) {
-      toast.error("Fant ikke scenario");
+    if (scenarios.length === 0) {
+      toast.error("Ingen scenarioer å lagre");
       return;
     }
     setSaving(true);
     try {
-      const payload = {
+      const savedAt = new Date().toISOString();
+      const rows = scenarios.map((bundle) => ({
         name: name.trim(),
         description: description.trim() || null,
-        scenario_id: scenarioId,
+        scenario_id: bundle.meta.id,
         data: {
           inputs: bundle.inputs,
           result: bundle.result,
           meta: bundle.meta,
-          saved_at: new Date().toISOString(),
+          saved_at: savedAt,
         } as any,
-      };
+      }));
       const { error } = await (supabase as any)
         .from("forecast_snapshots")
-        .insert(payload);
+        .insert(rows);
       if (error) throw error;
-      toast.success("Snapshot lagret", { description: name });
+      toast.success(`Snapshot lagret for ${scenarios.length} scenarioer`, { description: name });
       reset();
       onOpenChange(false);
     } catch (e: any) {
@@ -89,7 +76,7 @@ export function SaveSnapshotDialog({
         <DialogHeader>
           <DialogTitle>Lagre snapshot</DialogTitle>
           <DialogDescription>
-            Frys nåværende forutsetninger og resultater for et scenario.
+            Frys nåværende forutsetninger og resultater for alle {scenarios.length} scenarioer.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
@@ -101,21 +88,6 @@ export function SaveSnapshotDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="snap-scenario">Scenario</Label>
-            <Select value={scenarioId} onValueChange={setScenarioId}>
-              <SelectTrigger id="snap-scenario">
-                <SelectValue placeholder="Velg scenario" />
-              </SelectTrigger>
-              <SelectContent>
-                {scenarios.map((s) => (
-                  <SelectItem key={s.meta.id} value={s.meta.id}>
-                    {s.meta.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="snap-desc">Beskrivelse (valgfri)</Label>
