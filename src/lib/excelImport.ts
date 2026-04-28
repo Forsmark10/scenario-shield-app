@@ -227,6 +227,23 @@ export async function parseImportFile(file: File): Promise<ParseResult> {
 
   const rows: ParsedRow[] = [];
   const issues: RowIssue[] = [];
+
+  // Detect future-year columns (FC 2027–2031). These are not stored in cost_lines –
+  // the engine forecasts them from FC 2026 + drivers. Warn the user once.
+  const futureFcCols = ["FC 2027", "FC 2028", "FC 2029", "FC 2030", "FC 2031"];
+  const hasFutureFc = raw.some((r) =>
+    futureFcCols.some((c) => r[c] !== undefined && r[c] !== "" && r[c] !== null),
+  );
+  if (hasFutureFc) {
+    issues.push({
+      row: 0,
+      field: "FC 2027–2031",
+      message:
+        "FC 2027–2031 ignoreres ved import. Disse framskrives av modellen fra FC 2026 og driverne i Forutsetninger.",
+      severity: "warning",
+    });
+  }
+
   raw.forEach((r, idx) => {
     const { row, issues: rowIssues } = buildRow(r, idx, knownCategories);
     if (row) rows.push(row);
