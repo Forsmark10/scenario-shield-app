@@ -253,6 +253,46 @@ export default function Assumptions() {
             <History className="h-4 w-4 mr-2" />
             Historikk
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={!activeScenario}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Tilbakestill til default-verdier
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Tilbakestill alle forutsetninger?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Dette sletter alle forutsetninger (drivere, FTE-endringer, konverteringer, nearshoring, kategori-justeringer og capex) for det valgte scenarioet, og lar systemet bruke default-verdier. Dette kan ikke angres, men du kan gjenopprette en tidligere versjon fra Historikk.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (!activeScenario) return;
+                    const tables = [
+                      "global_assumptions","central_assumptions","internal_fte_changes",
+                      "external_fte_changes","conversions","nearshoring_additions",
+                      "nearshoring_changes","category_adjustments","capex_plan",
+                    ] as const;
+                    try {
+                      await Promise.all(tables.map((t) =>
+                        supabase.from(t).delete().eq("scenario_id", activeScenario)
+                      ));
+                      sonnerToast.success("Forutsetninger tilbakestilt");
+                      refresh();
+                    } catch (e: any) {
+                      sonnerToast.error("Kunne ikke tilbakestille", { description: e?.message ?? String(e) });
+                    }
+                  }}
+                >
+                  Tilbakestill
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -282,16 +322,8 @@ export default function Assumptions() {
             <SectionCategoryAdj data={data} scenario={s} patch={patch} />
             <SectionCapex data={data} scenario={s} patch={patch} />
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="pt-2">
               <p className="text-xs text-muted-foreground">Endringer lagres automatisk (debounce 500 ms).</p>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled
-                onClick={() => toast({ title: "Tilbakestill – kommer snart" })}
-              >
-                Tilbakestill til default-verdier
-              </Button>
             </div>
           </TabsContent>
         ))}
