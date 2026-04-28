@@ -60,6 +60,15 @@ export interface NearshoringAddition {
   overlap_months: number;
 }
 
+/** New model: nearshoring as an independent FTE-like resource. */
+export interface NearshoringChange {
+  scenario_id: string;
+  year: number;
+  increase: number;
+  decrease: number;
+  comment?: string | null;
+}
+
 export interface CategoryAdjustment {
   scenario_id: string;
   category: string;
@@ -141,6 +150,7 @@ export interface ForecastInputs {
   external_fte_changes: FteChange[];
   conversions: Conversion[];
   nearshoring_additions: NearshoringAddition[];
+  nearshoring_changes: NearshoringChange[];
   category_adjustments: CategoryAdjustment[];
   capex_plan: CapexPlan[];
   depreciation_rules: DepreciationRule[];
