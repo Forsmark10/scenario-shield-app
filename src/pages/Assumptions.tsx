@@ -367,7 +367,18 @@ export default function Assumptions() {
                         return {
                           ...prev,
                           global: zeroIfScenario(prev.global as any, ["salary_increase_pct", "price_increase_pct"] as any),
-                          central: zeroIfScenario(prev.central as any, ["central_price_increase_pct", "central_volume_increase_pct", "central_reduction_pct"] as any),
+                          central: (prev.central as any[]).map((r) =>
+                            r.scenario_id === sid
+                              ? {
+                                  ...r,
+                                  central_price_increase_pct: 0,
+                                  central_volume_increase_pct: 0,
+                                  central_reduction_pct: 0,
+                                  central_reduction_amount_tnok: 0,
+                                  central_eur_nok_rate: 11.3,
+                                }
+                              : r,
+                          ),
                           intChanges: zeroIfScenario(prev.intChanges as any, ["increase", "decrease"] as any),
                           extChanges: zeroIfScenario(prev.extChanges as any, ["increase", "decrease"] as any),
                           nearshoringChanges: zeroIfScenario(prev.nearshoringChanges as any, ["increase", "decrease"] as any),
