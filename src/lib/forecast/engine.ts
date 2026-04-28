@@ -333,7 +333,6 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
 
     for (const N of YEARS) {
       const g = getGlobal(global_assumptions, scenario_id, N);
-      const c = getCentral(central_assumptions, scenario_id, N);
       const yearOffset = N - 2026;
       let amount = 0;
       let bd = "";
