@@ -282,7 +282,7 @@ export default function Assumptions() {
                       const steps: Array<[string, () => any]> = [
                         ["global_assumptions", () =>
                           supabase.from("global_assumptions").update({
-                            salary_increase_pct: 0, price_increase_pct: 0,
+                            salary_increase_pct: 0, price_increase_pct: 0, eur_nok_rate: 11.3,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["central_assumptions", () =>
                           supabase.from("central_assumptions").update({
@@ -366,7 +366,11 @@ export default function Assumptions() {
                           );
                         return {
                           ...prev,
-                          global: zeroIfScenario(prev.global as any, ["salary_increase_pct", "price_increase_pct"] as any),
+                          global: (prev.global as any[]).map((r) =>
+                            r.scenario_id === sid
+                              ? { ...r, salary_increase_pct: 0, price_increase_pct: 0, eur_nok_rate: 11.3 }
+                              : r,
+                          ),
                           central: (prev.central as any[]).map((r) =>
                             r.scenario_id === sid
                               ? {
@@ -654,7 +658,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
         year,
         salary_increase_pct: 0.04,
         price_increase_pct: 0.05,
-        eur_nok_rate: 11.5,
+        eur_nok_rate: 11.3,
         [field]: value,
       };
       const { data: inserted, error } = await supabase
@@ -690,7 +694,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
           year,
           salary_increase_pct: 0.04,
           price_increase_pct: 0.05,
-          eur_nok_rate: 11.5,
+          eur_nok_rate: 11.3,
           comment,
           comment_updated_at: ts,
         } as any)
@@ -1453,7 +1457,7 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
           year,
           salary_increase_pct: 0.04,
           price_increase_pct: 0.05,
-          eur_nok_rate: 11.5,
+          eur_nok_rate: 11.3,
           comment,
           comment_updated_at: ts,
         } as any)
@@ -1584,7 +1588,7 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
               <tr>
                 {FC_YEARS.map((y) => {
                   const row = getGlobal(y);
-                  const v = Number(row?.eur_nok_rate ?? 11.5);
+                  const v = Number(row?.eur_nok_rate ?? 11.3);
                   return (
                     <td key={y} className="px-1 py-1">
                       <CellWithComment
