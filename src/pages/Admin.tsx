@@ -1,10 +1,9 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { importCostLinesFromCsv } from "@/lib/csvImport";
+import { ImportDialog } from "@/components/ImportDialog";
 import { formatNumberNO } from "@/lib/format";
 
 const TABLES = [
@@ -29,9 +28,7 @@ type TableName = (typeof TABLES)[number];
 const Index = () => {
   const [counts, setCounts] = useState<Record<string, number | null>>({});
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+  const [importOpen, setImportOpen] = useState(false);
 
   const loadCounts = async () => {
     setLoading(true);
@@ -51,37 +48,6 @@ const Index = () => {
   useEffect(() => {
     loadCounts();
   }, []);
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImporting(true);
-    try {
-      const res = await importCostLinesFromCsv(file);
-      if (res.errors.length) {
-        toast({
-          title: `Importert ${res.inserted} rader med advarsler`,
-          description: res.errors.slice(0, 3).join(" • "),
-          variant: res.inserted === 0 ? "destructive" : "default",
-        });
-      } else {
-        toast({
-          title: "Import fullført",
-          description: `${formatNumberNO(res.inserted)} rader lagt til i cost_lines.`,
-        });
-      }
-      await loadCounts();
-    } catch (err) {
-      toast({
-        title: "Import feilet",
-        description: err instanceof Error ? err.message : String(err),
-        variant: "destructive",
-      });
-    } finally {
-      setImporting(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  };
 
   return (
     <div className="p-6 space-y-6">
@@ -103,34 +69,30 @@ const Index = () => {
             <div>
               <CardTitle>Import av cost_lines</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Last opp <code>ltp_import.csv</code>. Eksisterende rader slettes
-                før import.
+                Last opp Excel/CSV. Du får forhåndsvisning av endringer (nye, endrede, slettede rader)
+                og en auto-backup lagres før endringene utføres.
               </p>
             </div>
             <div className="flex gap-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={handleImport}
-                className="hidden"
-              />
-              <Button
-                onClick={() => fileRef.current?.click()}
-                disabled={importing}
-              >
-                {importing ? "Importerer…" : "Velg CSV-fil"}
+              <Button onClick={() => setImportOpen(true)}>
+                Importer / Oppdater fra fil
               </Button>
               <Button
                 variant="outline"
                 onClick={loadCounts}
-                disabled={loading || importing}
+                disabled={loading}
               >
-                Oppdater
+                Oppdater tellere
               </Button>
             </div>
           </CardHeader>
         </Card>
+
+        <ImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onImported={loadCounts}
+        />
 
         <Card>
           <CardHeader>
