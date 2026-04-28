@@ -393,7 +393,7 @@ export default function Scenario() {
                   <Badge variant="outline">{selected.category}</Badge>
                   <Badge variant="outline">{selected.project}</Badge>
                   <Badge variant={selected.cost_type === "Central" ? "default" : "secondary"}>
-                    {selected.cost_type}
+                    {selected.cost_type === "Central" ? "Sentral" : selected.cost_type}
                   </Badge>
                   {selected.source === "virtual" && <Badge>Virtuell</Badge>}
                 </SheetDescription>
