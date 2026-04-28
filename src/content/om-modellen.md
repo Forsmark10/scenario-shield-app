@@ -294,7 +294,7 @@ Appen overstyrer alle FC 2027-tall fra Excel og beregner dem på nytt ut fra Ass
 Hvis du setter -10% på Consultancy i 2027, gjelder det også 2028-2031 (permanent reforhandling). Dette brukes til å modellere reforhandlede priser eller generelle kostnadskutt.
 
 ### Er valutakursen lik hele perioden?
-Nei – du setter EUR/NOK-kurs per år under Nearshoring-seksjonen. Dette lar deg modellere valutasensitivitet.
+Nei – du setter EUR/NOK-kurs per år. Sentrale kostnader bruker kursen som ligger under Sentrale drivere, og Nearshoring bruker kursen i Nearshoring-seksjonen. Dette lar deg modellere valutasensitivitet.
 
 ### Hvor mye overlapp er det ved nearshoring?
 Når en ekstern erstattes av en nearshoring-ressurs, er det 3 måneders overlapp. Etter det er kun nearshoring-kost igjen.
