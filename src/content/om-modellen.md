@@ -27,7 +27,7 @@ Visuell oversikt med søylediagrammer for alle tre scenarioer, årlig vekst, sce
 Rådata per kostnadslinje med beregnede prognoser for 2027-2031. Ekspanderbar tabell med drilldown per kategori, prosjekt og konto. Filtrer på kategori, type eller søk i kontonavn.
 
 ### Assumptions
-Her endrer du forutsetningene per scenario. Åtte seksjoner: AI-assistert forutsetning, globale drivere, central drivere, internal FTE, external FTE, ekstern→intern konvertering, nearshoring, kategori-justeringer og Capex-plan.
+Her endrer du forutsetningene per scenario. Åtte seksjoner: AI-assistert forutsetning, globale drivere, sentrale drivere, internal FTE, external FTE, ekstern→intern konvertering, nearshoring, kategori-justeringer og Capex-plan.
 
 ### Scenario Comparison
 Detaljert pivottabell med alle tre scenarioer side om side. Toggle mellom Absolute (absolutte beløp) og Delta vs Steady (forskjell fra Steady State).
