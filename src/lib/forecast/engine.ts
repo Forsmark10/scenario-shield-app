@@ -59,12 +59,17 @@ function getCentral(
     assumptions.find((a) => a.scenario_id === scenarioId && a.year === year) ?? {
       scenario_id: scenarioId,
       year,
-      central_price_increase_pct: 0.03,
-      central_volume_increase_pct: 0.02,
+      central_price_increase_pct: 0,
+      central_volume_increase_pct: 0,
       central_reduction_pct: 0,
+      central_reduction_amount_tnok: 0,
+      central_eur_nok_rate: 11.3,
     }
   );
 }
+
+/** Default EUR-basis rate that 2026 FC is assumed to be priced at. */
+const CENTRAL_BASE_EUR_NOK_RATE = 11.3;
 
 function getCatAdj(
   adjustments: CategoryAdjustment[],
