@@ -279,7 +279,7 @@ Steady State brukes som sammenligningsgrunnlag for alt: Scenario Comparison (Del
 Endringen gjelder fra det året og fremover, og påvirker alle påfølgende år fordi veksten er kumulativ.
 
 ### Kan jeg ha ulike lønnsveksttall per år?
-Ja. Hvert år (2027-2031) har sin egen lønnsvekst, prisvekst og EUR/NOK-kurs. Default er lik vekst alle år, men du kan fritt overstyre.
+Ja. Hvert år (2027-2031) har sin egen lønnsvekst og prisvekst. EUR/NOK-kurs settes per år både for sentrale kostnader (Sentrale drivere) og for nearshoring. Default er lik vekst alle år, men du kan fritt overstyre.
 
 ### Hva er forskjellen på FTE increase og decrease?
 - **Increase:** Antall nye ansettelser det året (positivt tall)
