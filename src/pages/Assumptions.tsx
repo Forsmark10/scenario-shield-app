@@ -658,7 +658,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
         year,
         salary_increase_pct: 0.04,
         price_increase_pct: 0.05,
-        eur_nok_rate: 11.5,
+        eur_nok_rate: 11.3,
         [field]: value,
       };
       const { data: inserted, error } = await supabase
@@ -694,7 +694,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
           year,
           salary_increase_pct: 0.04,
           price_increase_pct: 0.05,
-          eur_nok_rate: 11.5,
+          eur_nok_rate: 11.3,
           comment,
           comment_updated_at: ts,
         } as any)
@@ -1457,7 +1457,7 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
           year,
           salary_increase_pct: 0.04,
           price_increase_pct: 0.05,
-          eur_nok_rate: 11.5,
+          eur_nok_rate: 11.3,
           comment,
           comment_updated_at: ts,
         } as any)
@@ -1588,7 +1588,7 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
               <tr>
                 {FC_YEARS.map((y) => {
                   const row = getGlobal(y);
-                  const v = Number(row?.eur_nok_rate ?? 11.5);
+                  const v = Number(row?.eur_nok_rate ?? 11.3);
                   return (
                     <td key={y} className="px-1 py-1">
                       <CellWithComment
