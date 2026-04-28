@@ -45,7 +45,7 @@ function getGlobal(
       year,
       salary_increase_pct: 0.04,
       price_increase_pct: 0.05,
-      eur_nok_rate: 11.5,
+      eur_nok_rate: 11.3,
     }
   );
 }
