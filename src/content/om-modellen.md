@@ -152,15 +152,25 @@ Når du legger til nearshoring-ressurser, erstatter de eksisterende eksterne på
 
 EUR/NOK-kursen settes per år under Nearshoring-seksjonen og kan variere over tid.
 
-### Central-kostnader
+### Sentrale kostnader
 
-Central (allokeringer fra morselskap) har egen beregning:
+Sentrale kostnader (allokeringer fra morselskap) faktureres i EUR og har en egen, EUR-basert beregning:
 
 ```
-Central år N = Base × (1 + pris)^år × (1 + volum)^år × PRODUCT(1 - reduksjon_Y)
+EUR-basis        = FC2026 / 11,3
+EUR med prisvekst = EUR-basis × PRODUCT(1 + prisvekst_Y) for Y fra 2027 til N
+NOK før reduksjon = EUR med prisvekst × EUR/NOK-kurs(N)
+NOK etter %-red.  = NOK før reduksjon × PRODUCT(1 + reduksjon%_Y)
+Sentral kost(N)   = NOK etter %-red. + SUM(reduksjon_tNOK_Y) for Y ≤ N
 ```
 
-**Viktig om reduksjon:** Central reduksjon er **permanent reforhandling**. Når du setter -5% i 2027, gjelder den også 2028-2031. Hvis du legger til ytterligere -3% i 2029, kombineres de multiplikativt.
+**De fire sentrale driverne:**
+- **Sentral prisvekst %** – underliggende EUR-prisøkning, kumulativ år for år (kan være negativ)
+- **Sentral reduksjon %** – permanent reforhandling i prosent. Skrives som negativt tall (−5 = 5% rabatt). Multiplikativ.
+- **Sentral reduksjon tNOK** – permanent fast beløpsreduksjon. Skrives som negativt tall. Additivt: −500 i 2027 og −200 i 2029 gir −700 fra 2029. Vises som egen virtuell linje.
+- **EUR/NOK-kurs** – valutakurs for året. Default 11,3 (matcher EUR-basis i FC 2026). Settes per år, påvirker NOK-kostnaden direkte.
+
+**Viktig om reduksjon:** Begge reduksjonene er **permanente reforhandlinger**. Når satt i ett år gjelder de alle påfølgende år.
 
 ### Kategori-justeringer (Local)
 
