@@ -695,6 +695,45 @@ export type Database = {
         }
         Relationships: []
       }
+      nearshoring_changes: {
+        Row: {
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
+          created_at: string
+          decrease: number
+          id: string
+          increase: number
+          scenario_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
+          created_at?: string
+          decrease?: number
+          id?: string
+          increase?: number
+          scenario_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
+          created_at?: string
+          decrease?: number
+          id?: string
+          increase?: number
+          scenario_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       scenarios: {
         Row: {
           created_at: string
