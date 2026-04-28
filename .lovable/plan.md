@@ -1,24 +1,32 @@
-# Kategori-filter som sjekkliste med "Velg alle"
+# Forenkle "Lagre snapshot" – alltid alle scenarioer
 
-## Problem
-Dagens filter er en rad med klikkbare knapper – tar mye plass og mangler "Velg alle".
+## Endring i `src/components/SaveSnapshotDialog.tsx`
 
-## Løsning
-Erstatt knappe-raden i `src/pages/Dashboard.tsx` (rundt linje 255–278) med en kompakt `Popover`-knapp som åpner en avkrysningsliste.
+Fjern hele scenario-valget. En snapshot fryser alltid hele tilstanden (alle aktive scenarioer).
 
-### Knapp-tekst (dynamisk)
-- Alle valgt → "Alle kategorier"
-- Ingen valgt → "Ingen valgt"
-- Ellers → "X av Y valgt"
+### UI
+Behold kun:
+- Navn (påkrevd)
+- Beskrivelse (valgfri)
+- Hjelpetekst: "Lagrer alle N scenarioer som ett snapshot."
 
-### Popover-innhold
-1. **"Velg alle"** øverst med Checkbox (tri-state: checked / indeterminate / unchecked).
-   - Klikk når alle er valgt → fjern alle (`setExcludedCats(new Set(allCategories))`)
-   - Klikk ellers → velg alle (`setExcludedCats(new Set())`)
-2. `Separator`
-3. Scrollbar liste (`max-h-72 overflow-y-auto`) med én rad per kategori: Checkbox + navn. Klikk toggler `excludedCats`.
+### Lagring
+DB-kolonnen `scenario_id` er NOT NULL, så vi lagrer **én rad per scenario** i `forecast_snapshots`, alle med samme `name` og `description` (gruppert visuelt i historikken via felles navn + tidsstempel).
 
-### Komponenter som brukes
-Eksisterende shadcn-komponenter: `Popover`, `Button`, `Checkbox`, `Separator` (legges til i imports).
+```ts
+const rows = scenarios.map(b => ({
+  name: name.trim(),
+  description: description.trim() || null,
+  scenario_id: b.meta.id,
+  data: { inputs: b.inputs, result: b.result, meta: b.meta, saved_at: new Date().toISOString() },
+}));
+const { error } = await supabase.from("forecast_snapshots").insert(rows);
+```
 
-Ingen endringer i filtrerings-state (`excludedCats: Set<string>`) eller datamodell – kun UI-bytte.
+Toast: `Snapshot lagret for {N} scenarioer`.
+
+### State som fjernes
+- `scenarioId`-state og tilhørende `Select`/`Label` blokk
+- Validering for "Velg et scenario"
+
+Ingen DB-endringer, ingen endringer i History/Restore.
