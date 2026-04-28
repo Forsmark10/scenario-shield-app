@@ -20,6 +20,7 @@ import { GoalSeekPanel } from "@/components/GoalSeekPanel";
 import { CommentPopover } from "@/components/CommentPopover";
 import { CommentsOverviewPanel } from "@/components/CommentsOverviewPanel";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
+import { captureAssumptionsSnapshot } from "@/lib/versioning";
 import { useActiveScenario } from "@/hooks/useActiveScenario";
 import { cn } from "@/lib/utils";
 
@@ -257,14 +258,16 @@ export default function Assumptions() {
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={!activeScenario}>
                 <RotateCcw className="h-4 w-4 mr-2" />
-                Tilbakestill til default-verdier
+                Nullstill scenario
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Tilbakestill alle forutsetninger?</AlertDialogTitle>
+                <AlertDialogTitle>
+                  Tilbakestill alle forutsetninger for {data.scenarios.find((s) => s.id === activeScenario)?.name ?? "scenarioet"} til null?
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Dette sletter alle forutsetninger (drivere, FTE-endringer, konverteringer, nearshoring, kategori-justeringer og capex) for det valgte scenarioet, og lar systemet bruke default-verdier. Dette kan ikke angres, men du kan gjenopprette en tidligere versjon fra Historikk.
+                  Dette nullstiller alle vekstrater, FTE-endringer, konverteringer, kategori-justeringer og Capex-planer. Kommentarer og Executive Summary beholdes. Handlingen kan angres via Historikk.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -272,19 +275,60 @@ export default function Assumptions() {
                 <AlertDialogAction
                   onClick={async () => {
                     if (!activeScenario) return;
-                    const tables = [
-                      "global_assumptions","central_assumptions","internal_fte_changes",
-                      "external_fte_changes","conversions","nearshoring_additions",
-                      "nearshoring_changes","category_adjustments","capex_plan",
-                    ] as const;
+                    const sid = activeScenario;
                     try {
-                      await Promise.all(tables.map((t) =>
-                        supabase.from(t).delete().eq("scenario_id", activeScenario)
-                      ));
-                      sonnerToast.success("Forutsetninger tilbakestilt");
+                      // Verdier som nullstilles, men kommentarer beholdes:
+                      await Promise.all([
+                        supabase.from("global_assumptions").update({
+                          salary_increase_pct: 0, price_increase_pct: 0,
+                        } as any).eq("scenario_id", sid),
+                        supabase.from("central_assumptions").update({
+                          central_price_increase_pct: 0,
+                          central_volume_increase_pct: 0,
+                          central_reduction_pct: 0,
+                        } as any).eq("scenario_id", sid),
+                        supabase.from("internal_fte_changes").update({
+                          increase: 0, decrease: 0,
+                        } as any).eq("scenario_id", sid),
+                        supabase.from("external_fte_changes").update({
+                          increase: 0, decrease: 0,
+                        } as any).eq("scenario_id", sid),
+                        supabase.from("nearshoring_changes").update({
+                          increase: 0, decrease: 0,
+                        } as any).eq("scenario_id", sid),
+                        supabase.from("category_adjustments").update({
+                          adjustment_pct: 0, adjustment_amount_tnok: 0,
+                        } as any).eq("scenario_id", sid),
+                        // Aggregerte capex-bøtter (uten description) → amount = 0,
+                        // kommentarer beholdes.
+                        supabase.from("capex_plan").update({ amount: 0 } as any)
+                          .eq("scenario_id", sid).is("description", null),
+                      ]);
+                      // Slett rader som spesifisert: konverteringer, legacy nearshoring,
+                      // og detaljerte capex-investeringer.
+                      await Promise.all([
+                        supabase.from("conversions").delete().eq("scenario_id", sid),
+                        supabase.from("nearshoring_additions").delete().eq("scenario_id", sid),
+                        supabase.from("capex_plan").delete()
+                          .eq("scenario_id", sid).not("description", "is", null),
+                      ]);
+                      // Lag eksplisitt auto-versjon for sporbarhet.
+                      try {
+                        const snap = await captureAssumptionsSnapshot(sid);
+                        const ts = new Date().toLocaleString("nb-NO");
+                        await supabase.from("auto_versions").insert({
+                          scenario_id: sid,
+                          data: snap as any,
+                          summary: `Tilbakestilt til null - ${ts}`,
+                        } as any);
+                        autoVersion.resetWindow(sid);
+                      } catch (verr) {
+                        console.warn("auto-version (reset) failed", verr);
+                      }
+                      sonnerToast.success("Scenario nullstilt");
                       refresh();
                     } catch (e: any) {
-                      sonnerToast.error("Kunne ikke tilbakestille", { description: e?.message ?? String(e) });
+                      sonnerToast.error("Kunne ikke nullstille", { description: e?.message ?? String(e) });
                     }
                   }}
                 >
