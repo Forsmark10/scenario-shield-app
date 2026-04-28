@@ -25,7 +25,7 @@ const SECTION_LABEL: Record<string, string> = {
   internal_fte_changes: "Interne FTE",
   external_fte_changes: "Eksterne FTE",
   conversions: "Konverteringer",
-  nearshoring_additions: "Nearshoring",
+  nearshoring_changes: "Nearshoring",
   category_adjustments: "Kategori-justeringer",
   capex_plan: "Capex-plan",
 };
@@ -40,8 +40,8 @@ function describe(section: string, row: any, variant?: "pct" | "amt"): string {
       return `${row.year} · ${row.level} · inc ${row.increase} / dec ${row.decrease}`;
     case "conversions":
       return `${row.year} · ${row.external_level} → ${row.internal_level} (×${row.count})`;
-    case "nearshoring_additions":
-      return `${row.year} · erstatter ${row.replaces_external_level} (×${row.count})`;
+    case "nearshoring_changes":
+      return `${row.year} · inc ${row.increase} / dec ${row.decrease}`;
     case "category_adjustments": {
       const tag = variant === "amt" ? "tNOK" : "%";
       const value =

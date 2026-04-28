@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, History, MessageSquare, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, History, MessageSquare, Plus, RotateCcw, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -69,6 +73,7 @@ interface AllData {
   conversions: any[];
   nearshoringBase: any | null;
   nearshoringAdds: any[];
+  nearshoringChanges: any[];
   catAdj: any[];
   capexPlan: any[];
   depRules: any[];
@@ -85,6 +90,7 @@ type TableKey =
   | "conversions"
   | "nearshoringBase"
   | "nearshoringAdds"
+  | "nearshoringChanges"
   | "catAdj"
   | "capexPlan";
 
@@ -113,7 +119,7 @@ export default function Assumptions() {
     (async () => {
       setLoading(true);
       const [
-        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, caRes, capRes, drRes, clRes,
+        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, ncRes, caRes, capRes, drRes, clRes,
       ] = await Promise.all([
         supabase.from("scenarios").select("*").eq("is_active", true).order("sort_order"),
         supabase.from("global_assumptions").select("*"),
@@ -125,6 +131,7 @@ export default function Assumptions() {
         supabase.from("conversions").select("*"),
         supabase.from("nearshoring_base").select("*").limit(1).maybeSingle(),
         supabase.from("nearshoring_additions").select("*"),
+        supabase.from("nearshoring_changes").select("*"),
         supabase.from("category_adjustments").select("*"),
         supabase.from("capex_plan").select("*"),
         supabase.from("depreciation_rules").select("*"),
@@ -143,6 +150,7 @@ export default function Assumptions() {
         conversions: convRes.data ?? [],
         nearshoringBase: nbRes.data ?? null,
         nearshoringAdds: naRes.data ?? [],
+        nearshoringChanges: ncRes.data ?? [],
         catAdj: caRes.data ?? [],
         capexPlan: capRes.data ?? [],
         depRules: drRes.data ?? [],
@@ -245,6 +253,46 @@ export default function Assumptions() {
             <History className="h-4 w-4 mr-2" />
             Historikk
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={!activeScenario}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Tilbakestill til default-verdier
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Tilbakestill alle forutsetninger?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Dette sletter alle forutsetninger (drivere, FTE-endringer, konverteringer, nearshoring, kategori-justeringer og capex) for det valgte scenarioet, og lar systemet bruke default-verdier. Dette kan ikke angres, men du kan gjenopprette en tidligere versjon fra Historikk.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Avbryt</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (!activeScenario) return;
+                    const tables = [
+                      "global_assumptions","central_assumptions","internal_fte_changes",
+                      "external_fte_changes","conversions","nearshoring_additions",
+                      "nearshoring_changes","category_adjustments","capex_plan",
+                    ] as const;
+                    try {
+                      await Promise.all(tables.map((t) =>
+                        supabase.from(t).delete().eq("scenario_id", activeScenario)
+                      ));
+                      sonnerToast.success("Forutsetninger tilbakestilt");
+                      refresh();
+                    } catch (e: any) {
+                      sonnerToast.error("Kunne ikke tilbakestille", { description: e?.message ?? String(e) });
+                    }
+                  }}
+                >
+                  Tilbakestill
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -274,16 +322,8 @@ export default function Assumptions() {
             <SectionCategoryAdj data={data} scenario={s} patch={patch} />
             <SectionCapex data={data} scenario={s} patch={patch} />
 
-            <div className="flex items-center justify-between pt-2">
+            <div className="pt-2">
               <p className="text-xs text-muted-foreground">Endringer lagres automatisk (debounce 500 ms).</p>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled
-                onClick={() => toast({ title: "Tilbakestill – kommer snart" })}
-              >
-                Tilbakestill til default-verdier
-              </Button>
             </div>
           </TabsContent>
         ))}
@@ -565,7 +605,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d, dIdx) => (
+          {drivers.map((d) => (
             <tr key={d.key} className="border-b">
               <td className="px-2 py-2">{d.label}</td>
               {FC_YEARS.map((y) => {
@@ -573,27 +613,19 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
                 const v = (row?.[d.key] ?? (d.key === "salary_increase_pct" ? 0.04 : 0.05)) * d.scale;
                 return (
                   <td key={y} className="px-1 py-1">
-                    {dIdx === 0 ? (
-                      <CellWithComment
-                        comment={row?.comment}
-                        updatedAt={row?.comment_updated_at}
-                        updatedBy={row?.comment_updated_by}
-                        onSaveComment={(next) => upsertComment(y, next)}
-                        label={`Globale drivere ${y}`}
-                      >
-                        <NumCell
-                          value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
-                          suffix={d.suffix}
-                          onCommit={(num) => upsert(y, d.key, num / d.scale)}
-                        />
-                      </CellWithComment>
-                    ) : (
+                    <CellWithComment
+                      comment={row?.comment}
+                      updatedAt={row?.comment_updated_at}
+                      updatedBy={row?.comment_updated_by}
+                      onSaveComment={(next) => upsertComment(y, next)}
+                      label={`Globale drivere ${y} · ${d.label}`}
+                    >
                       <NumCell
                         value={Number(v.toFixed(d.scale === 100 ? 2 : 3))}
                         suffix={d.suffix}
                         onCommit={(num) => upsert(y, d.key, num / d.scale)}
                       />
-                    )}
+                    </CellWithComment>
                   </td>
                 );
               })}
@@ -685,7 +717,7 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
           </tr>
         </thead>
         <tbody>
-          {drivers.map((d, dIdx) => {
+          {drivers.map((d) => {
             const isReduction = d.key === "central_reduction_pct";
             return (
               <tr key={d.key} className="border-b">
@@ -700,34 +732,27 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
                 {FC_YEARS.map((y) => {
                   const row = get(y);
                   const v = ((row?.[d.key] ?? d.default) * 100);
-                  const cell = (
-                    <NumCell
-                      value={Number(v.toFixed(2))}
-                      suffix="%"
-                      max={isReduction ? 0 : undefined}
-                      errorHint={
-                        isReduction
-                          ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
-                          : undefined
-                      }
-                      onCommit={(num) => upsert(y, d.key, num / 100)}
-                    />
-                  );
                   return (
                     <td key={y} className="px-1 py-1 align-top">
-                      {dIdx === 0 ? (
-                        <CellWithComment
-                          comment={row?.comment}
-                          updatedAt={row?.comment_updated_at}
-                          updatedBy={row?.comment_updated_by}
-                          onSaveComment={(next) => upsertComment(y, next)}
-                          label={`Central drivere ${y}`}
-                        >
-                          {cell}
-                        </CellWithComment>
-                      ) : (
-                        cell
-                      )}
+                      <CellWithComment
+                        comment={row?.comment}
+                        updatedAt={row?.comment_updated_at}
+                        updatedBy={row?.comment_updated_by}
+                        onSaveComment={(next) => upsertComment(y, next)}
+                        label={`Central drivere ${y} · ${d.label}`}
+                      >
+                        <NumCell
+                          value={Number(v.toFixed(2))}
+                          suffix="%"
+                          max={isReduction ? 0 : undefined}
+                          errorHint={
+                            isReduction
+                              ? "Reduksjon må være 0 eller negativ. Skriv −5 for 5% rabatt."
+                              : undefined
+                          }
+                          onCommit={(num) => upsert(y, d.key, num / 100)}
+                        />
+                      </CellWithComment>
                     </td>
                   );
                 })}
@@ -1181,7 +1206,15 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
                   </Select>
                 </td>
                 <td className="px-1 py-1">
-                  <NumCell value={Number(r.count)} step="1" min={0} errorHint="Antall må være 0 eller positivt." onCommit={(v) => updateField(r.id, "count", Math.max(0, Math.round(v)))} />
+                  <CellWithComment
+                    comment={r.comment}
+                    updatedAt={r.comment_updated_at}
+                    updatedBy={r.comment_updated_by}
+                    onSaveComment={(next) => updateComment(r.id, next)}
+                    label={`Konvertering ${r.year} · Antall`}
+                  >
+                    <NumCell value={Number(r.count)} step="1" min={0} errorHint="Antall må være 0 eller positivt." onCommit={(v) => updateField(r.id, "count", Math.max(0, Math.round(v)))} />
+                  </CellWithComment>
                 </td>
                 <td className="px-1 py-1">
                   <Select value={r.internal_level} onValueChange={(v) => updateField(r.id, "internal_level", v)}>
@@ -1207,7 +1240,6 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
 // ---------------------- 6. Nearshoring ----------------------
 function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const base = data.nearshoringBase;
-  const adds = data.nearshoringAdds.filter((n) => n.scenario_id === scenario.id);
 
   const getGlobal = (year: number) =>
     data.global.find((g) => g.scenario_id === scenario.id && g.year === year) ?? null;
@@ -1238,6 +1270,41 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
+  // Comment on FX (eur_nok_rate) cell — shares the global_assumptions row's `comment` column.
+  const upsertFxComment = async (year: number, comment: string | null) => {
+    const existing = getGlobal(year);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({
+        type: "update",
+        table: "global",
+        id: existing.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("global_assumptions")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("global_assumptions")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          salary_increase_pct: 0.04,
+          price_increase_pct: 0.05,
+          eur_nok_rate: 11.5,
+          comment,
+          comment_updated_at: ts,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "global", row: inserted });
+    }
+  };
+
   const updateBase = async (field: string, value: number) => {
     if (base) {
       patch({ type: "setSingleton", table: "nearshoringBase", row: { ...base, [field]: value } });
@@ -1254,54 +1321,68 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
-  const addRow = async () => {
-    const { data: inserted, error } = await supabase
-      .from("nearshoring_additions")
-      .insert({
-        scenario_id: scenario.id,
-        year: 2027,
-        replaces_external_level: "Low",
-        count: 0,
-        overlap_months: 3,
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    patch({ type: "upsert", table: "nearshoringAdds", row: inserted });
+  // === New FTE-style Increase/Decrease per year ===
+  const getChange = (year: number) =>
+    data.nearshoringChanges.find((c) => c.scenario_id === scenario.id && c.year === year) ?? null;
+
+  const upsertChange = async (year: number, field: "increase" | "decrease", value: number) => {
+    const existing = getChange(year);
+    if (existing) {
+      patch({ type: "update", table: "nearshoringChanges", id: existing.id, changes: { [field]: value } });
+      const { error } = await supabase
+        .from("nearshoring_changes")
+        .update({ [field]: value } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("nearshoring_changes")
+        .insert({ scenario_id: scenario.id, year, increase: 0, decrease: 0, [field]: value } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "nearshoringChanges", row: inserted });
+    }
   };
 
-  const updateField = async (id: string, field: string, value: any) => {
-    patch({ type: "update", table: "nearshoringAdds", id, changes: { [field]: value } });
-    const { error } = await supabase.from("nearshoring_additions").update({ [field]: value } as any).eq("id", id);
-    if (error) throw error;
-  };
-
-  const updateComment = async (id: string, comment: string | null) => {
+  const upsertChangeComment = async (year: number, comment: string | null) => {
+    const existing = getChange(year);
     const ts = new Date().toISOString();
-    patch({
-      type: "update",
-      table: "nearshoringAdds",
-      id,
-      changes: { comment, comment_updated_at: ts },
-    });
-    const { error } = await supabase
-      .from("nearshoring_additions")
-      .update({ comment, comment_updated_at: ts } as any)
-      .eq("id", id);
-    if (error) throw error;
-  };
-
-  const remove = async (id: string) => {
-    patch({ type: "delete", table: "nearshoringAdds", id });
-    const { error } = await supabase.from("nearshoring_additions").delete().eq("id", id);
-    if (error) throw error;
+    if (existing) {
+      patch({
+        type: "update",
+        table: "nearshoringChanges",
+        id: existing.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("nearshoring_changes")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("nearshoring_changes")
+        .insert({
+          scenario_id: scenario.id,
+          year,
+          increase: 0,
+          decrease: 0,
+          comment,
+          comment_updated_at: ts,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "nearshoringChanges", row: inserted });
+    }
   };
 
   return (
     <Section
       title="Nearshoring"
       description="Faktureres i EUR per år, konverteres med EUR/NOK-kurs per år."
-      tooltip="Nearshoring-ressurser erstatter eksterne. Kostnaden er i EUR og konverteres med EUR/NOK-kursen for det aktuelle året. Overlapp gir doble kostnader i innfasingsperioden."
+      tooltip="Nearshoring fungerer som en uavhengig ressurstype, parallell til interne og eksterne FTE-er. Bruk Increase/Decrease per år for å justere antallet aktive ressurser. Endringer akkumuleres år for år; full årseffekt fra året de skjer."
     >
       <div className="space-y-5">
         <div>
@@ -1347,13 +1428,21 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
                   const v = Number(row?.eur_nok_rate ?? 11.5);
                   return (
                     <td key={y} className="px-1 py-1">
-                      <NumCell
-                        value={Number(v.toFixed(3))}
-                        step="0.01"
-                        min={0}
-                        errorHint="Valutakurs må være ≥ 0."
-                        onCommit={(num) => upsertFx(y, num)}
-                      />
+                      <CellWithComment
+                        comment={row?.comment}
+                        updatedAt={row?.comment_updated_at}
+                        updatedBy={row?.comment_updated_by}
+                        onSaveComment={(next) => upsertFxComment(y, next)}
+                        label={`EUR/NOK-kurs ${y}`}
+                      >
+                        <NumCell
+                          value={Number(v.toFixed(3))}
+                          step="0.01"
+                          min={0}
+                          errorHint="Valutakurs må være ≥ 0."
+                          onCommit={(num) => upsertFx(y, num)}
+                        />
+                      </CellWithComment>
                     </td>
                   );
                 })}
@@ -1364,60 +1453,60 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
 
         <div>
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-            Nye nearshoring-ressurser per år
+            Nearshoring-endringer per år
           </h3>
+          <p className="text-[11px] text-muted-foreground mb-2">
+            Increase legger til ressurser, Decrease fjerner. Endringer akkumuleres over år (en increase i 2027 gjelder også 2028–2031).
+          </p>
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b">
-                <th className="text-left font-medium px-2 py-2 w-[80px]">År</th>
-                <th className="text-left font-medium px-2 py-2 w-[200px]">Erstatter ekstern-nivå</th>
-                <th className="text-right font-medium px-2 py-2 w-[100px]">Antall</th>
-                <th className="w-[40px]"></th>
+                <th className="text-left font-medium px-2 py-2">Type</th>
+                {FC_YEARS.map((y) => (
+                  <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {adds.length === 0 && (
-                <tr><td colSpan={4} className="text-center text-muted-foreground px-2 py-4">Ingen nearshoring-tillegg ennå.</td></tr>
-              )}
-              {adds.map((r) => (
-                <tr key={r.id} className="border-b">
-                  <td className="px-1 py-1">
-                    <CellWithComment
-                      comment={r.comment}
-                      updatedAt={r.comment_updated_at}
-                      updatedBy={r.comment_updated_by}
-                      onSaveComment={(next) => updateComment(r.id, next)}
-                      label={`Nearshoring ${r.year}`}
-                    >
-                      <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </CellWithComment>
-                  </td>
-                  <td className="px-1 py-1">
-                    <Select value={r.replaces_external_level} onValueChange={(v) => updateField(r.id, "replaces_external_level", v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>{LEVELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </td>
-                  <td className="px-1 py-1">
-                    <NumCell value={Number(r.count)} step="1" min={0} errorHint="Antall må være 0 eller positivt." onCommit={(v) => updateField(r.id, "count", Math.max(0, Math.round(v)))} />
-                  </td>
-                  <td className="px-1 py-1 text-center">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(r.id)}>
-                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    </Button>
-                  </td>
+              {(["increase", "decrease"] as const).map((type) => (
+                <tr key={type} className="border-b">
+                  <td className="px-2 py-1.5 capitalize text-muted-foreground">{type}</td>
+                  {FC_YEARS.map((y) => {
+                    const c = getChange(y);
+                    const stored = Number(c?.[type] ?? 0);
+                    const display = type === "decrease" ? -stored : stored;
+                    return (
+                      <td key={y} className="px-1 py-1 align-top">
+                        <CellWithComment
+                          comment={c?.comment}
+                          updatedAt={c?.comment_updated_at}
+                          updatedBy={c?.comment_updated_by}
+                          onSaveComment={(next) => upsertChangeComment(y, next)}
+                          label={`Nearshoring ${y} (${type})`}
+                        >
+                          <NumCell
+                            value={display}
+                            step="1"
+                            min={type === "increase" ? 0 : undefined}
+                            max={type === "decrease" ? 0 : undefined}
+                            errorHint={
+                              type === "increase"
+                                ? "Increase må være 0 eller positiv."
+                                : "Decrease må være 0 eller negativ. Skriv −1 for én færre."
+                            }
+                            onCommit={(v) => {
+                              const stored = type === "decrease" ? Math.abs(Math.round(v)) : Math.round(v);
+                              return upsertChange(y, type, stored);
+                            }}
+                          />
+                        </CellWithComment>
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
           </table>
-          <Button variant="outline" size="sm" className="mt-2" onClick={addRow}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Legg til ressurs
-          </Button>
         </div>
       </div>
     </Section>

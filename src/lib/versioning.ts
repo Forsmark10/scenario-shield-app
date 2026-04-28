@@ -10,6 +10,7 @@ const SCOPED_TABLES = [
   "external_fte_changes",
   "conversions",
   "nearshoring_additions",
+  "nearshoring_changes",
   "category_adjustments",
   "capex_plan",
 ] as const;
@@ -47,7 +48,8 @@ export function diffSummary(
     internal_fte_changes: "Interne FTE",
     external_fte_changes: "Eksterne FTE",
     conversions: "Konverteringer",
-    nearshoring_additions: "Nearshoring",
+    nearshoring_additions: "Nearshoring (legacy)",
+    nearshoring_changes: "Nearshoring",
     category_adjustments: "Kategori-justeringer",
     capex_plan: "Capex-plan",
   };

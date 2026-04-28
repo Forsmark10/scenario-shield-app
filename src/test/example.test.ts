@@ -57,6 +57,7 @@ function buildInputs(overrides?: Partial<ForecastInputs>): ForecastInputs {
     external_fte_changes: [],
     conversions: [],
     nearshoring_additions: [],
+    nearshoring_changes: [],
     category_adjustments: [],
     capex_plan: [],
     depreciation_rules: [

@@ -36,6 +36,7 @@ export function useForecast(scenarioId: string | null): UseForecastState {
           ec,
           conv,
           ns,
+          nc,
           adj,
           cap,
           dr,
@@ -50,6 +51,7 @@ export function useForecast(scenarioId: string | null): UseForecastState {
           supabase.from("external_fte_changes").select("*").eq("scenario_id", scenarioId),
           supabase.from("conversions").select("*").eq("scenario_id", scenarioId),
           supabase.from("nearshoring_additions").select("*").eq("scenario_id", scenarioId),
+          supabase.from("nearshoring_changes").select("*").eq("scenario_id", scenarioId),
           supabase.from("category_adjustments").select("*").eq("scenario_id", scenarioId),
           supabase.from("capex_plan").select("*").eq("scenario_id", scenarioId),
           supabase.from("depreciation_rules").select("*"),
@@ -58,7 +60,7 @@ export function useForecast(scenarioId: string | null): UseForecastState {
           supabase.from("nearshoring_base").select("*").limit(1).maybeSingle(),
         ]);
 
-        const errs = [cl, ga, ca, ic, ec, conv, ns, adj, cap, dr, intRates, extRates, nsBase]
+        const errs = [cl, ga, ca, ic, ec, conv, ns, nc, adj, cap, dr, intRates, extRates, nsBase]
           .map((r) => r.error)
           .filter(Boolean);
         if (errs.length) throw new Error(errs.map((e) => e!.message).join("; "));
@@ -72,6 +74,7 @@ export function useForecast(scenarioId: string | null): UseForecastState {
           external_fte_changes: (ec.data ?? []) as ForecastInputs["external_fte_changes"],
           conversions: (conv.data ?? []) as ForecastInputs["conversions"],
           nearshoring_additions: (ns.data ?? []) as ForecastInputs["nearshoring_additions"],
+          nearshoring_changes: (nc.data ?? []) as ForecastInputs["nearshoring_changes"],
           category_adjustments: adj.data ?? [],
           capex_plan: (cap.data ?? []) as ForecastInputs["capex_plan"],
           depreciation_rules: (dr.data ?? []) as ForecastInputs["depreciation_rules"],
