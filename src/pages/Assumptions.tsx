@@ -279,7 +279,7 @@ export default function Assumptions() {
                     console.log("[Reset] Start nullstilling for scenario:", sid);
                     try {
                       // Sekvensielle update-calls med .select() for å verifisere antall rader.
-                      const steps: Array<[string, () => Promise<{ data: any; error: any }>]> = [
+                      const steps: Array<[string, () => any]> = [
                         ["global_assumptions", () =>
                           supabase.from("global_assumptions").update({
                             salary_increase_pct: 0, price_increase_pct: 0,
@@ -319,7 +319,7 @@ export default function Assumptions() {
                         console.log(`[Reset] ${label} → ${rows?.length ?? 0} rader oppdatert`);
                       }
                       // Slett rader som skal fjernes.
-                      const deletes: Array<[string, () => Promise<{ error: any }>]> = [
+                      const deletes: Array<[string, () => any]> = [
                         ["conversions", () =>
                           supabase.from("conversions").delete().eq("scenario_id", sid)],
                         ["nearshoring_additions (legacy)", () =>
