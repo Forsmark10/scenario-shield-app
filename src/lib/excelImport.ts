@@ -156,6 +156,29 @@ function buildRow(
       });
     }
   }
+  // Validate annual fallback columns too
+  for (const c of ["BU 2026", "BU_2026", "FC 2026", "FC_2026"]) {
+    const v = raw[c];
+    if (v !== undefined && v !== "" && !isNumericLike(v)) {
+      issues.push({
+        row: sourceRow,
+        field: c,
+        message: `Ikke-numerisk verdi i ${c}: "${v}"`,
+        severity: "error",
+      });
+    }
+  }
+
+  // Read monthly arrays. If month-columns (BU_2026_01..12) exist, use them.
+  // Otherwise fall back to a single annual column ("BU 2026") spread evenly across 12 months.
+  const readMonthly = (prefix: string, ...annualKeys: string[]): number[] => {
+    const monthlyVals = monthCols(prefix).map((c) => raw[c]);
+    const hasMonthly = monthlyVals.some((v) => v !== undefined && v !== "");
+    if (hasMonthly) return monthlyVals.map(num);
+    const annual = num(pick(raw, ...annualKeys));
+    if (annual === 0) return Array(12).fill(0);
+    return Array(12).fill(annual / 12);
+  };
 
   const isFteMaster = account === 50000;
   let driver: number | null = null;
