@@ -104,6 +104,7 @@ function computeYearTotals(
     if (excludedCategories.has(c.category)) return false;
     if (view === "PL" && c.category === "Capex") return false;
     if (view === "Spend" && c.category === "Depreciation") return false;
+    if (view === "Spend" && c.category === "Other operating income") return false;
     return true;
   });
   const ac = filtCl.reduce((a, c) => a + Number(c.ac_2025 || 0), 0);
@@ -116,6 +117,7 @@ function computeYearTotals(
     if (excludedCategories.has(l.category)) return false;
     if (view === "PL" && l.is_capex) return false;
     if (view === "Spend" && l.is_depreciation) return false;
+    if (view === "Spend" && l.category === "Other operating income") return false;
     return true;
   });
 
@@ -140,6 +142,7 @@ function computeStackedYearly(
     if (excludedCategories.has(c.category)) return false;
     if (view === "PL" && c.category === "Capex") return false;
     if (view === "Spend" && c.category === "Depreciation") return false;
+    if (view === "Spend" && c.category === "Other operating income") return false;
     return true;
   });
 
@@ -148,6 +151,7 @@ function computeStackedYearly(
     if (excludedCategories.has(l.category)) return false;
     if (view === "PL" && l.is_capex) return false;
     if (view === "Spend" && l.is_depreciation) return false;
+    if (view === "Spend" && l.category === "Other operating income") return false;
     return true;
   });
 
@@ -702,6 +706,7 @@ function DetailTable({
       if (typeFilter !== "all" && c.cost_type !== typeFilter) return false;
       if (view === "PL" && c.category === "Capex") return false;
       if (view === "Spend" && c.category === "Depreciation") return false;
+      if (view === "Spend" && c.category === "Other operating income") return false;
       return c.category === cat;
     });
     if (label === "AC 2025") return cl.reduce((a, c) => a + Number(c.ac_2025 || 0), 0);
@@ -715,6 +720,7 @@ function DetailTable({
         if (typeFilter !== "all" && l.cost_type !== typeFilter) return false;
         if (view === "PL" && l.is_capex) return false;
         if (view === "Spend" && l.is_depreciation) return false;
+        if (view === "Spend" && l.category === "Other operating income") return false;
         return l.category === cat;
       })
       .reduce((a, l) => a + (l.amounts[y] ?? 0), 0);
@@ -793,6 +799,7 @@ function computeScenarioYearByCategory(
     if (excludedCategories.has(l.category)) return false;
     if (view === "PL" && l.is_capex) return false;
     if (view === "Spend" && l.is_depreciation) return false;
+    if (view === "Spend" && l.category === "Other operating income") return false;
     return true;
   });
   const out: Record<string, Record<number, number>> = {};
