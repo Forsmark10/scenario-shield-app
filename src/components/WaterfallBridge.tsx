@@ -658,6 +658,42 @@ function DrilldownTooltip({
     );
   }
 
+  // Special tooltip for "Rest" – descriptive paragraph
+  if (bar.type === "rest") {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          left: pos.x + 18,
+          top: pos.y - 20,
+          background: "#1e293b",
+          color: "#e2e8f0",
+          fontFamily: "Inter, system-ui, sans-serif",
+          fontSize: 11,
+          padding: "12px 16px",
+          borderRadius: 8,
+          pointerEvents: "none",
+          boxShadow: "0 10px 32px rgba(0,0,0,.35)",
+          zIndex: 999,
+          lineHeight: 1.55,
+          width: 320,
+          borderLeft: "3px solid #94a3b8",
+        }}
+      >
+        <div style={{ fontWeight: 700, fontSize: 12, color: "#f8fafc", marginBottom: 6 }}>
+          Rest ({fmtParen(bar.raw)} MNOK)
+        </div>
+        <div style={{ borderTop: "1px solid #334155", marginBottom: 6 }} />
+        <div style={{ color: "#cbd5e1" }}>
+          Modellteknisk differanse som skyldes forskjell mellom faktiske kostnader i FC 2026
+          og modellens beregnede satser (arbeidsgiveravgift, feriepenger, og andre
+          personalrelaterte beregningsforskjeller). Denne posten påvirkes av samspill med
+          andre drivere og er ikke en selvstendig kostnadsendring.
+        </div>
+      </div>
+    );
+  }
+
   const details = bar.details ?? [];
   const hasSections = details.some((d) => d.isHeader);
 
