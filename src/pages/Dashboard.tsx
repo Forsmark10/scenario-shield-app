@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { ExecutiveSummary } from "@/components/ExecutiveSummary";
+import { WaterfallSection } from "@/components/WaterfallBridge";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "PL" | "Spend";
@@ -347,6 +348,9 @@ export default function Dashboard() {
           allCategories={allCategories}
         />
       ))}
+
+      {/* Cost bridge (waterfall) per scenario */}
+      <WaterfallSection scenarios={scenarios} view={view} scenarioColors={SCENARIO_COLOR} />
 
       {/* Comparison */}
       <ScenarioComparisonChart
