@@ -782,9 +782,12 @@ function WaterfallChart({
 
   bridges.forEach((b, idx) => {
     const next = running + b.value;
-    const isDeprBar = idx === bridges.length - 1;
+    const isRestBar = b.label === "Rest";
+    const isDeprBar = !isRestBar && idx === bridges.length - 2; // nest siste = Avskrivning/Capex
     let c: string;
-    if (isDeprBar) {
+    if (isRestBar) {
+      c = COLOR_REST;
+    } else if (isDeprBar) {
       // soft blue when reducing, brick when adding
       c = b.value < 0 ? COLOR_DEPR_NEG : COLOR_INCREASE;
     } else if (Math.abs(b.value) < 1) {
@@ -796,7 +799,7 @@ function WaterfallChart({
     }
     bars.push({
       name: b.label,
-      type: "bridge",
+      type: isRestBar ? "rest" : "bridge",
       raw: b.value,
       top: Math.max(running, next),
       bottom: Math.min(running, next),
@@ -807,7 +810,6 @@ function WaterfallChart({
     running = next;
   });
 
-  // "Rest" rendres ALDRI som søyle. Avvik logges som console.warn i computeBridges.
   void rest;
 
   bars.push({
