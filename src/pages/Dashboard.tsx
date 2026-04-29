@@ -584,7 +584,7 @@ function ScenarioSection({
               {breakdown === "Total" ? (
                 <BarChart data={barData} margin={{ top: 32, right: 12, bottom: 4, left: 0 }}>
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis hide />
+                  <YAxis hide domain={[0, sharedBarMax]} />
                   <Tooltip content={renderTooltip} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
                   <Bar dataKey="value" radius={[3, 3, 0, 0]}>
                     {barData.map((d) => (
@@ -601,7 +601,7 @@ function ScenarioSection({
               ) : (
                 <BarChart data={stackedData} margin={{ top: 32, right: 12, bottom: 4, left: 0 }}>
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis hide />
+                  <YAxis hide domain={[0, sharedBarMax]} />
                   <Tooltip content={renderTooltip} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
                   <Legend wrapperStyle={{ fontSize: 10 }} iconSize={8} />
                   {stackedCats.map((cat) => (
