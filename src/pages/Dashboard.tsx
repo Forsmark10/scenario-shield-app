@@ -584,7 +584,7 @@ function ScenarioSection({
                   </Bar>
                 </BarChart>
               ) : (
-                <BarChart data={stackedData} margin={{ top: 18, right: 12, bottom: 4, left: 0 }}>
+                <BarChart data={stackedData} margin={{ top: 32, right: 12, bottom: 4, left: 0 }}>
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip content={renderTooltip} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
