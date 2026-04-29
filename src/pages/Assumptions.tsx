@@ -1452,20 +1452,16 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
-  // Comment on FX (eur_nok_rate) cell — shares the global_assumptions row's `comment` column.
+  // Comment on FX (eur_nok_rate) cell — uses dedicated `comment_rate` column on global_assumptions.
   const upsertFxComment = async (year: number, comment: string | null) => {
     const existing = getGlobal(year);
     const ts = new Date().toISOString();
+    const changes = { comment_rate: comment, comment_rate_updated_at: ts } as any;
     if (existing) {
-      patch({
-        type: "update",
-        table: "global",
-        id: existing.id,
-        changes: { comment, comment_updated_at: ts },
-      });
+      patch({ type: "update", table: "global", id: existing.id, changes });
       const { error } = await supabase
         .from("global_assumptions")
-        .update({ comment, comment_updated_at: ts } as any)
+        .update(changes)
         .eq("id", existing.id);
       if (error) throw error;
     } else {
@@ -1477,8 +1473,7 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
           salary_increase_pct: 0.04,
           price_increase_pct: 0.05,
           eur_nok_rate: 11.3,
-          comment,
-          comment_updated_at: ts,
+          ...changes,
         } as any)
         .select()
         .single();
