@@ -436,6 +436,12 @@ export type Database = {
       external_fte_changes: {
         Row: {
           comment: string | null
+          comment_decrease: string | null
+          comment_decrease_updated_at: string | null
+          comment_decrease_updated_by: string | null
+          comment_increase: string | null
+          comment_increase_updated_at: string | null
+          comment_increase_updated_by: string | null
           comment_updated_at: string | null
           comment_updated_by: string | null
           created_at: string
@@ -449,6 +455,12 @@ export type Database = {
         }
         Insert: {
           comment?: string | null
+          comment_decrease?: string | null
+          comment_decrease_updated_at?: string | null
+          comment_decrease_updated_by?: string | null
+          comment_increase?: string | null
+          comment_increase_updated_at?: string | null
+          comment_increase_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
@@ -462,6 +474,12 @@ export type Database = {
         }
         Update: {
           comment?: string | null
+          comment_decrease?: string | null
+          comment_decrease_updated_at?: string | null
+          comment_decrease_updated_by?: string | null
+          comment_increase?: string | null
+          comment_increase_updated_at?: string | null
+          comment_increase_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
@@ -524,6 +542,15 @@ export type Database = {
       global_assumptions: {
         Row: {
           comment: string | null
+          comment_price: string | null
+          comment_price_updated_at: string | null
+          comment_price_updated_by: string | null
+          comment_rate: string | null
+          comment_rate_updated_at: string | null
+          comment_rate_updated_by: string | null
+          comment_salary: string | null
+          comment_salary_updated_at: string | null
+          comment_salary_updated_by: string | null
           comment_updated_at: string | null
           comment_updated_by: string | null
           created_at: string
@@ -537,6 +564,15 @@ export type Database = {
         }
         Insert: {
           comment?: string | null
+          comment_price?: string | null
+          comment_price_updated_at?: string | null
+          comment_price_updated_by?: string | null
+          comment_rate?: string | null
+          comment_rate_updated_at?: string | null
+          comment_rate_updated_by?: string | null
+          comment_salary?: string | null
+          comment_salary_updated_at?: string | null
+          comment_salary_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
@@ -550,6 +586,15 @@ export type Database = {
         }
         Update: {
           comment?: string | null
+          comment_price?: string | null
+          comment_price_updated_at?: string | null
+          comment_price_updated_by?: string | null
+          comment_rate?: string | null
+          comment_rate_updated_at?: string | null
+          comment_rate_updated_by?: string | null
+          comment_salary?: string | null
+          comment_salary_updated_at?: string | null
+          comment_salary_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
@@ -598,6 +643,12 @@ export type Database = {
       internal_fte_changes: {
         Row: {
           comment: string | null
+          comment_decrease: string | null
+          comment_decrease_updated_at: string | null
+          comment_decrease_updated_by: string | null
+          comment_increase: string | null
+          comment_increase_updated_at: string | null
+          comment_increase_updated_by: string | null
           comment_updated_at: string | null
           comment_updated_by: string | null
           created_at: string
@@ -611,6 +662,12 @@ export type Database = {
         }
         Insert: {
           comment?: string | null
+          comment_decrease?: string | null
+          comment_decrease_updated_at?: string | null
+          comment_decrease_updated_by?: string | null
+          comment_increase?: string | null
+          comment_increase_updated_at?: string | null
+          comment_increase_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
@@ -624,6 +681,12 @@ export type Database = {
         }
         Update: {
           comment?: string | null
+          comment_decrease?: string | null
+          comment_decrease_updated_at?: string | null
+          comment_decrease_updated_by?: string | null
+          comment_increase?: string | null
+          comment_increase_updated_at?: string | null
+          comment_increase_updated_by?: string | null
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
@@ -760,6 +823,8 @@ export type Database = {
       }
       scenarios: {
         Row: {
+          ai_executive_summary: string | null
+          ai_executive_summary_generated_at: string | null
           created_at: string
           description: string | null
           executive_summary: string | null
@@ -770,6 +835,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ai_executive_summary?: string | null
+          ai_executive_summary_generated_at?: string | null
           created_at?: string
           description?: string | null
           executive_summary?: string | null
@@ -780,6 +847,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ai_executive_summary?: string | null
+          ai_executive_summary_generated_at?: string | null
           created_at?: string
           description?: string | null
           executive_summary?: string | null
