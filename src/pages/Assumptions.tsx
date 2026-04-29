@@ -1166,19 +1166,22 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
-  const upsertChangeComment = async (year: number, level: Level, comment: string | null) => {
+  const upsertChangeComment = async (
+    year: number,
+    level: Level,
+    type: "increase" | "decrease",
+    comment: string | null,
+  ) => {
     const existing = getChange(year, level);
     const ts = new Date().toISOString();
+    const cField = type === "increase" ? "comment_increase" : "comment_decrease";
+    const atField = type === "increase" ? "comment_increase_updated_at" : "comment_decrease_updated_at";
+    const changes = { [cField]: comment, [atField]: ts } as any;
     if (existing) {
-      patch({
-        type: "update",
-        table: "extChanges",
-        id: existing.id,
-        changes: { comment, comment_updated_at: ts },
-      });
+      patch({ type: "update", table: "extChanges", id: existing.id, changes });
       const { error } = await supabase
         .from("external_fte_changes")
-        .update({ comment, comment_updated_at: ts } as any)
+        .update(changes)
         .eq("id", existing.id);
       if (error) throw error;
     } else {
@@ -1190,8 +1193,7 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
           level,
           increase: 0,
           decrease: 0,
-          comment,
-          comment_updated_at: ts,
+          ...changes,
         } as any)
         .select()
         .single();
