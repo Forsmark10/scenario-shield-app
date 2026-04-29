@@ -347,22 +347,24 @@ export default function Dashboard() {
       />
 
       {/* Per-scenario sections */}
-      {scenarios.map((bundle, i) => (
-        <ScenarioSection
-          key={bundle.meta.id}
-          bundle={bundle}
-          color={SCENARIO_COLOR[i % SCENARIO_COLOR.length]}
-          view={view}
-          breakdown={breakdown}
-          typeFilter={typeFilter}
-          excludedCats={excludedCats}
-          allCategories={allCategories}
-        />
-      ))}
+      {chartMode === "bars" &&
+        scenarios.map((bundle, i) => (
+          <ScenarioSection
+            key={bundle.meta.id}
+            bundle={bundle}
+            color={SCENARIO_COLOR[i % SCENARIO_COLOR.length]}
+            view={view}
+            breakdown={breakdown}
+            typeFilter={typeFilter}
+            excludedCats={excludedCats}
+            allCategories={allCategories}
+          />
+        ))}
 
       {/* Cost bridge (waterfall) per scenario */}
-      <WaterfallSection scenarios={scenarios} view={view} scenarioColors={SCENARIO_COLOR} />
-
+      {chartMode === "waterfall" && (
+        <WaterfallSection scenarios={scenarios} view={view} scenarioColors={SCENARIO_COLOR} />
+      )}
       {/* Comparison */}
       <ScenarioComparisonChart
         scenarios={scenarios}
