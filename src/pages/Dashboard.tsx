@@ -523,12 +523,12 @@ function ScenarioSection({
 
   return (
     <Card>
-      <CardContent className="pt-5">
-        <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
-          <h2 className="text-[15px] font-medium tracking-tight" style={{ color }}>
+      <CardContent className="pt-4 pb-3">
+        <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1.5">
+          <h2 className="text-[13px] font-semibold tracking-tight" style={{ color }}>
             {bundle.meta.name}
           </h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             Totalkostnad 2031: <span className="font-medium text-foreground">{formatNumberNO(total2031M, 1)} MNOK</span>{" "}
             · CAGR 2026–2031:{" "}
             <span className={cn("font-medium", cagr < 0 ? "text-[hsl(var(--positive))]" : "text-foreground")}>
@@ -537,9 +537,9 @@ function ScenarioSection({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-3">
           {/* Bars */}
-          <div className="h-[280px] relative">
+          <div className="h-[180px] relative">
             {/* Section labels overlay — aligned to bar slots (8 equal columns) */}
             <div
               className="absolute top-0 left-0 right-0 grid pointer-events-none z-10 text-[11px] font-bold text-foreground uppercase tracking-wide"

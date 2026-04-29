@@ -1,41 +1,32 @@
 ## Mål
 
-Legg til en **Diagram**-velger øverst i filter-raden på Dashboard som bytter mellom **Stolpediagram** (de tre eksisterende per-scenario søylediagrammene) og **Waterfall** (Kostnadsbridge-seksjonen). Kun én av dem vises om gangen; alt annet på Dashboard (Executive Summary, Besparelser, Scenario-sammenligning, filtre) vises som før uavhengig av valget.
+Komprimere de tre per-scenario stolpediagram-seksjonene (inkl. YoY-vekst-grafen) til samme høyde som hver waterfall (~190 px), så stolpediagram-modus tar like lite vertikal plass som waterfall-modus.
 
-## Endringer i `src/pages/Dashboard.tsx`
+## Endringer i `src/pages/Dashboard.tsx` (kun `ScenarioSection`)
 
-1. **Ny type + state**:
-   ```ts
-   type ChartMode = "bars" | "waterfall";
-   const [chartMode, setChartMode] = useState<ChartMode>("bars");
-   ```
+| Element | Før | Etter |
+|---|---|---|
+| `CardContent` | `pt-5` | `pt-4 pb-3` |
+| Scenario-tittel `<h2>` | `text-[15px] font-medium`, `mb-3` | `text-[13px] font-semibold`, `mb-1.5` |
+| Subheader (Totalkostnad/CAGR) | `text-xs` | `text-[11px]` |
+| Grid gap | `gap-4` | `gap-3` |
+| Bars-container høyde | `h-[280px]` | `h-[180px]` |
+| Bars `BarChart margin.top` (begge BarChart) | 28 | 18 |
+| Section labels overlay paddingTop | (default) | beholdes; overlay-tekst forblir lesbar |
+| YoY-container høyde | `h-[280px]` | `h-[180px]` |
+| YoY `LineChart margin.top` | 16 | 12 |
+| YoY label "YoY-vekst %" | `mb-1` | `mb-0.5` |
 
-2. **Ny Tabs-velger først i filter-raden** (linje ~230, før "Visning"):
-   ```tsx
-   <div className="flex items-center gap-2">
-     <span className="text-xs font-medium text-muted-foreground">Diagram</span>
-     <Tabs value={chartMode} onValueChange={(v) => setChartMode(v as ChartMode)}>
-       <TabsList className="h-8">
-         <TabsTrigger value="bars" className="text-xs px-3">Stolpediagram</TabsTrigger>
-         <TabsTrigger value="waterfall" className="text-xs px-3">Waterfall</TabsTrigger>
-       </TabsList>
-     </Tabs>
-   </div>
-   ```
-
-3. **Betinget rendering**:
-   - Wrap `{scenarios.map(... <ScenarioSection ... />)}` (linje 339–350) med `{chartMode === "bars" && (...)}`
-   - Wrap `<WaterfallSection ... />` (linje 353) med `{chartMode === "waterfall" && (...)}`
+Dashboard-side `space-y-6` (mellom Cards) beholdes — det er allerede konsistent.
 
 ## Det som **IKKE** endres
 
-- Visning (P&L/Spend), Breakdown, Type, Kategorier-filtrene vises uansett (du sa "alt det andre skal vises som det er").
-- Executive Summary, ScenarioComparisonChart, Besparelser-seksjonen og resten av Dashboard er uendret.
-- `WaterfallSection`/`ScenarioSection`-komponentene selv endres ikke.
+- Beregninger, data, farger, tooltip-innhold.
+- Filter-rad, Executive Summary, Besparelser, Comparison.
+- Waterfall-seksjonen.
 
 ## Verifisering
 
-1. Last Dashboard – ny "Diagram"-toggle vises først i filter-raden, "Stolpediagram" er aktiv.
-2. De tre per-scenario søylediagrammene vises som før; Kostnadsbridge er skjult.
-3. Klikk "Waterfall" – søylediagrammene forsvinner, Kostnadsbridge-seksjonen vises i stedet.
-4. Bytt P&L↔Spend, endre kategori-filter – fungerer uavhengig av Diagram-valget.
+1. Switch til Stolpediagram-modus — hver scenario-section er nå ~190 px høy (matcher waterfall).
+2. Akse-labels, verditekst over barer og YoY-prosenter skal fortsatt være lesbare.
+3. Stacked-modus (legend nederst) skal fortsatt få plass.
