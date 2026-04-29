@@ -116,9 +116,10 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const masterAtN = result.lines.find((l) => l.line_id === masterLine?.id)?.amounts[N] ?? 0;
   const masterBaselineGrowth = masterBase * cumSalary;
 
+  // ─────── Lønnsvekst: kun eksisterende Internal FTE fra FC 2026 ───────
   let salaryBridge = 0;
   const salaryDetails: BridgeBreakdown["details"] = [];
-  let masterSalary = masterBase * (cumSalary - 1);
+  const masterSalary = masterBase * (cumSalary - 1);
   salaryBridge += masterSalary;
   let driverSalary = 0;
   let otherIntSalary = 0;
@@ -136,15 +137,18 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
       salaryBridge += v;
     }
   }
-  salaryDetails.push({ label: "Master FTE-linje", value: masterSalary });
-  if (driverSalary !== 0) salaryDetails.push({ label: "Driver-linjer (AGA, pensjon, m.fl.)", value: driverSalary });
-  if (otherIntSalary !== 0) salaryDetails.push({ label: "Øvrige Internal FTE", value: otherIntSalary });
+  salaryDetails.push({ label: "Lønnsvekst på eksisterende Internal FTE", value: salaryBridge, isHeader: true });
+  salaryDetails.push({ label: "Master FTE-linje", value: masterSalary, indent: true });
+  if (driverSalary !== 0) salaryDetails.push({ label: "Driver-linjer (AGA, pensjon, m.fl.)", value: driverSalary, indent: true });
+  if (otherIntSalary !== 0) salaryDetails.push({ label: "Øvrige Internal FTE", value: otherIntSalary, indent: true });
 
-  let priceBridge = 0;
+  // ─────── Prisvekst: lokal + sentral EUR + valutaeffekt på sentral prisvekst ───────
+  // Valutaeffekt-søylen får isolert effekt av FX-endring på BASIS (ikke prisvekst-delta)
   let localPrice = 0;
   let extFtePrice = 0;
-  let centralPriceEur = 0;
-  let centralFx = 0;
+  let centralPriceNok = 0;       // sentral prisvekst i NOK (inkl. fxN)
+  let centralPriceFxOnDelta = 0; // valutaeffekt på selve prisvekst-delta
+  let centralFxOnBase = 0;       // valutaeffekt på basis (uten prisvekst)
   for (const cl of inputs.cost_lines) {
     if (!includeRealLine(cl.category)) continue;
     if (cl.category === "Internal FTE") continue;
@@ -153,35 +157,55 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     const base = (cl.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0);
     if (cl.cost_type === "Central") {
       const eurBasis = base / CENTRAL_BASE_FX;
-      const priceEffect = eurBasis * (cumCPrice - 1) * CENTRAL_BASE_FX;
-      const fxEffect = eurBasis * cumCPrice * (fxN - CENTRAL_BASE_FX);
-      centralPriceEur += priceEffect;
-      centralFx += fxEffect;
-      // priceBridge gets only the EUR price effect; FX becomes its own bridge
-      priceBridge += priceEffect;
+      // Total sentral effekt = eurBasis * cumCPrice * fxN - base
+      // Splitt i: prisvekst (NOK ved fxN) + ren FX på basis
+      const priceDeltaNok = eurBasis * (cumCPrice - 1) * fxN;
+      const fxOnBase = eurBasis * (fxN - CENTRAL_BASE_FX); // basis-effekt
+      centralPriceNok += priceDeltaNok;
+      centralFxOnBase += fxOnBase;
+      // (priceDeltaNok inneholder allerede valutaeffekt på prisvekst-delen via fxN)
+      const priceDeltaAtBaseFx = eurBasis * (cumCPrice - 1) * CENTRAL_BASE_FX;
+      centralPriceFxOnDelta += priceDeltaNok - priceDeltaAtBaseFx;
     } else if (cl.category === "External FTE") {
       const v = base * (cumPrice - 1);
       extFtePrice += v;
-      priceBridge += v;
     } else {
       const v = base * (cumPrice - 1);
       localPrice += v;
-      priceBridge += v;
     }
   }
+  // Prisvekst-søylen: lokal + ext-FTE + sentral prisvekst (inkl. fx-effekt på prisvekst-delta)
+  const priceBridge = localPrice + extFtePrice + centralPriceNok;
   const priceDetails: BridgeBreakdown["details"] = [];
-  if (localPrice !== 0) priceDetails.push({ label: "Local prisvekst", value: localPrice });
+  if (localPrice !== 0) priceDetails.push({ label: "Lokal prisvekst", value: localPrice });
   if (extFtePrice !== 0) priceDetails.push({ label: "External FTE prisvekst", value: extFtePrice });
-  if (centralPriceEur !== 0) priceDetails.push({ label: "Sentral prisvekst (EUR)", value: centralPriceEur });
+  if (centralPriceNok !== 0) priceDetails.push({ label: "Sentral prisvekst (EUR→NOK)", value: centralPriceNok });
+  if (centralPriceFxOnDelta !== 0)
+    priceDetails.push({ label: "  herav valutaeffekt på prisvekst", value: centralPriceFxOnDelta, indent: true });
 
+  // ─────── Nearshoring FX-split: skille rent FX fra prisvekst ───────
+  const nsFxBaseEffect = (() => {
+    const g = inputs.global_assumptions.find((x) => x.year === N);
+    const fxn = g?.eur_nok_rate ?? CENTRAL_BASE_FX;
+    let cumNet = 0;
+    for (let Y = 2027; Y <= N; Y++) {
+      for (const r of inputs.nearshoring_changes.filter((n) => n.year === Y)) {
+        cumNet += Number(r.increase || 0) - Number(r.decrease || 0);
+      }
+    }
+    // Andel av nearshoring-kost som er ren FX-effekt vs. base-fx
+    const baseAnnualEur = inputs.nearshoring_base.base_annual_cost_eur;
+    return (cumNet * baseAnnualEur * (fxn - CENTRAL_BASE_FX)) / 1000;
+  })();
+
+  // Total valutaeffekt-søyle = isolert FX-effekt på basis (sentrale + nearshoring)
+  const fxBridge = centralFxOnBase + nsFxBaseEffect;
   const fxDetails: BridgeBreakdown["details"] = [
-    { label: "EUR/NOK-effekt på sentrale kost.", value: centralFx },
-    { label: `EUR/NOK i FC ${N}`, value: 0 }, // informational; we'll override label below
+    { label: "EUR/NOK-effekt sentrale kost.", value: centralFxOnBase },
+    { label: "EUR/NOK-effekt nearshoring", value: nsFxBaseEffect },
   ];
-  // Replace second row with informational text via custom rendering — keep numeric for consistency
-  fxDetails.length = 0;
-  fxDetails.push({ label: "EUR/NOK-effekt (sentrale)", value: centralFx });
 
+  // ─────── FTE-endring ───────
   const internalChangeMaster = masterAtN - masterBaselineGrowth;
   let driverChange = 0;
   for (const cl of inputs.cost_lines) {
@@ -272,7 +296,51 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     nsDec = -cumDec * annualNokK;
   }
 
-  const fteNet = internalTotal + extChangesAmt + extConvAmt + nsAmt;
+  // FTE-endring inkluderer også kategori-justeringer (tNOK + %) for Internal FTE og External FTE
+  const fteCatAdjAmount = result.lines
+    .filter((l) => l.line_id.startsWith("virtual:cat_adj_amount:"))
+    .filter((l) => l.category === "Internal FTE" || l.category === "External FTE")
+    .filter(includeForecastLine)
+    .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
+
+  // %-justering for Internal FTE (External FTE allerede inkludert i extInc/extDec via catAdjExtFactor)
+  let intCatAdjPct = 0;
+  {
+    let f = 1;
+    for (let Y = 2027; Y <= N; Y++) {
+      const r = inputs.category_adjustments.find(
+        (a) => a.category === "Internal FTE" && a.year === Y,
+      );
+      if (r?.adjustment_pct) f *= 1 + r.adjustment_pct;
+    }
+    if (f !== 1) {
+      // Effekt = (f - 1) * (sum av Internal FTE etter lønnsvekst og endringer)
+      const intLinesSum = result.lines
+        .filter((l) => l.category === "Internal FTE")
+        .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
+      // Trekk ut komponenten som skyldes %-justeringen selv (siden den er multiplikativ)
+      intCatAdjPct = intLinesSum - intLinesSum / f;
+    }
+  }
+
+  // Reconcile: bruk faktiske beløp fra forecast for Internal FTE for å sikre nøyaktighet
+  // FTE-bidraget = (sum Internal FTE i N - masterBaselineGrowth-justert) + ext + ns + konv + cat-adj-amounts for FTE
+  const internalActualSumAtN = result.lines
+    .filter((l) => l.category === "Internal FTE")
+    .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
+  const internalBaselineSum = inputs.cost_lines
+    .filter((c) => c.category === "Internal FTE")
+    .reduce((a, c) => a + (c.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0), 0);
+  const internalSalaryGrownBaseline = internalBaselineSum * cumSalary;
+  const internalFteChangeContribution = internalActualSumAtN - internalSalaryGrownBaseline;
+
+  const fteNet =
+    internalFteChangeContribution +
+    extChangesAmt +
+    extConvAmt +
+    nsAmt +
+    fteCatAdjAmount;
+
   const fteDetails: BridgeBreakdown["details"] = [
     { label: "ØKNINGER", value: intIncTot + extInc + nsInc, isHeader: true },
     { label: "Interne FTE", value: intIncTot, indent: true },
@@ -283,9 +351,74 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     { label: "Eksterne FTE", value: extDec, indent: true },
     { label: "Nearshoring", value: nsDec, indent: true },
     { label: "Konvertering (ekstern reduksjon)", value: extConvAmt, indent: true },
-    { label: "NETTO", value: fteNet, isHeader: true },
   ];
+  if (fteCatAdjAmount !== 0 || intCatAdjPct !== 0) {
+    fteDetails.push({ label: "Kategori-justering FTE (tNOK + %)", value: fteCatAdjAmount + intCatAdjPct, indent: true });
+  }
+  fteDetails.push({ label: "NETTO", value: fteNet, isHeader: true });
 
+  // ─────── Øvrige økninger / Øvrige besparelser ───────
+  // Kategorier: Consultancy, IT Costs, Operations & Personnel-related, Other operating income
+  const OTHER_CATS = new Set([
+    "Consultancy",
+    "IT Costs",
+    "Operations & Personnel-related",
+    "Other operating income",
+  ]);
+
+  const incByCat: Record<string, number> = {};
+  const decByCat: Record<string, number> = {};
+  const commentByCat: Record<string, string[]> = {};
+  const addCat = (cat: string, v: number) => {
+    if (v === 0) return;
+    if (v > 0) incByCat[cat] = (incByCat[cat] ?? 0) + v;
+    else decByCat[cat] = (decByCat[cat] ?? 0) + v;
+  };
+  const addComment = (cat: string, c?: string | null) => {
+    if (!c) return;
+    const arr = (commentByCat[cat] ??= []);
+    if (!arr.includes(c)) arr.push(c);
+  };
+
+  const cumCatFactor = (cat: string) => {
+    let f = 1;
+    for (let Y = 2027; Y <= N; Y++) {
+      const r = inputs.category_adjustments.find((a) => a.category === cat && a.year === Y);
+      if (r?.adjustment_pct) {
+        f *= 1 + r.adjustment_pct;
+        addComment(cat, r.comment ?? null);
+      }
+    }
+    return f;
+  };
+
+  for (const cl of inputs.cost_lines) {
+    if (!includeRealLine(cl.category)) continue;
+    if (!OTHER_CATS.has(cl.category)) continue;
+    if (cl.cost_type !== "Local") continue;
+    const base = (cl.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0);
+    const cat = cl.category;
+    const f = cumCatFactor(cat);
+    if (f === 1) continue;
+    const v = base * cumPrice * (f - 1);
+    addCat(cat, v);
+  }
+  for (const l of result.lines) {
+    if (!l.line_id.startsWith("virtual:cat_adj_amount:")) continue;
+    if (!OTHER_CATS.has(l.category)) continue;
+    if (!includeForecastLine(l)) continue;
+    const v = l.amounts[N] ?? 0;
+    addCat(l.category, v);
+    // Kommentar fra category_adjustments med tNOK
+    for (let Y = 2027; Y <= N; Y++) {
+      const r = inputs.category_adjustments.find(
+        (a) => a.category === l.category && a.year === Y && (a.adjustment_amount_tnok ?? 0) !== 0,
+      );
+      if (r?.comment) addComment(l.category, r.comment);
+    }
+  }
+
+  // Sentrale reduksjoner (% + tNOK) → Øvrige besparelser
   let centralRedPct = 0;
   for (const cl of inputs.cost_lines) {
     if (cl.cost_type !== "Central") continue;
@@ -297,67 +430,39 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   }
   const cRedAmtLine = result.lines.find((l) => l.line_id === "virtual:central_reduction_amount");
   const centralRedAmt = cRedAmtLine?.amounts[N] ?? 0;
-  const centralBridge = centralRedPct + centralRedAmt;
-  const centralDetails: BridgeBreakdown["details"] = [
-    { label: "Reduksjon %", value: centralRedPct },
-    { label: "Reduksjon tNOK (fast beløp)", value: centralRedAmt },
-  ];
 
-  let othersBridge = 0;
-  const incByCat: Record<string, number> = {};
-  const decByCat: Record<string, number> = {};
-  const addCat = (cat: string, v: number) => {
-    if (v === 0) return;
-    if (v > 0) incByCat[cat] = (incByCat[cat] ?? 0) + v;
-    else decByCat[cat] = (decByCat[cat] ?? 0) + v;
-  };
-  const cumCatFactor = (cat: string) => {
-    let f = 1;
-    for (let Y = 2027; Y <= N; Y++) {
-      const r = inputs.category_adjustments.find((a) => a.category === cat && a.year === Y);
-      if (r?.adjustment_pct) f *= 1 + r.adjustment_pct;
-    }
-    return f;
-  };
-  for (const cl of inputs.cost_lines) {
-    if (!includeRealLine(cl.category)) continue;
-    if (cl.cost_type !== "Local") continue;
-    if (cl.category === "Internal FTE") continue;
-    if (cl.category === "Depreciation" || cl.category === "Capex") continue;
-    const base = (cl.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0);
-    const cat = cl.category;
-    const f = cumCatFactor(cat);
-    if (f === 1) continue;
-    const v = base * cumPrice * (f - 1);
-    addCat(cat, v);
-    othersBridge += v;
-  }
-  for (const l of result.lines) {
-    if (!l.line_id.startsWith("virtual:cat_adj_amount:")) continue;
-    if (!includeForecastLine(l)) continue;
-    const v = l.amounts[N] ?? 0;
-    addCat(l.category, v);
-    othersBridge += v;
-  }
   const incTot = Object.values(incByCat).reduce((a, b) => a + b, 0);
-  const decTot = Object.values(decByCat).reduce((a, b) => a + b, 0);
-  const othersDetails: BridgeBreakdown["details"] = [];
-  othersDetails.push({ label: "ØKNINGER", value: incTot, isHeader: true });
-  Object.entries(incByCat).forEach(([cat, v]) => othersDetails.push({ label: cat, value: v, indent: true }));
-  othersDetails.push({ label: "BESPARELSER", value: decTot, isHeader: true });
-  Object.entries(decByCat).forEach(([cat, v]) => othersDetails.push({ label: cat, value: v, indent: true }));
-  othersDetails.push({ label: "NETTO", value: incTot + decTot, isHeader: true });
+  const decTot = Object.values(decByCat).reduce((a, b) => a + b, 0) + centralRedPct + centralRedAmt;
 
+  const incDetails: BridgeBreakdown["details"] = [];
+  if (Object.keys(incByCat).length === 0) {
+    incDetails.push({ label: "Ingen positive justeringer", value: 0 });
+  } else {
+    Object.entries(incByCat).forEach(([cat, v]) => {
+      incDetails.push({ label: cat, value: v });
+      (commentByCat[cat] ?? []).forEach((c) =>
+        incDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
+      );
+    });
+    incDetails.push({ label: "SUM", value: incTot, isHeader: true });
+  }
+
+  const decDetails: BridgeBreakdown["details"] = [];
+  Object.entries(decByCat).forEach(([cat, v]) => {
+    decDetails.push({ label: cat, value: v });
+    (commentByCat[cat] ?? []).forEach((c) =>
+      decDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
+    );
+  });
+  if (centralRedPct !== 0) decDetails.push({ label: "Sentral reduksjon %", value: centralRedPct });
+  if (centralRedAmt !== 0) decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmt });
+  if (decDetails.length === 0) decDetails.push({ label: "Ingen besparelser", value: 0 });
+  else decDetails.push({ label: "SUM", value: decTot, isHeader: true });
+
+  // ─────── Avskrivning / Capex ───────
   let deprBridge = 0;
   const deprDetails: BridgeBreakdown["details"] = [];
   if (view === "PL") {
-    const baseDepr = inputs.cost_lines
-      .filter((c) => c.category === "Depreciation")
-      .reduce((a, c) => a + (c.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0), 0);
-    const nDepr = result.lines
-      .filter((l) => l.is_depreciation)
-      .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
-    deprBridge = nDepr - baseDepr;
     let existingDelta = 0;
     let newDepr = 0;
     for (const cl of inputs.cost_lines.filter((c) => c.category === "Depreciation")) {
@@ -374,23 +479,46 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
       existingDelta += existing - base;
       newDepr += amt - existing;
     }
+    deprBridge = existingDelta + newDepr;
     deprDetails.push({ label: "Eksisterende utfasing", value: existingDelta });
     deprDetails.push({ label: "Nye avskrivninger", value: newDepr });
+    // Kategori-justeringer for Depreciation
+    const deprCatAdj = result.lines
+      .filter((l) => l.line_id.startsWith("virtual:cat_adj_amount:") && l.category === "Depreciation")
+      .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
+    if (deprCatAdj !== 0) {
+      deprDetails.push({ label: "Kategori-justering Depreciation", value: deprCatAdj });
+      deprBridge += deprCatAdj;
+    }
   } else {
     const nCapex = result.lines
       .filter((l) => l.is_capex)
       .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
+    // Splitt per type
+    const byType: Record<string, number> = {};
+    for (const l of result.lines.filter((x) => x.is_capex)) {
+      const t = l.project || l.account_name || "Capex";
+      byType[t] = (byType[t] ?? 0) + (l.amounts[N] ?? 0);
+    }
     deprBridge = nCapex;
-    deprDetails.push({ label: "Nye investeringer", value: nCapex });
+    Object.entries(byType).forEach(([t, v]) => deprDetails.push({ label: t, value: v }));
+    if (deprDetails.length === 0) deprDetails.push({ label: "Nye investeringer", value: nCapex });
+    const capexCatAdj = result.lines
+      .filter((l) => l.line_id.startsWith("virtual:cat_adj_amount:") && l.category === "Capex")
+      .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
+    if (capexCatAdj !== 0) {
+      deprDetails.push({ label: "Kategori-justering Capex", value: capexCatAdj });
+      deprBridge += capexCatAdj;
+    }
   }
 
   const bridges: BridgeBreakdown[] = [
     { label: "Lønnsvekst", value: salaryBridge, details: salaryDetails },
     { label: "Prisvekst", value: priceBridge, details: priceDetails },
     { label: "FTE-endring", value: fteNet, details: fteDetails },
-    { label: "Sentrale red.", value: centralBridge, details: centralDetails },
-    { label: "Øvrige netto", value: othersBridge, details: othersDetails },
-    { label: "Valutaeffekt", value: centralFx, details: fxDetails },
+    { label: "Øvrige økninger", value: incTot, details: incDetails },
+    { label: "Øvrige besparelser", value: decTot, details: decDetails },
+    { label: "Valutaeffekt", value: fxBridge, details: fxDetails },
     {
       label: view === "PL" ? "Avskrivning" : "Capex",
       value: deprBridge,
@@ -400,6 +528,16 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
 
   const sumBridges = bridges.reduce((a, b) => a + b.value, 0);
   const rest = end - (start + sumBridges);
+
+  // Kontrollregel: avvik > 0,1 MNOK = 100 tNOK
+  if (Math.abs(rest) > 100) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[WaterfallBridge] Avvik ${(rest / 1000).toFixed(2)} MNOK i ${bundle.meta.name} → FC ${N} (${view}). ` +
+        `Start=${(start / 1000).toFixed(1)} + Sum drivere=${(sumBridges / 1000).toFixed(1)} ≠ End=${(end / 1000).toFixed(1)}`,
+      bridges.map((b) => ({ label: b.label, MNOK: +(b.value / 1000).toFixed(2) })),
+    );
+  }
 
   return { start, end, bridges, rest };
 }
@@ -656,19 +794,8 @@ function WaterfallChart({
     running = next;
   });
 
-  if (Math.abs(rest) > 100) {
-    const next = running + rest;
-    bars.push({
-      name: "Rest",
-      type: "rest",
-      raw: rest,
-      top: Math.max(running, next),
-      bottom: Math.min(running, next),
-      color: rest < 0 ? COLOR_DECREASE : COLOR_INCREASE,
-      details: [{ label: "Ujusterte poster", value: rest }],
-    });
-    running = next;
-  }
+  // "Rest" rendres ALDRI som søyle. Avvik logges som console.warn i computeBridges.
+  void rest;
 
   bars.push({
     name: `FC ${year}`,
