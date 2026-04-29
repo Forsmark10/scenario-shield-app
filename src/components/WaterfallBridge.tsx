@@ -1,17 +1,18 @@
 import { useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  LabelList,
-  ReferenceLine,
-} from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ScenarioBundle } from "@/hooks/useAllScenarios";
 import type { Level } from "@/lib/forecast/types";
 import { formatNumberNO } from "@/lib/format";
@@ -22,11 +23,14 @@ const FC_YEARS = [2027, 2028, 2029, 2030, 2031] as const;
 const CENTRAL_BASE_FX = 11.3;
 const LEVELS: Level[] = ["Low", "Medium", "High"];
 
-const COLOR_START = "#1E3A8A"; // dark blue
-const COLOR_INCREASE = "#F59E0B"; // amber/orange-red for growth
-const COLOR_DECREASE = "hsl(var(--positive))"; // green
-const COLOR_NEUTRAL_DEPR = "#9CA3AF"; // grey
-const COLOR_REST = "#D1D5DB";
+// Think-cell inspired strong colors
+const COLOR_START = "#042C53"; // dark blue (matches dashboard Internal FTE)
+const COLOR_END = "#042C53";
+const COLOR_INCREASE = "#C0392B"; // strong red
+const COLOR_DECREASE = "#1F8A4C"; // strong green
+const COLOR_NEUTRAL_DEPR = "#85B7EB"; // light blue (depreciation/capex)
+const COLOR_REST = "#B5D4F4";
+const COLOR_CONNECTOR = "#94A3B8";
 
 const toM = (v: number) => v / 1000;
 const fmtM = (v: number) => formatNumberNO(toM(v), 1);
@@ -34,13 +38,19 @@ const fmtMSigned = (v: number) => {
   const m = toM(v);
   const s = formatNumberNO(Math.abs(m), 1);
   if (m > 0) return `+${s}`;
-  if (m < 0) return `−${s}`;
+  if (m < 0) return `(${s})`;
   return "0,0";
+};
+const fmtPctSigned = (v: number) => {
+  const s = formatNumberNO(Math.abs(v) * 100, 1);
+  if (v > 0) return `+${s}%`;
+  if (v < 0) return `−${s}%`;
+  return "0,0%";
 };
 
 interface BridgeBreakdown {
   label: string;
-  value: number; // tNOK
+  value: number;
   details: Array<{ label: string; value: number; isHeader?: boolean; indent?: boolean }>;
 }
 
@@ -269,6 +279,7 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     { label: "Eksterne FTE", value: extDec, indent: true },
     { label: "Nearshoring", value: nsDec, indent: true },
     { label: "Konvertering (ekstern reduksjon)", value: extConvAmt, indent: true },
+    { label: "NETTO", value: fteNet, isHeader: true },
   ];
 
   let centralRedPct = 0;
@@ -331,6 +342,7 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   Object.entries(incByCat).forEach(([cat, v]) => othersDetails.push({ label: cat, value: v, indent: true }));
   othersDetails.push({ label: "BESPARELSER", value: decTot, isHeader: true });
   Object.entries(decByCat).forEach(([cat, v]) => othersDetails.push({ label: cat, value: v, indent: true }));
+  othersDetails.push({ label: "NETTO", value: incTot + decTot, isHeader: true });
 
   let deprBridge = 0;
   const deprDetails: BridgeBreakdown["details"] = [];
@@ -364,8 +376,7 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     const nCapex = result.lines
       .filter((l) => l.is_capex)
       .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
-    const baseCapex = 0;
-    deprBridge = nCapex - baseCapex;
+    deprBridge = nCapex;
     deprDetails.push({ label: "Nye investeringer", value: nCapex });
   }
 
@@ -373,7 +384,7 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     { label: "Lønnsvekst", value: salaryBridge, details: salaryDetails },
     { label: "Prisvekst", value: priceBridge, details: priceDetails },
     { label: "FTE-endring", value: fteNet, details: fteDetails },
-    { label: "Sentrale reduksjoner", value: centralBridge, details: centralDetails },
+    { label: "Sentrale red.", value: centralBridge, details: centralDetails },
     { label: "Øvrige netto", value: othersBridge, details: othersDetails },
     {
       label: view === "PL" ? "Avskrivning" : "Capex",
@@ -399,12 +410,12 @@ export function WaterfallSection({ scenarios, view, scenarioColors }: WaterfallS
 
   return (
     <Card>
-      <CardContent className="pt-5 space-y-5">
+      <CardContent className="pt-5 space-y-6">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <h2 className="text-[15px] font-medium tracking-tight">Kostnadsbridge</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Dekomponering av endring fra FC 2026 til valgt år, per scenario.
+              Dekomponering av endring fra FC 2026 til valgt år.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -424,7 +435,7 @@ export function WaterfallSection({ scenarios, view, scenarioColors }: WaterfallS
           </div>
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-7">
           {scenarios.map((b, i) => (
             <WaterfallChart
               key={b.meta.id}
@@ -438,6 +449,16 @@ export function WaterfallSection({ scenarios, view, scenarioColors }: WaterfallS
       </CardContent>
     </Card>
   );
+}
+
+interface BarSpec {
+  name: string;
+  type: "start" | "bridge" | "end" | "rest";
+  raw: number;
+  top: number; // value-space top of bar
+  bottom: number; // value-space bottom of bar
+  color: string;
+  details?: BridgeBreakdown["details"];
 }
 
 function WaterfallChart({
@@ -456,45 +477,33 @@ function WaterfallChart({
     [bundle, year, view],
   );
 
-  type Row = {
-    name: string;
-    base: number;
-    value: number;
-    raw: number;
-    color: string;
-    type: "start" | "bridge" | "end" | "rest";
-    details?: BridgeBreakdown["details"];
-  };
-
-  const rows: Row[] = [];
+  const bars: BarSpec[] = [];
   let running = start;
 
-  rows.push({
+  bars.push({
     name: "FC 2026",
-    base: 0,
-    value: toM(start),
-    raw: start,
-    color: COLOR_START,
     type: "start",
+    raw: start,
+    top: Math.max(0, start),
+    bottom: Math.min(0, start),
+    color: COLOR_START,
   });
 
   bridges.forEach((b, idx) => {
     const next = running + b.value;
-    const lo = Math.min(running, next);
-    const hi = Math.max(running, next);
     const isDeprBar = idx === bridges.length - 1;
     let c: string;
     if (isDeprBar) c = COLOR_NEUTRAL_DEPR;
-    else if (b.label === "Sentrale reduksjoner") c = COLOR_DECREASE;
+    else if (b.label === "Sentrale red.") c = COLOR_DECREASE;
     else if (b.label === "Lønnsvekst" || b.label === "Prisvekst") c = COLOR_INCREASE;
     else c = b.value < 0 ? COLOR_DECREASE : COLOR_INCREASE;
-    rows.push({
+    bars.push({
       name: b.label,
-      base: toM(lo),
-      value: toM(hi - lo),
-      raw: b.value,
-      color: c,
       type: "bridge",
+      raw: b.value,
+      top: Math.max(running, next),
+      bottom: Math.min(running, next),
+      color: c,
       details: b.details,
     });
     running = next;
@@ -502,112 +511,215 @@ function WaterfallChart({
 
   if (Math.abs(rest) > 100) {
     const next = running + rest;
-    const lo = Math.min(running, next);
-    const hi = Math.max(running, next);
-    rows.push({
+    bars.push({
       name: "Rest",
-      base: toM(lo),
-      value: toM(hi - lo),
-      raw: rest,
-      color: COLOR_REST,
       type: "rest",
+      raw: rest,
+      top: Math.max(running, next),
+      bottom: Math.min(running, next),
+      color: COLOR_REST,
     });
     running = next;
   }
 
-  rows.push({
+  bars.push({
     name: `FC ${year}`,
-    base: 0,
-    value: toM(end),
-    raw: end,
-    color: COLOR_START,
     type: "end",
+    raw: end,
+    top: Math.max(0, end),
+    bottom: Math.min(0, end),
+    color: COLOR_END,
   });
 
-  const allTops = rows.map((r) => r.base + r.value);
-  const allBots = rows.map((r) => r.base);
-  const max = Math.max(...allTops);
-  const min = Math.min(0, ...allBots);
-  const range = max - min || 1;
-  const yDomain: [number, number] = [min - range * 0.1, max + range * 0.15];
+  // Focused Y-domain
+  const tops = bars.map((b) => b.top);
+  const bots = bars.map((b) => b.bottom);
+  const maxV = Math.max(...tops);
+  const minV = Math.min(...bots, 0);
+  const span = maxV - minV || 1;
+  const yMax = maxV + span * 0.1;
+  const yMin = minV - span * 0.1;
 
-  const renderTooltip = ({ active, payload }: any) => {
-    if (!active || !payload?.length) return null;
-    const r: Row = payload[0]?.payload;
-    if (!r) return null;
-    return (
-      <div className="rounded-md border bg-background px-3 py-2 text-xs shadow-md min-w-[240px]">
-        <div className="font-semibold mb-1.5 flex items-center justify-between gap-3">
-          <span>{r.name}</span>
-          <span className="tabular-nums">
-            {r.type === "start" || r.type === "end" ? `${fmtM(r.raw)}` : fmtMSigned(r.raw)} MNOK
-          </span>
-        </div>
-        {r.details && r.details.length > 0 && (
-          <div className="space-y-0.5 border-t pt-1.5">
-            {r.details.map((d, i) => (
-              <div
-                key={i}
-                className={
-                  "flex items-center justify-between gap-3 " +
-                  (d.isHeader ? "font-semibold uppercase text-[10px] tracking-wide mt-1" : "") +
-                  (d.indent ? " pl-3 text-muted-foreground" : "")
-                }
-              >
-                <span>{d.label}</span>
-                <span className="tabular-nums">{fmtMSigned(d.value)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Layout
+  const W = 880;
+  const H = 280;
+  const PAD_L = 12;
+  const PAD_R = 12;
+  const PAD_T = 32;
+  const PAD_B = 56;
+  const innerW = W - PAD_L - PAD_R;
+  const innerH = H - PAD_T - PAD_B;
+  const n = bars.length;
+  const slot = innerW / n;
+  const barW = Math.min(72, slot * 0.6);
+
+  const yScale = (v: number) => PAD_T + ((yMax - v) / (yMax - yMin)) * innerH;
+  const xCenter = (i: number) => PAD_L + slot * i + slot / 2;
+
+  const totalChangePct = start === 0 ? 0 : (end - start) / start;
+  const totalChangeColor = end < start ? COLOR_DECREASE : COLOR_INCREASE;
 
   return (
     <div>
-      <h3 className="text-[13px] font-semibold mb-2" style={{ color }}>
-        {bundle.meta.name}
-      </h3>
-      <div className="h-[260px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={rows} margin={{ top: 28, right: 12, bottom: 4, left: 0 }}>
-            <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval={0} />
-            <YAxis hide domain={yDomain} />
-            <Tooltip content={renderTooltip} cursor={{ fill: "hsl(var(--muted) / 0.3)" }} />
-            <ReferenceLine y={0} stroke="hsl(var(--border))" />
-            <Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false} />
-            <Bar dataKey="value" stackId="w" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-              {rows.map((r, i) => (
-                <Cell key={i} fill={r.color} />
-              ))}
-              <LabelList
-                dataKey="value"
-                position="top"
-                content={(props: any) => {
-                  const { x, y, width, index } = props;
-                  const r = rows[index];
-                  if (!r) return null;
-                  const text =
-                    r.type === "start" || r.type === "end"
-                      ? fmtM(r.raw)
-                      : fmtMSigned(r.raw);
-                  return (
-                    <text
-                      x={Number(x) + Number(width) / 2}
-                      y={Number(y) - 6}
-                      textAnchor="middle"
-                      style={{ fontSize: 10, fontWeight: 500, fill: "hsl(var(--foreground))" }}
-                    >
-                      {text}
-                    </text>
-                  );
-                }}
-              />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-[13px] font-semibold" style={{ color }}>
+          {bundle.meta.name}
+        </h3>
+        <div
+          className="text-[12px] font-semibold rounded-full px-3 py-1 text-white tabular-nums"
+          style={{ backgroundColor: totalChangeColor }}
+          title={`FC 2026 → FC ${year}`}
+        >
+          {fmtPctSigned(totalChangePct)}
+        </div>
       </div>
+
+      <TooltipProvider delayDuration={100}>
+        <div className="w-full overflow-x-auto">
+          <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 600 }}>
+            {/* zero line */}
+            {yMin < 0 && yMax > 0 && (
+              <line
+                x1={PAD_L}
+                x2={W - PAD_R}
+                y1={yScale(0)}
+                y2={yScale(0)}
+                stroke="hsl(var(--border))"
+                strokeWidth={1}
+              />
+            )}
+
+            {/* connector lines between bars (horizontal stitches at running waterline) */}
+            {bars.map((b, i) => {
+              if (i === bars.length - 1) return null;
+              const nextBar = bars[i + 1];
+              // waterline between bar i and i+1:
+              // for start -> first bridge: connector at start value (top of start bar)
+              // for bridge i -> bridge i+1: connector at running level after bar i
+              // for last bridge/rest -> end: connector at end value (top of end bar)
+              let yVal: number;
+              if (b.type === "start") yVal = b.raw;
+              else if (nextBar.type === "end") yVal = nextBar.raw;
+              else {
+                // running after bar i = bar.top if value positive, bar.bottom if negative
+                // We can derive from cumulative: easier to recompute
+                yVal = b.raw >= 0 ? b.top : b.bottom;
+                // Actually for bridges, running BEFORE bar = the side closest to previous,
+                // running AFTER bar = the other side. Determine direction by sign:
+                // bridge with positive value: bottom = prev running, top = new running
+                // bridge with negative value: top = prev running, bottom = new running
+                yVal = b.raw >= 0 ? b.top : b.bottom;
+              }
+              const x1 = xCenter(i) + barW / 2;
+              const x2 = xCenter(i + 1) - barW / 2;
+              const y = yScale(yVal);
+              return (
+                <line
+                  key={`conn-${i}`}
+                  x1={x1}
+                  x2={x2}
+                  y1={y}
+                  y2={y}
+                  stroke={COLOR_CONNECTOR}
+                  strokeWidth={1}
+                  strokeDasharray="3 3"
+                />
+              );
+            })}
+
+            {/* bars */}
+            {bars.map((b, i) => {
+              const x = xCenter(i) - barW / 2;
+              const yTop = yScale(b.top);
+              const yBot = yScale(b.bottom);
+              const h = Math.max(1, yBot - yTop);
+              const labelText =
+                b.type === "start" || b.type === "end" ? fmtM(b.raw) : fmtMSigned(b.raw);
+              const labelColor =
+                b.type === "start" || b.type === "end"
+                  ? "hsl(var(--foreground))"
+                  : b.raw < 0
+                    ? COLOR_DECREASE
+                    : COLOR_INCREASE;
+              const labelY = yTop - 6;
+              const xLabelY = H - PAD_B + 16;
+              return (
+                <UITooltip key={b.name + i}>
+                  <TooltipTrigger asChild>
+                    <g style={{ cursor: "pointer" }}>
+                      <rect
+                        x={x}
+                        y={yTop}
+                        width={barW}
+                        height={h}
+                        fill={b.color}
+                        rx={2}
+                        ry={2}
+                      />
+                      {/* hover hit area */}
+                      <rect
+                        x={xCenter(i) - slot / 2}
+                        y={PAD_T}
+                        width={slot}
+                        height={innerH}
+                        fill="transparent"
+                      />
+                      <text
+                        x={xCenter(i)}
+                        y={labelY}
+                        textAnchor="middle"
+                        style={{ fontSize: 11, fontWeight: 600, fill: labelColor }}
+                      >
+                        {labelText}
+                      </text>
+                      <text
+                        x={xCenter(i)}
+                        y={xLabelY}
+                        textAnchor="middle"
+                        style={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      >
+                        {b.name}
+                      </text>
+                    </g>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <div className="text-xs space-y-1 min-w-[220px]">
+                      <div className="font-semibold flex items-center justify-between gap-3">
+                        <span>{b.name}</span>
+                        <span className="tabular-nums">
+                          {b.type === "start" || b.type === "end"
+                            ? fmtM(b.raw)
+                            : fmtMSigned(b.raw)}{" "}
+                          MNOK
+                        </span>
+                      </div>
+                      {b.details && b.details.length > 0 && (
+                        <div className="space-y-0.5 border-t pt-1.5">
+                          {b.details.map((d, di) => (
+                            <div
+                              key={di}
+                              className={
+                                "flex items-center justify-between gap-3 " +
+                                (d.isHeader
+                                  ? "font-semibold uppercase text-[10px] tracking-wide mt-1"
+                                  : "") +
+                                (d.indent ? " pl-3 opacity-80" : "")
+                              }
+                            >
+                              <span>{d.label}</span>
+                              <span className="tabular-nums">{fmtMSigned(d.value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </UITooltip>
+              );
+            })}
+          </svg>
+        </div>
+      </TooltipProvider>
     </div>
   );
 }
