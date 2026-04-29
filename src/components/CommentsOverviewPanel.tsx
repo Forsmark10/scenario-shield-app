@@ -117,7 +117,13 @@ export async function loadScenarioComments(scenarioId: string): Promise<CommentE
         push("central_rate", row.comment_rate, row.comment_rate_updated_at);
         continue;
       }
-      // Default single-column comment tables (conversions, nearshoring_changes, capex_plan)
+      if (section === "nearshoring_changes") {
+        push("increase", row.comment_increase, row.comment_increase_updated_at);
+        push("decrease", row.comment_decrease, row.comment_decrease_updated_at);
+        push(undefined, row.comment, row.comment_updated_at);
+        continue;
+      }
+      // Default single-column comment tables (conversions, capex_plan)
       push(undefined, row.comment, row.comment_updated_at);
     }
   });
