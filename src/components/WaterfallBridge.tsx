@@ -715,12 +715,12 @@ function WaterfallChart({
 
   return (
     <div style={{ position: "relative" }}>
-      <div className="flex items-center justify-between mb-1 px-2">
-        <h3 className="text-[13px] font-semibold" style={{ color }}>
+      <div className="flex items-center justify-between mb-0.5 px-2">
+        <h3 className="text-[12px] font-semibold" style={{ color }}>
           {bundle.meta.name}
         </h3>
         <div
-          className="text-[11px] font-bold rounded px-2.5 py-0.5 text-white tabular-nums"
+          className="text-[10px] font-bold rounded px-2 py-0 text-white tabular-nums"
           style={{ backgroundColor: totalChangeColor }}
           title={`FC 2026 → FC ${year}`}
         >
@@ -729,7 +729,7 @@ function WaterfallChart({
       </div>
 
       <div className="w-full overflow-x-auto">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 640, display: "block" }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 560, display: "block" }}>
           {/* zero line */}
           {yMin < 0 && yMax > 0 && (
             <line
