@@ -567,7 +567,7 @@ function ScenarioSection({
             </div>
             <ResponsiveContainer width="100%" height="100%">
               {breakdown === "Total" ? (
-                <BarChart data={barData} margin={{ top: 28, right: 12, bottom: 4, left: 0 }}>
+                <BarChart data={barData} margin={{ top: 18, right: 12, bottom: 4, left: 0 }}>
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip content={renderTooltip} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
