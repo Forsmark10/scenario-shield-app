@@ -1532,19 +1532,21 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
-  const upsertChangeComment = async (year: number, comment: string | null) => {
+  const upsertChangeComment = async (year: number, type: "increase" | "decrease", comment: string | null) => {
     const existing = getChange(year);
     const ts = new Date().toISOString();
+    const commentField = type === "increase" ? "comment_increase" : "comment_decrease";
+    const commentAtField = type === "increase" ? "comment_increase_updated_at" : "comment_decrease_updated_at";
     if (existing) {
       patch({
         type: "update",
         table: "nearshoringChanges",
         id: existing.id,
-        changes: { comment, comment_updated_at: ts },
+        changes: { [commentField]: comment, [commentAtField]: ts },
       });
       const { error } = await supabase
         .from("nearshoring_changes")
-        .update({ comment, comment_updated_at: ts } as any)
+        .update({ [commentField]: comment, [commentAtField]: ts } as any)
         .eq("id", existing.id);
       if (error) throw error;
     } else {
@@ -1555,8 +1557,8 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
           year,
           increase: 0,
           decrease: 0,
-          comment,
-          comment_updated_at: ts,
+          [commentField]: comment,
+          [commentAtField]: ts,
         } as any)
         .select()
         .single();
@@ -1665,10 +1667,10 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
                     return (
                       <td key={y} className="px-1 py-1 align-top">
                         <CellWithComment
-                          comment={c?.comment}
-                          updatedAt={c?.comment_updated_at}
-                          updatedBy={c?.comment_updated_by}
-                          onSaveComment={(next) => upsertChangeComment(y, next)}
+                          comment={type === "increase" ? c?.comment_increase : c?.comment_decrease}
+                          updatedAt={type === "increase" ? c?.comment_increase_updated_at : c?.comment_decrease_updated_at}
+                          updatedBy={type === "increase" ? c?.comment_increase_updated_by : c?.comment_decrease_updated_by}
+                          onSaveComment={(next) => upsertChangeComment(y, type, next)}
                           label={`Nearshoring ${y} (${type})`}
                         >
                           <NumCell
