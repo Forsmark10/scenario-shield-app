@@ -750,10 +750,10 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
                 return (
                   <td key={y} className="px-1 py-1">
                     <CellWithComment
-                      comment={row?.comment}
-                      updatedAt={row?.comment_updated_at}
-                      updatedBy={row?.comment_updated_by}
-                      onSaveComment={(next) => upsertComment(y, next)}
+                      comment={row?.[d.commentField]}
+                      updatedAt={row?.[d.atField]}
+                      updatedBy={row?.[d.byField]}
+                      onSaveComment={(next) => upsertCommentField(y, d.commentField, d.atField, next)}
                       label={`Globale drivere ${y} · ${d.label}`}
                     >
                       <NumCell
