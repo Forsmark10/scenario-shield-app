@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 type ViewMode = "PL" | "Spend";
 type Breakdown = "Total" | "Stacked";
 type TypeFilter = "all" | "Local" | "Central";
+type ChartMode = "bars" | "waterfall";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
 
@@ -189,6 +190,7 @@ export default function Dashboard() {
   const { loading, error, scenarios } = useAllScenarios();
   const [view, setView] = useState<ViewMode>("PL");
   const [breakdown, setBreakdown] = useState<Breakdown>("Total");
+  const [chartMode, setChartMode] = useState<ChartMode>("bars");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [excludedCats, setExcludedCats] = useState<Set<string>>(new Set());
   const [tableOpen, setTableOpen] = useState(false);
@@ -228,6 +230,15 @@ export default function Dashboard() {
       {/* Filters */}
       <div className="sticky top-14 z-20 -mx-6 px-6 py-3 bg-background/95 backdrop-blur border-b">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Diagram</span>
+            <Tabs value={chartMode} onValueChange={(v) => setChartMode(v as ChartMode)}>
+              <TabsList className="h-8">
+                <TabsTrigger value="bars" className="text-xs px-3">Stolpediagram</TabsTrigger>
+                <TabsTrigger value="waterfall" className="text-xs px-3">Waterfall</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground">Visning</span>
             <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
@@ -336,22 +347,24 @@ export default function Dashboard() {
       />
 
       {/* Per-scenario sections */}
-      {scenarios.map((bundle, i) => (
-        <ScenarioSection
-          key={bundle.meta.id}
-          bundle={bundle}
-          color={SCENARIO_COLOR[i % SCENARIO_COLOR.length]}
-          view={view}
-          breakdown={breakdown}
-          typeFilter={typeFilter}
-          excludedCats={excludedCats}
-          allCategories={allCategories}
-        />
-      ))}
+      {chartMode === "bars" &&
+        scenarios.map((bundle, i) => (
+          <ScenarioSection
+            key={bundle.meta.id}
+            bundle={bundle}
+            color={SCENARIO_COLOR[i % SCENARIO_COLOR.length]}
+            view={view}
+            breakdown={breakdown}
+            typeFilter={typeFilter}
+            excludedCats={excludedCats}
+            allCategories={allCategories}
+          />
+        ))}
 
       {/* Cost bridge (waterfall) per scenario */}
-      <WaterfallSection scenarios={scenarios} view={view} scenarioColors={SCENARIO_COLOR} />
-
+      {chartMode === "waterfall" && (
+        <WaterfallSection scenarios={scenarios} view={view} scenarioColors={SCENARIO_COLOR} />
+      )}
       {/* Comparison */}
       <ScenarioComparisonChart
         scenarios={scenarios}
