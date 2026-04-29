@@ -619,10 +619,10 @@ function ScenarioSection({
           </div>
 
           {/* YoY */}
-          <div className="h-[180px]">
+          <div className="h-[210px]">
             <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">YoY-vekst %</div>
             <ResponsiveContainer width="100%" height="92%">
-              <LineChart data={yoyData} margin={{ top: 12, right: 24, bottom: 4, left: 16 }}>
+              <LineChart data={yoyData} margin={{ top: 18, right: 24, bottom: 4, left: 16 }}>
                 <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} padding={{ left: 12, right: 12 }} />
                 <YAxis hide />
                 <Tooltip
