@@ -330,7 +330,7 @@ export default function Dashboard() {
 
       {/* Executive Summary (above scenario sections) */}
       <ExecutiveSummary
-        scenarios={scenarios.map((b) => b.meta)}
+        scenarios={scenarios}
         colors={SCENARIO_COLOR}
       />
 
