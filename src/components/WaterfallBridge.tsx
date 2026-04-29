@@ -794,19 +794,8 @@ function WaterfallChart({
     running = next;
   });
 
-  if (Math.abs(rest) > 100) {
-    const next = running + rest;
-    bars.push({
-      name: "Rest",
-      type: "rest",
-      raw: rest,
-      top: Math.max(running, next),
-      bottom: Math.min(running, next),
-      color: rest < 0 ? COLOR_DECREASE : COLOR_INCREASE,
-      details: [{ label: "Ujusterte poster", value: rest }],
-    });
-    running = next;
-  }
+  // "Rest" rendres ALDRI som søyle. Avvik logges som console.warn i computeBridges.
+  void rest;
 
   bars.push({
     name: `FC ${year}`,
