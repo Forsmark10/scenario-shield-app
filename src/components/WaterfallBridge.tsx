@@ -454,17 +454,16 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     Object.values(decByCat).reduce((a, b) => a + b, 0) + centralRedPctDec + centralRedAmtDec;
 
   const incDetails: BridgeBreakdown["details"] = [];
-  if (Object.keys(incByCat).length === 0) {
-    incDetails.push({ label: "Ingen positive justeringer", value: 0 });
-  } else {
-    Object.entries(incByCat).forEach(([cat, v]) => {
-      incDetails.push({ label: cat, value: v });
-      (commentByCat[cat] ?? []).forEach((c) =>
-        incDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
-      );
-    });
-    incDetails.push({ label: "SUM", value: incTot, isHeader: true });
-  }
+  Object.entries(incByCat).forEach(([cat, v]) => {
+    incDetails.push({ label: cat, value: v });
+    (commentByCat[cat] ?? []).forEach((c) =>
+      incDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
+    );
+  });
+  if (centralRedPctInc !== 0) incDetails.push({ label: "Sentral reduksjon %", value: centralRedPctInc });
+  if (centralRedAmtInc !== 0) incDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtInc });
+  if (incDetails.length === 0) incDetails.push({ label: "Ingen positive justeringer", value: 0 });
+  else incDetails.push({ label: "SUM", value: incTot, isHeader: true });
 
   const decDetails: BridgeBreakdown["details"] = [];
   Object.entries(decByCat).forEach(([cat, v]) => {
@@ -473,8 +472,8 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
       decDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
     );
   });
-  if (centralRedPct !== 0) decDetails.push({ label: "Sentral reduksjon %", value: centralRedPct });
-  if (centralRedAmt !== 0) decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmt });
+  if (centralRedPctDec !== 0) decDetails.push({ label: "Sentral reduksjon %", value: centralRedPctDec });
+  if (centralRedAmtDec !== 0) decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtDec });
   if (decDetails.length === 0) decDetails.push({ label: "Ingen besparelser", value: 0 });
   else decDetails.push({ label: "SUM", value: decTot, isHeader: true });
 
