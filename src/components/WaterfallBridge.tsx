@@ -323,23 +323,15 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     }
   }
 
-  // Reconcile: bruk faktiske beløp fra forecast for Internal FTE for å sikre nøyaktighet
-  // FTE-bidraget = (sum Internal FTE i N - masterBaselineGrowth-justert) + ext + ns + konv + cat-adj-amounts for FTE
-  const internalActualSumAtN = result.lines
-    .filter((l) => l.category === "Internal FTE")
-    .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
-  const internalBaselineSum = inputs.cost_lines
-    .filter((c) => c.category === "Internal FTE")
-    .reduce((a, c) => a + (c.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0), 0);
-  const internalSalaryGrownBaseline = internalBaselineSum * cumSalary;
-  const internalFteChangeContribution = internalActualSumAtN - internalSalaryGrownBaseline;
-
+  // FTE-endring = KUN direkte beregnede FTE-relaterte kostnadsendringer.
+  // Ingen residual: bruk de eksplisitt beregnede komponentene
+  // (interne endringer, eksterne endringer, konvertering, nearshoring) + FTE-kategorijusteringer.
   const fteNet =
-    internalFteChangeContribution +
-    extChangesAmt +
+    intIncTot + intDecTot +
+    extInc + extDec +
+    nsInc + nsDec +
     extConvAmt +
-    nsAmt +
-    fteCatAdjAmount;
+    fteCatAdjAmount + intCatAdjPct;
 
   const fteDetails: BridgeBreakdown["details"] = [
     { label: "ØKNINGER", value: intIncTot + extInc + nsInc, isHeader: true },
