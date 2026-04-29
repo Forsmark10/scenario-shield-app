@@ -30,18 +30,24 @@ const SECTION_LABEL: Record<string, string> = {
   capex_plan: "Capex-plan",
 };
 
-function describe(section: string, row: any, variant?: "pct" | "amt" | "rate" | "central_pct" | "central_amt" | "central_rate"): string {
+function describe(section: string, row: any, variant?: string): string {
   switch (section) {
-    case "global_assumptions":
-      return `${row.year}`;
+    case "global_assumptions": {
+      if (variant === "price") return `${row.year} · Prisvekst %`;
+      if (variant === "rate") return `${row.year} · EUR/NOK-kurs`;
+      return `${row.year} · Lønnsvekst %`;
+    }
     case "central_assumptions": {
       if (variant === "central_amt") return `${row.year} · Sentral reduksjon tNOK`;
       if (variant === "central_rate") return `${row.year} · EUR/NOK-kurs`;
       return `${row.year} · Sentral pris/reduksjon %`;
     }
     case "internal_fte_changes":
-    case "external_fte_changes":
-      return `${row.year} · ${row.level} · inc ${row.increase} / dec ${row.decrease}`;
+    case "external_fte_changes": {
+      const t = variant === "decrease" ? "decrease" : "increase";
+      const v = variant === "decrease" ? row.decrease : row.increase;
+      return `${row.year} · ${row.level} · ${t} ${v}`;
+    }
     case "conversions":
       return `${row.year} · ${row.external_level} → ${row.internal_level} (×${row.count})`;
     case "nearshoring_changes":
