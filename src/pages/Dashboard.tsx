@@ -434,6 +434,7 @@ function ScenarioSection({
   typeFilter,
   excludedCats,
   allCategories,
+  sharedBarMax,
 }: {
   bundle: ScenarioBundle;
   color: string;
@@ -442,6 +443,7 @@ function ScenarioSection({
   typeFilter: TypeFilter;
   excludedCats: Set<string>;
   allCategories: string[];
+  sharedBarMax: number;
 }) {
   const totals = useMemo(
     () => computeYearTotals(bundle, view, typeFilter, excludedCats),
