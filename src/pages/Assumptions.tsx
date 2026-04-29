@@ -1300,7 +1300,11 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
 
 // ---------------------- 5. Conversions ----------------------
 function SectionConversions({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
-  const rows = data.conversions.filter((c) => c.scenario_id === scenario.id);
+  const rows = [...data.conversions.filter((c) => c.scenario_id === scenario.id)].sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return aTime - bTime;
+  });
 
   const addRow = async () => {
     const { data: inserted, error } = await supabase
@@ -1326,6 +1330,8 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
   };
 
   const updateComment = async (id: string, comment: string | null) => {
+    const row = rows.find((entry) => entry.id === id);
+    if (!row) return;
     const ts = new Date().toISOString();
     patch({
       type: "update",
@@ -1336,7 +1342,7 @@ function SectionConversions({ data, scenario, patch }: { data: AllData; scenario
     const { error } = await supabase
       .from("conversions")
       .update({ comment, comment_updated_at: ts } as any)
-      .eq("id", id);
+      .eq("id", row.id);
     if (error) throw error;
   };
 
