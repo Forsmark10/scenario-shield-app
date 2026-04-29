@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Trash2, Eye, GitCompare, RotateCcw, Database } from "lucide-react";
+import { Trash2, Eye, GitCompare, RotateCcw, Database, Undo2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,30 +28,67 @@ import { formatNumberNO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { listBackups, deleteBackup, type BackupSummary } from "@/lib/excelImport";
 import { RestoreBackupDialog } from "@/components/RestoreBackupDialog";
+import { restoreAssumptionsSnapshot, type AssumptionsSnapshot } from "@/lib/versioning";
 
 interface Snapshot {
   id: string;
   name: string;
   description: string | null;
   scenario_id: string;
+  snapshot_group_id: string | null;
   data: any;
   created_at: string;
 }
 
+interface SnapshotGroup {
+  groupKey: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  rows: Snapshot[];
+}
+
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
+
+function groupSnapshots(rows: Snapshot[]): SnapshotGroup[] {
+  const map = new Map<string, SnapshotGroup>();
+  for (const r of rows) {
+    // Bruk snapshot_group_id hvis tilgjengelig, ellers fall tilbake til (name + sekund).
+    const key =
+      r.snapshot_group_id ??
+      `${r.name}__${new Date(r.created_at).toISOString().slice(0, 19)}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        groupKey: key,
+        name: r.name,
+        description: r.description,
+        created_at: r.created_at,
+        rows: [],
+      });
+    }
+    map.get(key)!.rows.push(r);
+  }
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+}
 
 export default function History() {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
-  const [viewing, setViewing] = useState<Snapshot | null>(null);
-  const [comparing, setComparing] = useState<Snapshot | null>(null);
-  const [toDelete, setToDelete] = useState<Snapshot | null>(null);
+  const [viewing, setViewing] = useState<{ group: SnapshotGroup; snap: Snapshot } | null>(null);
+  const [comparing, setComparing] = useState<{ group: SnapshotGroup; snap: Snapshot } | null>(
+    null,
+  );
+  const [toDelete, setToDelete] = useState<SnapshotGroup | null>(null);
+  const [toRestore, setToRestore] = useState<SnapshotGroup | null>(null);
+  const [restoring, setRestoringGroup] = useState(false);
 
   const [backups, setBackups] = useState<BackupSummary[]>([]);
   const [backupsLoading, setBackupsLoading] = useState(true);
   const [backupReloadKey, setBackupReloadKey] = useState(0);
-  const [restoring, setRestoring] = useState<BackupSummary | null>(null);
+  const [restoringBackup, setRestoringBackup] = useState<BackupSummary | null>(null);
   const [backupToDelete, setBackupToDelete] = useState<BackupSummary | null>(null);
 
   const { scenarios } = useAllScenarios();
@@ -94,15 +131,18 @@ export default function History() {
     };
   }, [backupReloadKey]);
 
+  const groups = useMemo(() => groupSnapshots(snapshots), [snapshots]);
+
   const scenarioName = (id: string) =>
     scenarios.find((s) => s.meta.id === id)?.meta.name ?? "Ukjent scenario";
 
-  const handleDelete = async () => {
+  const handleDeleteGroup = async () => {
     if (!toDelete) return;
+    const ids = toDelete.rows.map((r) => r.id);
     const { error } = await (supabase as any)
       .from("forecast_snapshots")
       .delete()
-      .eq("id", toDelete.id);
+      .in("id", ids);
     if (error) {
       toast.error("Kunne ikke slette", { description: error.message });
     } else {
@@ -110,6 +150,36 @@ export default function History() {
       setReloadKey((k) => k + 1);
     }
     setToDelete(null);
+  };
+
+  const handleRestoreGroup = async () => {
+    if (!toRestore) return;
+    setRestoringGroup(true);
+    try {
+      // Gjenopprett alle scenarioer i gruppen sekvensielt for forutsigbarhet.
+      for (const row of toRestore.rows) {
+        const tables = row.data?.tables ?? row.data?.inputs?.tables;
+        if (!tables) {
+          throw new Error(
+            `Snapshotet for «${scenarioName(row.scenario_id)}» mangler assumptions-data og kan ikke gjenopprettes.`,
+          );
+        }
+        const snap: AssumptionsSnapshot = {
+          scenario_id: row.scenario_id,
+          taken_at: row.created_at,
+          tables,
+        };
+        await restoreAssumptionsSnapshot(snap);
+      }
+      toast.success("Alle scenarioer gjenopprettet", {
+        description: `${toRestore.rows.length} scenarioer satt tilbake til «${toRestore.name}».`,
+      });
+      setToRestore(null);
+    } catch (e: any) {
+      toast.error("Gjenoppretting feilet", { description: e?.message ?? String(e) });
+    } finally {
+      setRestoringGroup(false);
+    }
   };
 
   const handleDeleteBackup = async () => {
@@ -139,7 +209,8 @@ export default function History() {
         <div>
           <h2 className="text-base font-semibold">Scenario-snapshots</h2>
           <p className="text-xs text-muted-foreground">
-            Lagres manuelt fra Dashboard eller Scenario Comparison.
+            Lagres manuelt fra Dashboard eller Scenario Comparison. Hver snapshot inneholder alle
+            scenarioer og kan gjenopprettes som én enhet.
           </p>
         </div>
         {loading ? (
@@ -148,7 +219,7 @@ export default function History() {
               <Skeleton key={i} className="h-24 w-full" />
             ))}
           </div>
-        ) : snapshots.length === 0 ? (
+        ) : groups.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center">
               <p className="text-sm text-muted-foreground">
@@ -159,40 +230,65 @@ export default function History() {
           </Card>
         ) : (
           <div className="grid gap-3">
-            {snapshots.map((s) => (
-              <Card key={s.id}>
-                <CardContent className="p-4 flex items-start justify-between gap-4 flex-wrap">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-sm">{s.name}</h3>
-                      <Badge variant="outline">{scenarioName(s.scenario_id)}</Badge>
+            {groups.map((g) => {
+              const sortedRows = [...g.rows].sort((a, b) => {
+                const an =
+                  scenarios.find((s) => s.meta.id === a.scenario_id)?.meta.sort_order ?? 999;
+                const bn =
+                  scenarios.find((s) => s.meta.id === b.scenario_id)?.meta.sort_order ?? 999;
+                return an - bn;
+              });
+              const firstRow = sortedRows[0];
+              return (
+                <Card key={g.groupKey}>
+                  <CardContent className="p-4 flex items-start justify-between gap-4 flex-wrap">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-sm">{g.name}</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(g.created_at).toLocaleString("nb-NO")}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {sortedRows.map((r) => scenarioName(r.scenario_id)).join(" · ")}
+                      </p>
+                      {g.description && (
+                        <p className="text-sm text-foreground/85 mt-2">{g.description}</p>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(s.created_at).toLocaleString("nb-NO")}
-                    </p>
-                    {s.description && (
-                      <p className="text-sm text-foreground/85 mt-2">{s.description}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Button variant="outline" size="sm" onClick={() => setViewing(s)}>
-                      <Eye className="h-4 w-4 mr-1.5" /> Vis
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setComparing(s)}>
-                      <GitCompare className="h-4 w-4 mr-1.5" /> Sammenlign
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setToDelete(s)}
-                      aria-label="Slett snapshot"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setViewing({ group: g, snap: firstRow })}
+                      >
+                        <Eye className="h-4 w-4 mr-1.5" /> Vis
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setComparing({ group: g, snap: firstRow })}
+                      >
+                        <GitCompare className="h-4 w-4 mr-1.5" /> Sammenlign
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setToRestore(g)}
+                      >
+                        <Undo2 className="h-4 w-4 mr-1.5" /> Gjenopprett
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setToDelete(g)}
+                        aria-label="Slett snapshot"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>
@@ -235,7 +331,7 @@ export default function History() {
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Button variant="outline" size="sm" onClick={() => setRestoring(b)}>
+                    <Button variant="outline" size="sm" onClick={() => setRestoringBackup(b)}>
                       <RotateCcw className="h-4 w-4 mr-1.5" /> Gjenopprett
                     </Button>
                     <Button
@@ -254,18 +350,33 @@ export default function History() {
         )}
       </section>
 
-      <ViewSnapshotDialog snapshot={viewing} onOpenChange={(o) => !o && setViewing(null)} />
+      <ViewSnapshotDialog
+        snapshot={viewing?.snap ?? null}
+        group={viewing?.group ?? null}
+        onPickScenario={(snap) =>
+          viewing && setViewing({ group: viewing.group, snap })
+        }
+        scenarioName={scenarioName}
+        onOpenChange={(o) => !o && setViewing(null)}
+      />
       <CompareSnapshotDialog
-        snapshot={comparing}
+        snapshot={comparing?.snap ?? null}
+        group={comparing?.group ?? null}
+        onPickScenario={(snap) =>
+          comparing && setComparing({ group: comparing.group, snap })
+        }
+        scenarioName={scenarioName}
         currentBundle={
-          comparing ? scenarios.find((s) => s.meta.id === comparing.scenario_id) : undefined
+          comparing
+            ? scenarios.find((s) => s.meta.id === comparing.snap.scenario_id)
+            : undefined
         }
         onOpenChange={(o) => !o && setComparing(null)}
       />
 
       <RestoreBackupDialog
-        backup={restoring}
-        onOpenChange={(o) => !o && setRestoring(null)}
+        backup={restoringBackup}
+        onOpenChange={(o) => !o && setRestoringBackup(null)}
         onRestored={() => {
           setBackupReloadKey((k) => k + 1);
         }}
@@ -276,12 +387,36 @@ export default function History() {
           <AlertDialogHeader>
             <AlertDialogTitle>Slette snapshot?</AlertDialogTitle>
             <AlertDialogDescription>
-              «{toDelete?.name}» blir permanent slettet. Dette kan ikke angres.
+              «{toDelete?.name}» (alle {toDelete?.rows.length} scenarioer) blir permanent slettet.
+              Dette kan ikke angres.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Avbryt</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Slett</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteGroup}>Slett</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!toRestore}
+        onOpenChange={(o) => !o && !restoring && setToRestore(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Gjenopprett snapshot?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dette vil overskrive alle nåværende assumptions og kommentarer for alle scenarioer
+              ({toRestore?.rows.map((r) => scenarioName(r.scenario_id)).join(" · ")}) med
+              tilstanden fra «{toRestore?.name}». Er du sikker?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoring}>Avbryt</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestoreGroup} disabled={restoring}>
+              {restoring && <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />}
+              Gjenopprett
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -310,9 +445,15 @@ export default function History() {
 // ---------- View dialog: read-only Scenario-like table ----------
 function ViewSnapshotDialog({
   snapshot,
+  group,
+  onPickScenario,
+  scenarioName,
   onOpenChange,
 }: {
   snapshot: Snapshot | null;
+  group: SnapshotGroup | null;
+  onPickScenario: (s: Snapshot) => void;
+  scenarioName: (id: string) => string;
   onOpenChange: (o: boolean) => void;
 }) {
   const rows = useMemo(() => {
@@ -344,6 +485,20 @@ function ViewSnapshotDialog({
             read-only
           </DialogDescription>
         </DialogHeader>
+        {group && group.rows.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {group.rows.map((r) => (
+              <Button
+                key={r.id}
+                size="sm"
+                variant={r.id === snapshot?.id ? "default" : "outline"}
+                onClick={() => onPickScenario(r)}
+              >
+                {scenarioName(r.scenario_id)}
+              </Button>
+            ))}
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-muted/60">
@@ -382,10 +537,16 @@ function ViewSnapshotDialog({
 // ---------- Compare dialog: snapshot vs current ----------
 function CompareSnapshotDialog({
   snapshot,
+  group,
+  onPickScenario,
+  scenarioName,
   currentBundle,
   onOpenChange,
 }: {
   snapshot: Snapshot | null;
+  group: SnapshotGroup | null;
+  onPickScenario: (s: Snapshot) => void;
+  scenarioName: (id: string) => string;
   currentBundle: ReturnType<typeof useAllScenarios>["scenarios"][number] | undefined;
   onOpenChange: (o: boolean) => void;
 }) {
@@ -426,6 +587,20 @@ function CompareSnapshotDialog({
             lavere; grønne at den er høyere.
           </DialogDescription>
         </DialogHeader>
+        {group && group.rows.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {group.rows.map((r) => (
+              <Button
+                key={r.id}
+                size="sm"
+                variant={r.id === snapshot?.id ? "default" : "outline"}
+                onClick={() => onPickScenario(r)}
+              >
+                {scenarioName(r.scenario_id)}
+              </Button>
+            ))}
+          </div>
+        )}
         {!currentBundle ? (
           <p className="text-sm text-muted-foreground">
             Fant ikke gjeldende scenario for sammenligning.

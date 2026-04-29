@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import type { ScenarioBundle } from "@/hooks/useAllScenarios";
+import { captureAssumptionsSnapshot } from "@/lib/versioning";
 
 export function SaveSnapshotDialog({
   open,
@@ -45,17 +46,30 @@ export function SaveSnapshotDialog({
     setSaving(true);
     try {
       const savedAt = new Date().toISOString();
-      const rows = scenarios.map((bundle) => ({
+      // Felles gruppe-ID slik at alle tre scenario-radene behandles som én snapshot.
+      const groupId = (globalThis.crypto as any)?.randomUUID
+        ? (globalThis.crypto as any).randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      // Hent komplett assumptions-tilstand per scenario (alle tabellene + kommentarer).
+      const assumptionsByScenario = await Promise.all(
+        scenarios.map((b) => captureAssumptionsSnapshot(b.meta.id)),
+      );
+
+      const rows = scenarios.map((bundle, i) => ({
         name: name.trim(),
         description: description.trim() || null,
         scenario_id: bundle.meta.id,
+        snapshot_group_id: groupId,
         data: {
           inputs: bundle.inputs,
           result: bundle.result,
           meta: bundle.meta,
+          // Komplett assumptions-tilstand for restore.
+          tables: assumptionsByScenario[i].tables,
           saved_at: savedAt,
         } as any,
-      }));
+      })) as any[];
       const { error } = await (supabase as any)
         .from("forecast_snapshots")
         .insert(rows);
