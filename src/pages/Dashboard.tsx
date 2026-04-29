@@ -539,7 +539,7 @@ function ScenarioSection({
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-3">
           {/* Bars */}
-          <div className="h-[180px] relative">
+          <div className="h-[210px] relative">
             {/* Section labels overlay — aligned to bar slots (8 equal columns) */}
             <div
               className="absolute top-0 left-0 right-0 grid pointer-events-none z-10 text-[11px] font-bold text-foreground uppercase tracking-wide"
@@ -556,8 +556,8 @@ function ScenarioSection({
                 gridTemplateColumns: "repeat(8, 1fr)",
                 paddingLeft: 5,
                 paddingRight: 17,
-                paddingTop: 22,
-                paddingBottom: 22,
+                paddingTop: 36,
+                paddingBottom: 26,
               }}
             >
               <div className="border-r-2 border-dashed" style={{ borderColor: DIVIDER_COLOR }} />
@@ -567,7 +567,7 @@ function ScenarioSection({
             </div>
             <ResponsiveContainer width="100%" height="100%">
               {breakdown === "Total" ? (
-                <BarChart data={barData} margin={{ top: 18, right: 12, bottom: 4, left: 0 }}>
+                <BarChart data={barData} margin={{ top: 32, right: 12, bottom: 4, left: 0 }}>
                   <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip content={renderTooltip} cursor={{ fill: "hsl(var(--muted) / 0.4)" }} />
