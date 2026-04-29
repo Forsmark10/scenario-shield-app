@@ -30,18 +30,24 @@ const SECTION_LABEL: Record<string, string> = {
   capex_plan: "Capex-plan",
 };
 
-function describe(section: string, row: any, variant?: "pct" | "amt" | "rate" | "central_pct" | "central_amt" | "central_rate"): string {
+function describe(section: string, row: any, variant?: string): string {
   switch (section) {
-    case "global_assumptions":
-      return `${row.year}`;
+    case "global_assumptions": {
+      if (variant === "price") return `${row.year} · Prisvekst %`;
+      if (variant === "rate") return `${row.year} · EUR/NOK-kurs`;
+      return `${row.year} · Lønnsvekst %`;
+    }
     case "central_assumptions": {
       if (variant === "central_amt") return `${row.year} · Sentral reduksjon tNOK`;
       if (variant === "central_rate") return `${row.year} · EUR/NOK-kurs`;
       return `${row.year} · Sentral pris/reduksjon %`;
     }
     case "internal_fte_changes":
-    case "external_fte_changes":
-      return `${row.year} · ${row.level} · inc ${row.increase} / dec ${row.decrease}`;
+    case "external_fte_changes": {
+      const t = variant === "decrease" ? "decrease" : "increase";
+      const v = variant === "decrease" ? row.decrease : row.increase;
+      return `${row.year} · ${row.level} · ${t} ${v}`;
+    }
     case "conversions":
       return `${row.year} · ${row.external_level} → ${row.internal_level} (×${row.count})`;
     case "nearshoring_changes":
@@ -76,42 +82,43 @@ export async function loadScenarioComments(scenarioId: string): Promise<CommentE
   results.forEach((res, idx) => {
     const section = tables[idx];
     for (const row of (res.data ?? []) as any[]) {
-      if (row.comment && String(row.comment).trim()) {
-        list.push({
-          section,
-          label: describe(section, row, section === "category_adjustments" ? "pct" : undefined),
-          comment: row.comment,
-          updatedAt: row.comment_updated_at ?? null,
-        });
+      const push = (variant: string | undefined, comment: any, updatedAt: any) => {
+        if (comment && String(comment).trim()) {
+          list.push({
+            section,
+            label: describe(section, row, variant),
+            comment,
+            updatedAt: updatedAt ?? null,
+          });
+        }
+      };
+
+      if (section === "global_assumptions") {
+        push("salary", row.comment_salary, row.comment_salary_updated_at);
+        push("price", row.comment_price, row.comment_price_updated_at);
+        push("rate", row.comment_rate, row.comment_rate_updated_at);
+        continue;
       }
-      // Category adjustments has a separate comment for the tNOK cell
-      if (section === "category_adjustments" && row.comment_amount && String(row.comment_amount).trim()) {
-        list.push({
-          section,
-          label: describe(section, row, "amt"),
-          comment: row.comment_amount,
-          updatedAt: row.comment_amount_updated_at ?? null,
-        });
+      if (section === "internal_fte_changes" || section === "external_fte_changes") {
+        push("increase", row.comment_increase, row.comment_increase_updated_at);
+        push("decrease", row.comment_decrease, row.comment_decrease_updated_at);
+        // legacy single-comment fallback
+        push(undefined, row.comment, row.comment_updated_at);
+        continue;
       }
-      // Central assumptions: separate comments for tNOK-reduksjon and EUR/NOK-kurs
+      if (section === "category_adjustments") {
+        push("pct", row.comment, row.comment_updated_at);
+        push("amt", row.comment_amount, row.comment_amount_updated_at);
+        continue;
+      }
       if (section === "central_assumptions") {
-        if (row.comment_amount && String(row.comment_amount).trim()) {
-          list.push({
-            section,
-            label: describe(section, row, "central_amt"),
-            comment: row.comment_amount,
-            updatedAt: row.comment_amount_updated_at ?? null,
-          });
-        }
-        if (row.comment_rate && String(row.comment_rate).trim()) {
-          list.push({
-            section,
-            label: describe(section, row, "central_rate"),
-            comment: row.comment_rate,
-            updatedAt: row.comment_rate_updated_at ?? null,
-          });
-        }
+        push(undefined, row.comment, row.comment_updated_at);
+        push("central_amt", row.comment_amount, row.comment_amount_updated_at);
+        push("central_rate", row.comment_rate, row.comment_rate_updated_at);
+        continue;
       }
+      // Default single-column comment tables (conversions, nearshoring_changes, capex_plan)
+      push(undefined, row.comment, row.comment_updated_at);
     }
   });
   return list;

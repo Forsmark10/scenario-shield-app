@@ -671,19 +671,25 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
     }
   };
 
-  const upsertComment = async (year: number, comment: string | null) => {
+  const upsertCommentField = async (
+    year: number,
+    commentField: "comment_salary" | "comment_price" | "comment_rate",
+    atField: "comment_salary_updated_at" | "comment_price_updated_at" | "comment_rate_updated_at",
+    value: string | null,
+  ) => {
     const existing = get(year);
     const ts = new Date().toISOString();
+    const changes = { [commentField]: value, [atField]: ts } as any;
     if (existing) {
       patch({
         type: "update",
         table: "global",
         id: existing.id,
-        changes: { comment, comment_updated_at: ts },
+        changes,
       });
       const { error } = await supabase
         .from("global_assumptions")
-        .update({ comment, comment_updated_at: ts } as any)
+        .update(changes)
         .eq("id", existing.id);
       if (error) throw error;
     } else {
@@ -695,8 +701,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
           salary_increase_pct: 0.04,
           price_increase_pct: 0.05,
           eur_nok_rate: 11.3,
-          comment,
-          comment_updated_at: ts,
+          ...changes,
         } as any)
         .select()
         .single();
@@ -705,9 +710,23 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
     }
   };
 
-  const drivers = [
-    { key: "salary_increase_pct", label: "Lønnsvekst %", suffix: "%", scale: 100 },
-    { key: "price_increase_pct", label: "Prisvekst %", suffix: "%", scale: 100 },
+  const drivers: Array<{
+    key: string;
+    label: string;
+    suffix: string;
+    scale: number;
+    commentField: "comment_salary" | "comment_price";
+    atField: "comment_salary_updated_at" | "comment_price_updated_at";
+    byField: "comment_salary_updated_by" | "comment_price_updated_by";
+  }> = [
+    {
+      key: "salary_increase_pct", label: "Lønnsvekst %", suffix: "%", scale: 100,
+      commentField: "comment_salary", atField: "comment_salary_updated_at", byField: "comment_salary_updated_by",
+    },
+    {
+      key: "price_increase_pct", label: "Prisvekst %", suffix: "%", scale: 100,
+      commentField: "comment_price", atField: "comment_price_updated_at", byField: "comment_price_updated_by",
+    },
   ];
 
   return (
@@ -731,10 +750,10 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
                 return (
                   <td key={y} className="px-1 py-1">
                     <CellWithComment
-                      comment={row?.comment}
-                      updatedAt={row?.comment_updated_at}
-                      updatedBy={row?.comment_updated_by}
-                      onSaveComment={(next) => upsertComment(y, next)}
+                      comment={row?.[d.commentField]}
+                      updatedAt={row?.[d.atField]}
+                      updatedBy={row?.[d.byField]}
+                      onSaveComment={(next) => upsertCommentField(y, d.commentField, d.atField, next)}
                       label={`Globale drivere ${y} · ${d.label}`}
                     >
                       <NumCell
@@ -969,19 +988,22 @@ function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
-  const upsertChangeComment = async (year: number, level: Level, comment: string | null) => {
+  const upsertChangeComment = async (
+    year: number,
+    level: Level,
+    type: "increase" | "decrease",
+    comment: string | null,
+  ) => {
     const existing = getChange(year, level);
     const ts = new Date().toISOString();
+    const cField = type === "increase" ? "comment_increase" : "comment_decrease";
+    const atField = type === "increase" ? "comment_increase_updated_at" : "comment_decrease_updated_at";
+    const changes = { [cField]: comment, [atField]: ts } as any;
     if (existing) {
-      patch({
-        type: "update",
-        table: "intChanges",
-        id: existing.id,
-        changes: { comment, comment_updated_at: ts },
-      });
+      patch({ type: "update", table: "intChanges", id: existing.id, changes });
       const { error } = await supabase
         .from("internal_fte_changes")
-        .update({ comment, comment_updated_at: ts } as any)
+        .update(changes)
         .eq("id", existing.id);
       if (error) throw error;
     } else {
@@ -993,8 +1015,7 @@ function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario
           level,
           increase: 0,
           decrease: 0,
-          comment,
-          comment_updated_at: ts,
+          ...changes,
         } as any)
         .select()
         .single();
@@ -1082,10 +1103,10 @@ function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario
                       return (
                         <td key={y} className="px-1 py-1 align-top">
                           <CellWithComment
-                            comment={c?.comment}
-                            updatedAt={c?.comment_updated_at}
-                            updatedBy={c?.comment_updated_by}
-                            onSaveComment={(next) => upsertChangeComment(y, lvl, next)}
+                            comment={type === "increase" ? c?.comment_increase : c?.comment_decrease}
+                            updatedAt={type === "increase" ? c?.comment_increase_updated_at : c?.comment_decrease_updated_at}
+                            updatedBy={type === "increase" ? c?.comment_increase_updated_by : c?.comment_decrease_updated_by}
+                            onSaveComment={(next) => upsertChangeComment(y, lvl, type, next)}
                             label={`Internal ${lvl} ${y} (${type})`}
                           >
                             {cell}
@@ -1145,19 +1166,22 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
-  const upsertChangeComment = async (year: number, level: Level, comment: string | null) => {
+  const upsertChangeComment = async (
+    year: number,
+    level: Level,
+    type: "increase" | "decrease",
+    comment: string | null,
+  ) => {
     const existing = getChange(year, level);
     const ts = new Date().toISOString();
+    const cField = type === "increase" ? "comment_increase" : "comment_decrease";
+    const atField = type === "increase" ? "comment_increase_updated_at" : "comment_decrease_updated_at";
+    const changes = { [cField]: comment, [atField]: ts } as any;
     if (existing) {
-      patch({
-        type: "update",
-        table: "extChanges",
-        id: existing.id,
-        changes: { comment, comment_updated_at: ts },
-      });
+      patch({ type: "update", table: "extChanges", id: existing.id, changes });
       const { error } = await supabase
         .from("external_fte_changes")
-        .update({ comment, comment_updated_at: ts } as any)
+        .update(changes)
         .eq("id", existing.id);
       if (error) throw error;
     } else {
@@ -1169,8 +1193,7 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
           level,
           increase: 0,
           decrease: 0,
-          comment,
-          comment_updated_at: ts,
+          ...changes,
         } as any)
         .select()
         .single();
@@ -1253,10 +1276,10 @@ function SectionExternalFte({ data, scenario, patch }: { data: AllData; scenario
                       return (
                         <td key={y} className="px-1 py-1 align-top">
                           <CellWithComment
-                            comment={c?.comment}
-                            updatedAt={c?.comment_updated_at}
-                            updatedBy={c?.comment_updated_by}
-                            onSaveComment={(next) => upsertChangeComment(y, lvl, next)}
+                            comment={type === "increase" ? c?.comment_increase : c?.comment_decrease}
+                            updatedAt={type === "increase" ? c?.comment_increase_updated_at : c?.comment_decrease_updated_at}
+                            updatedBy={type === "increase" ? c?.comment_increase_updated_by : c?.comment_decrease_updated_by}
+                            onSaveComment={(next) => upsertChangeComment(y, lvl, type, next)}
                             label={`External ${lvl} ${y} (${type})`}
                           >
                             {cell}
@@ -1433,20 +1456,16 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
     }
   };
 
-  // Comment on FX (eur_nok_rate) cell — shares the global_assumptions row's `comment` column.
+  // Comment on FX (eur_nok_rate) cell — uses dedicated `comment_rate` column on global_assumptions.
   const upsertFxComment = async (year: number, comment: string | null) => {
     const existing = getGlobal(year);
     const ts = new Date().toISOString();
+    const changes = { comment_rate: comment, comment_rate_updated_at: ts } as any;
     if (existing) {
-      patch({
-        type: "update",
-        table: "global",
-        id: existing.id,
-        changes: { comment, comment_updated_at: ts },
-      });
+      patch({ type: "update", table: "global", id: existing.id, changes });
       const { error } = await supabase
         .from("global_assumptions")
-        .update({ comment, comment_updated_at: ts } as any)
+        .update(changes)
         .eq("id", existing.id);
       if (error) throw error;
     } else {
@@ -1458,8 +1477,7 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
           salary_increase_pct: 0.04,
           price_increase_pct: 0.05,
           eur_nok_rate: 11.3,
-          comment,
-          comment_updated_at: ts,
+          ...changes,
         } as any)
         .select()
         .single();
@@ -1592,9 +1610,9 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
                   return (
                     <td key={y} className="px-1 py-1">
                       <CellWithComment
-                        comment={row?.comment}
-                        updatedAt={row?.comment_updated_at}
-                        updatedBy={row?.comment_updated_by}
+                        comment={row?.comment_rate}
+                        updatedAt={row?.comment_rate_updated_at}
+                        updatedBy={row?.comment_rate_updated_by}
                         onSaveComment={(next) => upsertFxComment(y, next)}
                         label={`EUR/NOK-kurs ${y}`}
                       >
