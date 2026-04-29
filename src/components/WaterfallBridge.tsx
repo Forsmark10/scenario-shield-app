@@ -415,11 +415,11 @@ export function WaterfallSection({ scenarios, view, scenarioColors }: WaterfallS
 
   return (
     <Card>
-      <CardContent className="pt-5 space-y-6">
+      <CardContent className="pt-4 space-y-3">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-[15px] font-medium tracking-tight">Kostnadsbridge</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <h2 className="text-[14px] font-medium tracking-tight">Kostnadsbridge</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
               Dekomponering av endring fra FC 2026 til valgt år.
             </p>
           </div>
@@ -440,7 +440,7 @@ export function WaterfallSection({ scenarios, view, scenarioColors }: WaterfallS
           </div>
         </div>
 
-        <div className="space-y-7">
+        <div className="space-y-2">
           {scenarios.map((b, i) => (
             <WaterfallChart
               key={b.meta.id}
@@ -688,19 +688,19 @@ function WaterfallChart({
   const yMax = maxV + span * 0.12;
   const yMin = minV - span * 0.04;
 
-  // Layout — totals slightly wider than driver bars
+  // Layout — compact, totals slightly wider than driver bars
   const W = 960;
-  const H = 300;
-  const PAD_L = 12;
-  const PAD_R = 12;
-  const PAD_T = 32;
-  const PAD_B = 56;
+  const H = 190;
+  const PAD_L = 10;
+  const PAD_R = 10;
+  const PAD_T = 22;
+  const PAD_B = 34;
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
   const n = bars.length;
   const slot = innerW / n;
-  const driverBarW = Math.min(64, slot * 0.55);
-  const totalBarW = Math.min(90, slot * 0.78);
+  const driverBarW = Math.min(56, slot * 0.55);
+  const totalBarW = Math.min(78, slot * 0.78);
   const barWidthFor = (b: BarSpec) =>
     b.type === "start" || b.type === "end" ? totalBarW : driverBarW;
 
@@ -715,12 +715,12 @@ function WaterfallChart({
 
   return (
     <div style={{ position: "relative" }}>
-      <div className="flex items-center justify-between mb-1 px-2">
-        <h3 className="text-[13px] font-semibold" style={{ color }}>
+      <div className="flex items-center justify-between mb-0.5 px-2">
+        <h3 className="text-[12px] font-semibold" style={{ color }}>
           {bundle.meta.name}
         </h3>
         <div
-          className="text-[11px] font-bold rounded px-2.5 py-0.5 text-white tabular-nums"
+          className="text-[10px] font-bold rounded px-2 py-0 text-white tabular-nums"
           style={{ backgroundColor: totalChangeColor }}
           title={`FC 2026 → FC ${year}`}
         >
@@ -729,7 +729,7 @@ function WaterfallChart({
       </div>
 
       <div className="w-full overflow-x-auto">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 640, display: "block" }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 560, display: "block" }}>
           {/* zero line */}
           {yMin < 0 && yMax > 0 && (
             <line
@@ -788,8 +788,8 @@ function WaterfallChart({
               : b.raw < 0
                 ? COLOR_TEXT_DEC
                 : COLOR_TEXT_INC;
-            const labelY = yTop - 7;
-            const xLabelY = H - PAD_B + 18;
+            const labelY = yTop - 5;
+            const xLabelY = H - PAD_B + 14;
             const isActive = activeBar?.name === b.name && activeBar?.type === b.type;
             return (
               <g
@@ -816,7 +816,7 @@ function WaterfallChart({
                   textAnchor="middle"
                   style={{
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: isTotal ? 13 : 11,
+                    fontSize: isTotal ? 12 : 10,
                     fontWeight: 700,
                     fill: labelColor,
                   }}
@@ -838,7 +838,7 @@ function WaterfallChart({
                   textAnchor="middle"
                   style={{
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: 10,
+                    fontSize: 9,
                     fill: "hsl(var(--muted-foreground))",
                     fontWeight: isTotal ? 600 : 400,
                   }}
