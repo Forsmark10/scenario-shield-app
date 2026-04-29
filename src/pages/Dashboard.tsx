@@ -348,18 +348,31 @@ export default function Dashboard() {
 
       {/* Per-scenario sections */}
       {chartMode === "bars" &&
-        scenarios.map((bundle, i) => (
-          <ScenarioSection
-            key={bundle.meta.id}
-            bundle={bundle}
-            color={SCENARIO_COLOR[i % SCENARIO_COLOR.length]}
-            view={view}
-            breakdown={breakdown}
-            typeFilter={typeFilter}
-            excludedCats={excludedCats}
-            allCategories={allCategories}
-          />
-        ))}
+        (() => {
+          // Felles y-akse-domain på tvers av scenarier — så like verdier
+          // (AC 2025, BU 2026) får identisk bar-høyde i alle tre scenariene.
+          let sharedMax = 0;
+          for (const b of scenarios) {
+            const t = computeYearTotals(b, view, typeFilter, excludedCats);
+            const vals = [t.ac, t.bu, t.fc26, ...Object.values(t.fc)].map(toM);
+            for (const v of vals) if (v > sharedMax) sharedMax = v;
+          }
+          // 8% headroom så verditall over høyeste bar får luft.
+          const sharedBarMax = sharedMax > 0 ? sharedMax * 1.08 : 1;
+          return scenarios.map((bundle, i) => (
+            <ScenarioSection
+              key={bundle.meta.id}
+              bundle={bundle}
+              color={SCENARIO_COLOR[i % SCENARIO_COLOR.length]}
+              view={view}
+              breakdown={breakdown}
+              typeFilter={typeFilter}
+              excludedCats={excludedCats}
+              allCategories={allCategories}
+              sharedBarMax={sharedBarMax}
+            />
+          ));
+        })()}
 
       {/* Cost bridge (waterfall) per scenario */}
       {chartMode === "waterfall" && (
