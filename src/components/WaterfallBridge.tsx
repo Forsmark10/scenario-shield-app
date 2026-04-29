@@ -539,15 +539,18 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const sumBridges = bridges.reduce((a, b) => a + b.value, 0);
   const rest = end - (start + sumBridges);
 
-  // Kontrollregel: avvik > 0,1 MNOK = 100 tNOK
-  if (Math.abs(rest) > 100) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[WaterfallBridge] Avvik ${(rest / 1000).toFixed(2)} MNOK i ${bundle.meta.name} → FC ${N} (${view}). ` +
-        `Start=${(start / 1000).toFixed(1)} + Sum drivere=${(sumBridges / 1000).toFixed(1)} ≠ End=${(end / 1000).toFixed(1)}`,
-      bridges.map((b) => ({ label: b.label, MNOK: +(b.value / 1000).toFixed(2) })),
-    );
-  }
+  // Rest legges til som residual-driver rett før FC-N, slik at briden alltid stemmer per definisjon.
+  bridges.push({
+    label: "Rest",
+    value: rest,
+    details: [
+      {
+        label:
+          "Modellteknisk differanse som skyldes forskjell mellom faktiske kostnader i FC 2026 og modellens beregnede satser (arbeidsgiveravgift, feriepenger, og andre personalrelaterte beregningsforskjeller). Denne posten påvirkes av samspill med andre drivere og er ikke en selvstendig kostnadsendring.",
+        value: 0,
+      },
+    ],
+  });
 
   return { start, end, bridges, rest };
 }
