@@ -231,6 +231,15 @@ export default function Dashboard() {
       <div className="sticky top-14 z-20 -mx-6 px-6 py-3 bg-background/95 backdrop-blur border-b">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Diagram</span>
+            <Tabs value={chartMode} onValueChange={(v) => setChartMode(v as ChartMode)}>
+              <TabsList className="h-8">
+                <TabsTrigger value="bars" className="text-xs px-3">Stolpediagram</TabsTrigger>
+                <TabsTrigger value="waterfall" className="text-xs px-3">Waterfall</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground">Visning</span>
             <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
               <TabsList className="h-8">
