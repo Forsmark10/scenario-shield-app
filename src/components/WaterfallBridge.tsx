@@ -358,7 +358,14 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   fteDetails.push({ label: "NETTO", value: fteNet, isHeader: true });
 
   // ─────── Øvrige økninger / Øvrige besparelser ───────
-  // Kategorier: Consultancy, IT Costs, Operations & Personnel-related, Other operating income
+  // STRENG dekomponering per kategori per år:
+  //   Ny kostnad = B × (1+p) × (1+j) + tNOK_adj
+  //   Prisvekst-effekt   = B × p                       → Prisvekst-søylen (allerede behandlet over)
+  //   %-justeringseffekt = B × (1+p) × j               → her, sortert pos/neg
+  //   tNOK-effekt        = tNOK_adj (vokser IKKE)      → her, sortert pos/neg
+  // Per-komponent sign-split: hver enkelt %-bidrag og hvert enkelt tNOK-bidrag
+  // klassifiseres isolert som økning eller besparelse. tNOK og % blandes ALDRI
+  // før de er klassifisert.
   const OTHER_CATS = new Set([
     "Consultancy",
     "IT Costs",
@@ -366,10 +373,11 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     "Other operating income",
   ]);
 
+  // Bucket: per kategori, en pos- og en neg-akkumulator (separate komponenter)
   const incByCat: Record<string, number> = {};
   const decByCat: Record<string, number> = {};
   const commentByCat: Record<string, string[]> = {};
-  const addCat = (cat: string, v: number) => {
+  const addComponent = (cat: string, v: number) => {
     if (v === 0) return;
     if (v > 0) incByCat[cat] = (incByCat[cat] ?? 0) + v;
     else decByCat[cat] = (decByCat[cat] ?? 0) + v;
@@ -380,36 +388,39 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     if (!arr.includes(c)) arr.push(c);
   };
 
-  const cumCatFactor = (cat: string) => {
-    let f = 1;
-    for (let Y = 2027; Y <= N; Y++) {
-      const r = inputs.category_adjustments.find((a) => a.category === cat && a.year === Y);
-      if (r?.adjustment_pct) {
-        f *= 1 + r.adjustment_pct;
-        addComment(cat, r.comment ?? null);
-      }
-    }
-    return f;
-  };
-
+  // Sum baseline per kategori (kun Local cost_lines i de fire kategoriene)
+  const baseByCat: Record<string, number> = {};
   for (const cl of inputs.cost_lines) {
     if (!includeRealLine(cl.category)) continue;
     if (!OTHER_CATS.has(cl.category)) continue;
     if (cl.cost_type !== "Local") continue;
     const base = (cl.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0);
-    const cat = cl.category;
-    const f = cumCatFactor(cat);
-    if (f === 1) continue;
-    const v = base * cumPrice * (f - 1);
-    addCat(cat, v);
+    baseByCat[cl.category] = (baseByCat[cl.category] ?? 0) + base;
   }
+
+  // %-justeringseffekt per kategori = baseSum × cumPrice × (f - 1)
+  // Isolert effekt av selve %-justeringen, prisvekst er allerede i Prisvekst-søylen.
+  for (const cat of Object.keys(baseByCat)) {
+    let f = 1;
+    for (let Y = 2027; Y <= N; Y++) {
+      const r = inputs.category_adjustments.find((a) => a.category === cat && a.year === Y);
+      if (r?.adjustment_pct) {
+        f *= 1 + r.adjustment_pct;
+        if (r.comment) addComment(cat, r.comment);
+      }
+    }
+    if (f === 1) continue;
+    const pctEffect = baseByCat[cat] * cumPrice * (f - 1);
+    addComponent(cat, pctEffect);
+  }
+
+  // tNOK-justeringer (faste beløp, vokser IKKE med prisvekst)
   for (const l of result.lines) {
     if (!l.line_id.startsWith("virtual:cat_adj_amount:")) continue;
     if (!OTHER_CATS.has(l.category)) continue;
     if (!includeForecastLine(l)) continue;
     const v = l.amounts[N] ?? 0;
-    addCat(l.category, v);
-    // Kommentar fra category_adjustments med tNOK
+    addComponent(l.category, v);
     for (let Y = 2027; Y <= N; Y++) {
       const r = inputs.category_adjustments.find(
         (a) => a.category === l.category && a.year === Y && (a.adjustment_amount_tnok ?? 0) !== 0,
@@ -418,7 +429,7 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     }
   }
 
-  // Sentrale reduksjoner (% + tNOK) → Øvrige besparelser
+  // Sentrale reduksjoner (% + tNOK) → klassifisert per komponent
   let centralRedPct = 0;
   for (const cl of inputs.cost_lines) {
     if (cl.cost_type !== "Central") continue;
@@ -431,21 +442,28 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const cRedAmtLine = result.lines.find((l) => l.line_id === "virtual:central_reduction_amount");
   const centralRedAmt = cRedAmtLine?.amounts[N] ?? 0;
 
-  const incTot = Object.values(incByCat).reduce((a, b) => a + b, 0);
-  const decTot = Object.values(decByCat).reduce((a, b) => a + b, 0) + centralRedPct + centralRedAmt;
+  // Klassifiser sentrale komponenter isolert
+  let centralRedPctInc = 0, centralRedPctDec = 0;
+  if (centralRedPct > 0) centralRedPctInc = centralRedPct; else centralRedPctDec = centralRedPct;
+  let centralRedAmtInc = 0, centralRedAmtDec = 0;
+  if (centralRedAmt > 0) centralRedAmtInc = centralRedAmt; else centralRedAmtDec = centralRedAmt;
+
+  const incTot =
+    Object.values(incByCat).reduce((a, b) => a + b, 0) + centralRedPctInc + centralRedAmtInc;
+  const decTot =
+    Object.values(decByCat).reduce((a, b) => a + b, 0) + centralRedPctDec + centralRedAmtDec;
 
   const incDetails: BridgeBreakdown["details"] = [];
-  if (Object.keys(incByCat).length === 0) {
-    incDetails.push({ label: "Ingen positive justeringer", value: 0 });
-  } else {
-    Object.entries(incByCat).forEach(([cat, v]) => {
-      incDetails.push({ label: cat, value: v });
-      (commentByCat[cat] ?? []).forEach((c) =>
-        incDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
-      );
-    });
-    incDetails.push({ label: "SUM", value: incTot, isHeader: true });
-  }
+  Object.entries(incByCat).forEach(([cat, v]) => {
+    incDetails.push({ label: cat, value: v });
+    (commentByCat[cat] ?? []).forEach((c) =>
+      incDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
+    );
+  });
+  if (centralRedPctInc !== 0) incDetails.push({ label: "Sentral reduksjon %", value: centralRedPctInc });
+  if (centralRedAmtInc !== 0) incDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtInc });
+  if (incDetails.length === 0) incDetails.push({ label: "Ingen positive justeringer", value: 0 });
+  else incDetails.push({ label: "SUM", value: incTot, isHeader: true });
 
   const decDetails: BridgeBreakdown["details"] = [];
   Object.entries(decByCat).forEach(([cat, v]) => {
@@ -454,8 +472,8 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
       decDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
     );
   });
-  if (centralRedPct !== 0) decDetails.push({ label: "Sentral reduksjon %", value: centralRedPct });
-  if (centralRedAmt !== 0) decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmt });
+  if (centralRedPctDec !== 0) decDetails.push({ label: "Sentral reduksjon %", value: centralRedPctDec });
+  if (centralRedAmtDec !== 0) decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtDec });
   if (decDetails.length === 0) decDetails.push({ label: "Ingen besparelser", value: 0 });
   else decDetails.push({ label: "SUM", value: decTot, isHeader: true });
 
