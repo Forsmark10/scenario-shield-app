@@ -1103,10 +1103,10 @@ function SectionInternalFte({ data, scenario, patch }: { data: AllData; scenario
                       return (
                         <td key={y} className="px-1 py-1 align-top">
                           <CellWithComment
-                            comment={c?.comment}
-                            updatedAt={c?.comment_updated_at}
-                            updatedBy={c?.comment_updated_by}
-                            onSaveComment={(next) => upsertChangeComment(y, lvl, next)}
+                            comment={type === "increase" ? c?.comment_increase : c?.comment_decrease}
+                            updatedAt={type === "increase" ? c?.comment_increase_updated_at : c?.comment_decrease_updated_at}
+                            updatedBy={type === "increase" ? c?.comment_increase_updated_by : c?.comment_decrease_updated_by}
+                            onSaveComment={(next) => upsertChangeComment(y, lvl, type, next)}
                             label={`Internal ${lvl} ${y} (${type})`}
                           >
                             {cell}
