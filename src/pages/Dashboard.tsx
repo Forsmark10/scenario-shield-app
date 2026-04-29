@@ -190,6 +190,7 @@ export default function Dashboard() {
   const { loading, error, scenarios } = useAllScenarios();
   const [view, setView] = useState<ViewMode>("PL");
   const [breakdown, setBreakdown] = useState<Breakdown>("Total");
+  const [chartMode, setChartMode] = useState<ChartMode>("bars");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [excludedCats, setExcludedCats] = useState<Set<string>>(new Set());
   const [tableOpen, setTableOpen] = useState(false);
