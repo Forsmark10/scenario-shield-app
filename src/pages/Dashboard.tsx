@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 type ViewMode = "PL" | "Spend";
 type Breakdown = "Total" | "Stacked";
 type TypeFilter = "all" | "Local" | "Central";
+type ChartMode = "bars" | "waterfall";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031];
 
