@@ -671,19 +671,25 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
     }
   };
 
-  const upsertComment = async (year: number, comment: string | null) => {
+  const upsertCommentField = async (
+    year: number,
+    commentField: "comment_salary" | "comment_price" | "comment_rate",
+    atField: "comment_salary_updated_at" | "comment_price_updated_at" | "comment_rate_updated_at",
+    value: string | null,
+  ) => {
     const existing = get(year);
     const ts = new Date().toISOString();
+    const changes = { [commentField]: value, [atField]: ts } as any;
     if (existing) {
       patch({
         type: "update",
         table: "global",
         id: existing.id,
-        changes: { comment, comment_updated_at: ts },
+        changes,
       });
       const { error } = await supabase
         .from("global_assumptions")
-        .update({ comment, comment_updated_at: ts } as any)
+        .update(changes)
         .eq("id", existing.id);
       if (error) throw error;
     } else {
@@ -695,8 +701,7 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
           salary_increase_pct: 0.04,
           price_increase_pct: 0.05,
           eur_nok_rate: 11.3,
-          comment,
-          comment_updated_at: ts,
+          ...changes,
         } as any)
         .select()
         .single();
@@ -705,9 +710,23 @@ function SectionGlobal({ data, scenario, patch }: { data: AllData; scenario: Sce
     }
   };
 
-  const drivers = [
-    { key: "salary_increase_pct", label: "Lønnsvekst %", suffix: "%", scale: 100 },
-    { key: "price_increase_pct", label: "Prisvekst %", suffix: "%", scale: 100 },
+  const drivers: Array<{
+    key: string;
+    label: string;
+    suffix: string;
+    scale: number;
+    commentField: "comment_salary" | "comment_price";
+    atField: "comment_salary_updated_at" | "comment_price_updated_at";
+    byField: "comment_salary_updated_by" | "comment_price_updated_by";
+  }> = [
+    {
+      key: "salary_increase_pct", label: "Lønnsvekst %", suffix: "%", scale: 100,
+      commentField: "comment_salary", atField: "comment_salary_updated_at", byField: "comment_salary_updated_by",
+    },
+    {
+      key: "price_increase_pct", label: "Prisvekst %", suffix: "%", scale: 100,
+      commentField: "comment_price", atField: "comment_price_updated_at", byField: "comment_price_updated_by",
+    },
   ];
 
   return (
