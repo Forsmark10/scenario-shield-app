@@ -501,18 +501,26 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
       deprBridge += deprCatAdj;
     }
   } else {
+    // Spend-modus: Capex-søylen = total capex i sluttåret minus total capex i FC 2026.
+    // Bruker samme datakilde som stolpediagrammet (cost_lines for baseline, result.lines for sluttår).
+    const baselineCapex = inputs.cost_lines
+      .filter((c) => c.category === "Capex")
+      .reduce((a, c) => a + (c.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0), 0);
     const nCapex = result.lines
       .filter((l) => l.is_capex)
       .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
-    // Splitt per type
+    // Splitt per type for sluttåret
     const byType: Record<string, number> = {};
     for (const l of result.lines.filter((x) => x.is_capex)) {
       const t = l.project || l.account_name || "Capex";
       byType[t] = (byType[t] ?? 0) + (l.amounts[N] ?? 0);
     }
-    deprBridge = nCapex;
-    Object.entries(byType).forEach(([t, v]) => deprDetails.push({ label: t, value: v }));
-    if (deprDetails.length === 0) deprDetails.push({ label: "Nye investeringer", value: nCapex });
+    deprBridge = nCapex - baselineCapex;
+    if (baselineCapex !== 0) {
+      deprDetails.push({ label: `Baseline FC 2026 capex`, value: -baselineCapex });
+    }
+    Object.entries(byType).forEach(([t, v]) => deprDetails.push({ label: `Nytt: ${t}`, value: v }));
+    if (deprDetails.length === 0) deprDetails.push({ label: "Ingen capex", value: 0 });
     const capexCatAdj = result.lines
       .filter((l) => l.line_id.startsWith("virtual:cat_adj_amount:") && l.category === "Capex")
       .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
