@@ -415,11 +415,11 @@ export function WaterfallSection({ scenarios, view, scenarioColors }: WaterfallS
 
   return (
     <Card>
-      <CardContent className="pt-5 space-y-6">
+      <CardContent className="pt-4 space-y-3">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-[15px] font-medium tracking-tight">Kostnadsbridge</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <h2 className="text-[14px] font-medium tracking-tight">Kostnadsbridge</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
               Dekomponering av endring fra FC 2026 til valgt år.
             </p>
           </div>
@@ -440,7 +440,7 @@ export function WaterfallSection({ scenarios, view, scenarioColors }: WaterfallS
           </div>
         </div>
 
-        <div className="space-y-7">
+        <div className="space-y-2">
           {scenarios.map((b, i) => (
             <WaterfallChart
               key={b.meta.id}
