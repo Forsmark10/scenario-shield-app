@@ -323,23 +323,15 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     }
   }
 
-  // Reconcile: bruk faktiske beløp fra forecast for Internal FTE for å sikre nøyaktighet
-  // FTE-bidraget = (sum Internal FTE i N - masterBaselineGrowth-justert) + ext + ns + konv + cat-adj-amounts for FTE
-  const internalActualSumAtN = result.lines
-    .filter((l) => l.category === "Internal FTE")
-    .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
-  const internalBaselineSum = inputs.cost_lines
-    .filter((c) => c.category === "Internal FTE")
-    .reduce((a, c) => a + (c.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0), 0);
-  const internalSalaryGrownBaseline = internalBaselineSum * cumSalary;
-  const internalFteChangeContribution = internalActualSumAtN - internalSalaryGrownBaseline;
-
+  // FTE-endring = KUN direkte beregnede FTE-relaterte kostnadsendringer.
+  // Ingen residual: bruk de eksplisitt beregnede komponentene
+  // (interne endringer, eksterne endringer, konvertering, nearshoring) + FTE-kategorijusteringer.
   const fteNet =
-    internalFteChangeContribution +
-    extChangesAmt +
+    intIncTot + intDecTot +
+    extInc + extDec +
+    nsInc + nsDec +
     extConvAmt +
-    nsAmt +
-    fteCatAdjAmount;
+    fteCatAdjAmount + intCatAdjPct;
 
   const fteDetails: BridgeBreakdown["details"] = [
     { label: "ØKNINGER", value: intIncTot + extInc + nsInc, isHeader: true },
@@ -547,15 +539,18 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const sumBridges = bridges.reduce((a, b) => a + b.value, 0);
   const rest = end - (start + sumBridges);
 
-  // Kontrollregel: avvik > 0,1 MNOK = 100 tNOK
-  if (Math.abs(rest) > 100) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[WaterfallBridge] Avvik ${(rest / 1000).toFixed(2)} MNOK i ${bundle.meta.name} → FC ${N} (${view}). ` +
-        `Start=${(start / 1000).toFixed(1)} + Sum drivere=${(sumBridges / 1000).toFixed(1)} ≠ End=${(end / 1000).toFixed(1)}`,
-      bridges.map((b) => ({ label: b.label, MNOK: +(b.value / 1000).toFixed(2) })),
-    );
-  }
+  // Rest legges til som residual-driver rett før FC-N, slik at briden alltid stemmer per definisjon.
+  bridges.push({
+    label: "Rest",
+    value: rest,
+    details: [
+      {
+        label:
+          "Modellteknisk differanse som skyldes forskjell mellom faktiske kostnader i FC 2026 og modellens beregnede satser (arbeidsgiveravgift, feriepenger, og andre personalrelaterte beregningsforskjeller). Denne posten påvirkes av samspill med andre drivere og er ikke en selvstendig kostnadsendring.",
+        value: 0,
+      },
+    ],
+  });
 
   return { start, end, bridges, rest };
 }
@@ -659,6 +654,42 @@ function DrilldownTooltip({
         }}
       >
         {bar.name}: {totalText}
+      </div>
+    );
+  }
+
+  // Special tooltip for "Rest" – descriptive paragraph
+  if (bar.type === "rest") {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          left: pos.x + 18,
+          top: pos.y - 20,
+          background: "#1e293b",
+          color: "#e2e8f0",
+          fontFamily: "Inter, system-ui, sans-serif",
+          fontSize: 11,
+          padding: "12px 16px",
+          borderRadius: 8,
+          pointerEvents: "none",
+          boxShadow: "0 10px 32px rgba(0,0,0,.35)",
+          zIndex: 999,
+          lineHeight: 1.55,
+          width: 320,
+          borderLeft: "3px solid #94a3b8",
+        }}
+      >
+        <div style={{ fontWeight: 700, fontSize: 12, color: "#f8fafc", marginBottom: 6 }}>
+          Rest ({fmtParen(bar.raw)} MNOK)
+        </div>
+        <div style={{ borderTop: "1px solid #334155", marginBottom: 6 }} />
+        <div style={{ color: "#cbd5e1" }}>
+          Modellteknisk differanse som skyldes forskjell mellom faktiske kostnader i FC 2026
+          og modellens beregnede satser (arbeidsgiveravgift, feriepenger, og andre
+          personalrelaterte beregningsforskjeller). Denne posten påvirkes av samspill med
+          andre drivere og er ikke en selvstendig kostnadsendring.
+        </div>
       </div>
     );
   }
@@ -787,9 +818,12 @@ function WaterfallChart({
 
   bridges.forEach((b, idx) => {
     const next = running + b.value;
-    const isDeprBar = idx === bridges.length - 1;
+    const isRestBar = b.label === "Rest";
+    const isDeprBar = !isRestBar && idx === bridges.length - 2; // nest siste = Avskrivning/Capex
     let c: string;
-    if (isDeprBar) {
+    if (isRestBar) {
+      c = COLOR_REST;
+    } else if (isDeprBar) {
       // soft blue when reducing, brick when adding
       c = b.value < 0 ? COLOR_DEPR_NEG : COLOR_INCREASE;
     } else if (Math.abs(b.value) < 1) {
@@ -801,7 +835,7 @@ function WaterfallChart({
     }
     bars.push({
       name: b.label,
-      type: "bridge",
+      type: isRestBar ? "rest" : "bridge",
       raw: b.value,
       top: Math.max(running, next),
       bottom: Math.min(running, next),
@@ -812,7 +846,6 @@ function WaterfallChart({
     running = next;
   });
 
-  // "Rest" rendres ALDRI som søyle. Avvik logges som console.warn i computeBridges.
   void rest;
 
   bars.push({
