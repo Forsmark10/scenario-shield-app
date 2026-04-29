@@ -816,7 +816,7 @@ function WaterfallChart({
                   textAnchor="middle"
                   style={{
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: isTotal ? 13 : 11,
+                    fontSize: isTotal ? 12 : 10,
                     fontWeight: 700,
                     fill: labelColor,
                   }}
