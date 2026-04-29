@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Pencil, MessageSquare } from "lucide-react";
+import { ChevronDown, Pencil, Sparkles, RotateCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,21 +8,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { supabase } from "@/integrations/supabase/client";
 import { toast as sonnerToast } from "sonner";
 import { cn } from "@/lib/utils";
-import {
-  loadScenarioComments,
-  SECTION_LABEL,
-  type CommentEntry,
-} from "@/components/CommentsOverviewPanel";
-
-interface Scenario {
-  id: string;
-  name: string;
-  sort_order: number;
-}
+import { loadScenarioComments } from "@/components/CommentsOverviewPanel";
+import type { ScenarioBundle } from "@/hooks/useAllScenarios";
 
 interface Props {
-  /** Active scenarios from useAllScenarios — ordered by sort_order. */
-  scenarios: Scenario[];
+  /** Active scenarios (full bundles for delta computations). */
+  scenarios: ScenarioBundle[];
   /** Color per scenario column (matches Dashboard). */
   colors: string[];
 }
@@ -31,14 +22,15 @@ const STORAGE_KEY = "execSummary.collapsed.v1";
 
 /**
  * Executive Summary panel on top of the Dashboard. Per scenario:
- * - shows a condensed list of all comments grouped by section
- * - editable free-text narrative persisted in scenarios.executive_summary
- * - whole panel collapsible, persisted per-scenario in localStorage
+ * - AI-generated short summary (manual trigger), comparing the scenario to Steady State.
+ * - Editable manual narrative (auto-saved to scenarios.executive_summary).
+ * Steady State (the baseline / first scenario by sort_order) shows only the narrative.
  */
 export function ExecutiveSummary({ scenarios, colors }: Props) {
   const [loading, setLoading] = useState(true);
-  const [commentsBy, setCommentsBy] = useState<Record<string, CommentEntry[]>>({});
   const [narrativeBy, setNarrativeBy] = useState<Record<string, string>>({});
+  const [aiSummaryBy, setAiSummaryBy] = useState<Record<string, string>>({});
+  const [aiGeneratedAtBy, setAiGeneratedAtBy] = useState<Record<string, string | null>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
@@ -47,27 +39,29 @@ export function ExecutiveSummary({ scenarios, colors }: Props) {
     }
   });
 
-  // Load comments + narrative for all scenarios on mount / when scenario list changes
+  const baseline = scenarios[0]; // first by sort_order = Steady State
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const ids = scenarios.map((s) => s.id);
-      const [{ data: rows }, ...commentLists] = await Promise.all([
-        supabase.from("scenarios").select("id, executive_summary").in("id", ids),
-        ...ids.map((id) => loadScenarioComments(id)),
-      ]);
+      const ids = scenarios.map((s) => s.meta.id);
+      const { data: rows } = await supabase
+        .from("scenarios")
+        .select("id, executive_summary, ai_executive_summary, ai_executive_summary_generated_at")
+        .in("id", ids);
       if (cancelled) return;
       const narrative: Record<string, string> = {};
+      const ai: Record<string, string> = {};
+      const aiAt: Record<string, string | null> = {};
       (rows ?? []).forEach((r: any) => {
         narrative[r.id] = r.executive_summary ?? "";
-      });
-      const map: Record<string, CommentEntry[]> = {};
-      ids.forEach((id, i) => {
-        map[id] = commentLists[i] as CommentEntry[];
+        ai[r.id] = r.ai_executive_summary ?? "";
+        aiAt[r.id] = r.ai_executive_summary_generated_at ?? null;
       });
       setNarrativeBy(narrative);
-      setCommentsBy(map);
+      setAiSummaryBy(ai);
+      setAiGeneratedAtBy(aiAt);
       setLoading(false);
     })();
     return () => {
@@ -85,10 +79,9 @@ export function ExecutiveSummary({ scenarios, colors }: Props) {
     });
   }, []);
 
-  const isOpen = (s: Scenario) => {
-    if (s.id in collapsed) return !collapsed[s.id];
-    // Default: only first scenario (Steady) expanded
-    return s.sort_order === 0 || scenarios[0]?.id === s.id;
+  const isOpen = (s: ScenarioBundle) => {
+    if (s.meta.id in collapsed) return !collapsed[s.meta.id];
+    return s.meta.sort_order === 0 || scenarios[0]?.meta.id === s.meta.id;
   };
 
   return (
@@ -96,22 +89,30 @@ export function ExecutiveSummary({ scenarios, colors }: Props) {
       <div className="px-6 py-4 border-b">
         <h2 className="text-sm font-semibold">Executive Summary</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Dokumenterte tiltak og narrativ per scenario.
+          AI-oppsummering og manuelt narrativ per scenario.
         </p>
       </div>
       <CardContent className="pt-4 pb-5">
         <div className="grid gap-4 md:grid-cols-3">
           {scenarios.map((s, i) => (
             <ScenarioColumn
-              key={s.id}
-              scenario={s}
+              key={s.meta.id}
+              bundle={s}
+              baseline={baseline}
               color={colors[i % colors.length]}
               loading={loading}
-              comments={commentsBy[s.id] ?? []}
-              narrative={narrativeBy[s.id] ?? ""}
-              onNarrativeChange={(v) => setNarrativeBy((p) => ({ ...p, [s.id]: v }))}
+              narrative={narrativeBy[s.meta.id] ?? ""}
+              aiSummary={aiSummaryBy[s.meta.id] ?? ""}
+              aiGeneratedAt={aiGeneratedAtBy[s.meta.id] ?? null}
+              onNarrativeChange={(v) =>
+                setNarrativeBy((p) => ({ ...p, [s.meta.id]: v }))
+              }
+              onAiUpdate={(text, at) => {
+                setAiSummaryBy((p) => ({ ...p, [s.meta.id]: text }));
+                setAiGeneratedAtBy((p) => ({ ...p, [s.meta.id]: at }));
+              }}
               open={isOpen(s)}
-              onOpenChange={(open) => toggleCollapsed(s.id, open)}
+              onOpenChange={(open) => toggleCollapsed(s.meta.id, open)}
             />
           ))}
         </div>
@@ -121,32 +122,31 @@ export function ExecutiveSummary({ scenarios, colors }: Props) {
 }
 
 function ScenarioColumn({
-  scenario,
+  bundle,
+  baseline,
   color,
   loading,
-  comments,
   narrative,
+  aiSummary,
+  aiGeneratedAt,
   onNarrativeChange,
+  onAiUpdate,
   open,
   onOpenChange,
 }: {
-  scenario: Scenario;
+  bundle: ScenarioBundle;
+  baseline: ScenarioBundle | undefined;
   color: string;
   loading: boolean;
-  comments: CommentEntry[];
   narrative: string;
+  aiSummary: string;
+  aiGeneratedAt: string | null;
   onNarrativeChange: (v: string) => void;
+  onAiUpdate: (text: string, at: string) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const grouped = useMemo(() => {
-    return comments.reduce<Record<string, CommentEntry[]>>((acc, e) => {
-      (acc[e.section] = acc[e.section] ?? []).push(e);
-      return acc;
-    }, {});
-  }, [comments]);
-
-  const isEmpty = !loading && comments.length === 0 && !narrative.trim();
+  const isBaseline = !baseline || bundle.meta.id === baseline.meta.id;
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
@@ -158,11 +158,11 @@ function ScenarioColumn({
           >
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-sm font-semibold truncate" style={{ color }}>
-                {scenario.name}
+                {bundle.meta.name}
               </span>
-              {!loading && comments.length > 0 && (
+              {isBaseline && (
                 <span className="text-[10px] rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground">
-                  {comments.length}
+                  baseline
                 </span>
               )}
             </div>
@@ -175,28 +175,23 @@ function ScenarioColumn({
           <div className="px-3 pb-3 pt-1 space-y-3">
             {loading ? (
               <Skeleton className="h-24 w-full" />
-            ) : isEmpty ? (
-              <p className="text-xs text-muted-foreground italic py-3">
-                Ingen kommentarer eller oppsummering enda. Klikk på forutsetninger for å legge til kommentarer, eller fyll inn oppsummeringen.
-              </p>
             ) : (
               <>
-                {comments.length > 0 && (
-                  <CommentsList grouped={grouped} />
+                {!isBaseline && baseline && (
+                  <AiSummaryBlock
+                    bundle={bundle}
+                    baseline={baseline}
+                    aiSummary={aiSummary}
+                    aiGeneratedAt={aiGeneratedAt}
+                    onUpdate={onAiUpdate}
+                  />
                 )}
                 <NarrativeEditor
-                  scenarioId={scenario.id}
+                  scenarioId={bundle.meta.id}
                   value={narrative}
                   onChange={onNarrativeChange}
                 />
               </>
-            )}
-            {isEmpty && (
-              <NarrativeEditor
-                scenarioId={scenario.id}
-                value={narrative}
-                onChange={onNarrativeChange}
-              />
             )}
           </div>
         </CollapsibleContent>
@@ -205,40 +200,121 @@ function ScenarioColumn({
   );
 }
 
-function CommentsList({ grouped }: { grouped: Record<string, CommentEntry[]> }) {
-  const [showAll, setShowAll] = useState<Record<string, boolean>>({});
-  const MAX = 5;
+function AiSummaryBlock({
+  bundle,
+  baseline,
+  aiSummary,
+  aiGeneratedAt,
+  onUpdate,
+}: {
+  bundle: ScenarioBundle;
+  baseline: ScenarioBundle;
+  aiSummary: string;
+  aiGeneratedAt: string | null;
+  onUpdate: (text: string, at: string) => void;
+}) {
+  const [generating, setGenerating] = useState(false);
+
+  const generate = useCallback(async () => {
+    setGenerating(true);
+    try {
+      // Collect comments for this scenario
+      const comments = await loadScenarioComments(bundle.meta.id);
+
+      // Compute totals + top category deltas vs baseline
+      const totals_by_year = bundle.result.totals.by_year;
+      const baseline_totals_by_year = baseline.result.totals.by_year;
+
+      const years = Object.keys(totals_by_year).map(Number).sort();
+      const lastYear = years[years.length - 1];
+
+      const baseCats = baseline.result.totals.by_category;
+      const myCats = bundle.result.totals.by_category;
+      const allCatNames = new Set([...Object.keys(baseCats), ...Object.keys(myCats)]);
+      const top_category_deltas: { category: string; year: number; delta: number }[] = [];
+      for (const cat of allCatNames) {
+        const a = Number(myCats[cat]?.[lastYear] ?? 0);
+        const b = Number(baseCats[cat]?.[lastYear] ?? 0);
+        const d = a - b;
+        if (Math.abs(d) > 100) {
+          top_category_deltas.push({ category: cat, year: lastYear, delta: d });
+        }
+      }
+      top_category_deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+      const { data, error } = await supabase.functions.invoke("executive-summary", {
+        body: {
+          scenario_name: bundle.meta.name,
+          baseline_name: baseline.meta.name,
+          comments: comments.map((c) => ({ section: c.section, label: c.label, comment: c.comment })),
+          totals_by_year,
+          baseline_totals_by_year,
+          top_category_deltas: top_category_deltas.slice(0, 5),
+        },
+      });
+      if (error) throw error;
+      const summary = (data as any)?.summary as string | undefined;
+      if (!summary) throw new Error("Tomt AI-svar");
+
+      const at = new Date().toISOString();
+      const { error: upErr } = await supabase
+        .from("scenarios")
+        .update({
+          ai_executive_summary: summary,
+          ai_executive_summary_generated_at: at,
+        } as any)
+        .eq("id", bundle.meta.id);
+      if (upErr) throw upErr;
+
+      onUpdate(summary, at);
+      sonnerToast.success("AI-oppsummering generert", { duration: 1500, position: "bottom-right" });
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      sonnerToast.error("Kunne ikke generere", { description: msg });
+    } finally {
+      setGenerating(false);
+    }
+  }, [bundle, baseline, onUpdate]);
+
+  const hasSummary = !!aiSummary.trim();
+
   return (
-    <div className="space-y-3">
-      {Object.entries(grouped).map(([section, items]) => {
-        const expanded = showAll[section];
-        const visible = expanded ? items : items.slice(0, MAX);
-        return (
-          <div key={section}>
-            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1">
-              <MessageSquare className="h-3 w-3" />
-              {SECTION_LABEL[section] ?? section}
-              <span className="text-muted-foreground/70">({items.length})</span>
-            </h4>
-            <ul className="space-y-1">
-              {visible.map((e, i) => (
-                <li key={i} className="text-[11px] leading-snug">
-                  <span className="text-muted-foreground">{e.label}:</span>{" "}
-                  <span className="text-foreground">{e.comment}</span>
-                </li>
-              ))}
-            </ul>
-            {!expanded && items.length > MAX && (
-              <button
-                className="mt-1 text-[10px] text-primary hover:underline"
-                onClick={() => setShowAll((p) => ({ ...p, [section]: true }))}
-              >
-                Vis alle {items.length} kommentarer →
-              </button>
-            )}
-          </div>
-        );
-      })}
+    <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5">
+      <div className="flex items-center justify-between mb-1.5 gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-primary flex items-center gap-1">
+          <Sparkles className="h-3 w-3" />
+          AI-oppsummering
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-[10px]"
+          onClick={generate}
+          disabled={generating}
+        >
+          {generating ? (
+            <RotateCw className="h-3 w-3 mr-1 animate-spin" />
+          ) : (
+            <Sparkles className="h-3 w-3 mr-1" />
+          )}
+          {hasSummary ? "Generer på nytt" : "Generer oppsummering"}
+        </Button>
+      </div>
+      {hasSummary ? (
+        <p className="text-xs italic text-foreground/90 whitespace-pre-wrap leading-relaxed">
+          {aiSummary}
+        </p>
+      ) : (
+        <p className="text-xs italic text-muted-foreground">
+          Klikk «Generer oppsummering» for å lage en kort AI-tekst som forklarer hvordan dette
+          scenarioet skiller seg fra {baseline.meta.name}.
+        </p>
+      )}
+      {aiGeneratedAt && hasSummary && (
+        <div className="mt-1.5 text-[10px] text-muted-foreground">
+          Generert {new Date(aiGeneratedAt).toLocaleString("nb-NO")}
+        </div>
+      )}
     </div>
   );
 }
@@ -273,7 +349,7 @@ function NarrativeEditor({
         sonnerToast.error("Kunne ikke lagre", { description: error.message });
       } else {
         onChange(next);
-        sonnerToast.success("Oppsummering lagret", { duration: 1500, position: "bottom-right" });
+        sonnerToast.success("Narrativ lagret", { duration: 1500, position: "bottom-right" });
       }
     },
     [scenarioId, onChange],
@@ -320,14 +396,14 @@ function NarrativeEditor({
           }}
           autoFocus
           rows={6}
-          placeholder="Skriv en oppsummering av dette scenarioet – hvilke tiltak, hva forventet effekt, hvilke risikoer..."
+          placeholder="Skriv en manuell oppsummering..."
           className="text-xs min-h-[120px]"
         />
       ) : draft.trim() ? (
         <p className="text-xs whitespace-pre-wrap text-foreground/90">{draft}</p>
       ) : (
         <p className="text-xs italic text-muted-foreground">
-          Skriv en oppsummering av dette scenarioet – hvilke tiltak, hva forventet effekt, hvilke risikoer...
+          Skriv en manuell oppsummering...
         </p>
       )}
     </div>
