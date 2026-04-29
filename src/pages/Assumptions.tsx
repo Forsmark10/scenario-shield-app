@@ -1606,9 +1606,9 @@ function SectionNearshoring({ data, scenario, patch }: { data: AllData; scenario
                   return (
                     <td key={y} className="px-1 py-1">
                       <CellWithComment
-                        comment={row?.comment}
-                        updatedAt={row?.comment_updated_at}
-                        updatedBy={row?.comment_updated_by}
+                        comment={row?.comment_rate}
+                        updatedAt={row?.comment_rate_updated_at}
+                        updatedBy={row?.comment_rate_updated_by}
                         onSaveComment={(next) => upsertFxComment(y, next)}
                         label={`EUR/NOK-kurs ${y}`}
                       >
