@@ -788,8 +788,8 @@ function WaterfallChart({
               : b.raw < 0
                 ? COLOR_TEXT_DEC
                 : COLOR_TEXT_INC;
-            const labelY = yTop - 7;
-            const xLabelY = H - PAD_B + 18;
+            const labelY = yTop - 5;
+            const xLabelY = H - PAD_B + 14;
             const isActive = activeBar?.name === b.name && activeBar?.type === b.type;
             return (
               <g
