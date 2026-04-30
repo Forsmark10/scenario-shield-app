@@ -220,31 +220,41 @@ function AiSummaryBlock({
       // Collect comments for this scenario
       const comments = await loadScenarioComments(bundle.meta.id);
 
-      // Compute totals + top category deltas vs baseline
       const totals_by_year = bundle.result.totals.by_year;
-      const baseline_totals_by_year = baseline.result.totals.by_year;
+      const baseline_totals_by_year = baseline?.result.totals.by_year ?? {};
 
       const years = Object.keys(totals_by_year).map(Number).sort();
       const lastYear = years[years.length - 1];
 
-      const baseCats = baseline.result.totals.by_category;
-      const myCats = bundle.result.totals.by_category;
-      const allCatNames = new Set([...Object.keys(baseCats), ...Object.keys(myCats)]);
       const top_category_deltas: { category: string; year: number; delta: number }[] = [];
-      for (const cat of allCatNames) {
-        const a = Number(myCats[cat]?.[lastYear] ?? 0);
-        const b = Number(baseCats[cat]?.[lastYear] ?? 0);
-        const d = a - b;
-        if (Math.abs(d) > 100) {
-          top_category_deltas.push({ category: cat, year: lastYear, delta: d });
+      if (baseline) {
+        const baseCats = baseline.result.totals.by_category;
+        const myCats = bundle.result.totals.by_category;
+        const allCatNames = new Set([...Object.keys(baseCats), ...Object.keys(myCats)]);
+        for (const cat of allCatNames) {
+          const a = Number(myCats[cat]?.[lastYear] ?? 0);
+          const b = Number(baseCats[cat]?.[lastYear] ?? 0);
+          const d = a - b;
+          if (Math.abs(d) > 100) {
+            top_category_deltas.push({ category: cat, year: lastYear, delta: d });
+          }
         }
+        top_category_deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+      } else {
+        // For baseline: use top categories by absolute size in last year
+        const myCats = bundle.result.totals.by_category;
+        for (const cat of Object.keys(myCats)) {
+          const a = Number(myCats[cat]?.[lastYear] ?? 0);
+          if (Math.abs(a) > 100) top_category_deltas.push({ category: cat, year: lastYear, delta: a });
+        }
+        top_category_deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
       }
-      top_category_deltas.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
 
       const { data, error } = await supabase.functions.invoke("executive-summary", {
         body: {
           scenario_name: bundle.meta.name,
-          baseline_name: baseline.meta.name,
+          baseline_name: baseline?.meta.name ?? null,
+          is_baseline: isBaselineCol,
           comments: comments.map((c) => ({ section: c.section, label: c.label, comment: c.comment })),
           totals_by_year,
           baseline_totals_by_year,
@@ -273,7 +283,7 @@ function AiSummaryBlock({
     } finally {
       setGenerating(false);
     }
-  }, [bundle, baseline, onUpdate]);
+  }, [bundle, baseline, isBaselineCol, onUpdate]);
 
   const hasSummary = !!aiSummary.trim();
 
