@@ -47,7 +47,7 @@ const fmtPctSigned = (v: number) => {
 interface BridgeBreakdown {
   label: string;
   value: number;
-  details: Array<{ label: string; value: number; isHeader?: boolean; indent?: boolean }>;
+  details: Array<{ label: string; value: number; isHeader?: boolean; indent?: boolean; isComment?: boolean }>;
 }
 
 function cumFactor(start: number, end: number, rate: (y: number) => number): number {
