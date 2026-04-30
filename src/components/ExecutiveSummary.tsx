@@ -315,8 +315,10 @@ function AiSummaryBlock({
         </p>
       ) : (
         <p className="text-xs italic text-muted-foreground">
-          Klikk «Generer oppsummering» for å lage en kort AI-tekst som forklarer hvordan dette
-          scenarioet skiller seg fra {baseline.meta.name}.
+          Klikk «Generer oppsummering» for å lage en kort AI-tekst som oppsummerer{" "}
+          {isBaselineCol
+            ? `${bundle.meta.name} (baseline) – nivå, utvikling og største kostnadsdrivere.`
+            : `hvordan ${bundle.meta.name} skiller seg fra ${baseline?.meta.name}.`}
         </p>
       )}
       {aiGeneratedAt && hasSummary && (
