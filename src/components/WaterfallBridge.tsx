@@ -47,7 +47,7 @@ const fmtPctSigned = (v: number) => {
 interface BridgeBreakdown {
   label: string;
   value: number;
-  details: Array<{ label: string; value: number; isHeader?: boolean; indent?: boolean }>;
+  details: Array<{ label: string; value: number; isHeader?: boolean; indent?: boolean; isComment?: boolean }>;
 }
 
 function cumFactor(start: number, end: number, rate: (y: number) => number): number {
@@ -333,19 +333,32 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     extConvAmt +
     fteCatAdjAmount + intCatAdjPct;
 
+  // Splitt kategori-justering FTE i positiv (økning) og negativ (besparelse)
+  const fteCatAdjTotal = fteCatAdjAmount + intCatAdjPct;
+  const fteCatAdjInc = fteCatAdjTotal > 0 ? fteCatAdjTotal : 0;
+  const fteCatAdjDec = fteCatAdjTotal < 0 ? fteCatAdjTotal : 0;
+
+  const incTotFte = intIncTot + extInc + nsInc + fteCatAdjInc;
+  const decTotFte = intDecTot + extDec + nsDec + extConvAmt + fteCatAdjDec;
+
   const fteDetails: BridgeBreakdown["details"] = [
-    { label: "ØKNINGER", value: intIncTot + extInc + nsInc, isHeader: true },
+    { label: "ØKNINGER", value: incTotFte, isHeader: true },
     { label: "Interne FTE", value: intIncTot, indent: true },
     { label: "Eksterne FTE", value: extInc, indent: true },
     { label: "Nearshoring", value: nsInc, indent: true },
-    { label: "BESPARELSER", value: intDecTot + extDec + nsDec + extConvAmt, isHeader: true },
+  ];
+  if (fteCatAdjInc !== 0) {
+    fteDetails.push({ label: "Kategori-justering FTE", value: fteCatAdjInc, indent: true });
+  }
+  fteDetails.push(
+    { label: "BESPARELSER", value: decTotFte, isHeader: true },
     { label: "Interne FTE", value: intDecTot, indent: true },
     { label: "Eksterne FTE", value: extDec, indent: true },
     { label: "Nearshoring", value: nsDec, indent: true },
-    { label: "Konvertering (ekstern reduksjon)", value: extConvAmt, indent: true },
-  ];
-  if (fteCatAdjAmount !== 0 || intCatAdjPct !== 0) {
-    fteDetails.push({ label: "Kategori-justering FTE (tNOK + %)", value: fteCatAdjAmount + intCatAdjPct, indent: true });
+    { label: "Konvertering (ekstern red.)", value: extConvAmt, indent: true },
+  );
+  if (fteCatAdjDec !== 0) {
+    fteDetails.push({ label: "Kategori-justering FTE", value: fteCatAdjDec, indent: true });
   }
   fteDetails.push({ label: "NETTO", value: fteNet, isHeader: true });
 
@@ -440,6 +453,22 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   let centralRedAmtInc = 0, centralRedAmtDec = 0;
   if (centralRedAmt > 0) centralRedAmtInc = centralRedAmt; else centralRedAmtDec = centralRedAmt;
 
+  // Kommentarer for sentrale reduksjoner (hentes fra cellene i Sentrale drivere)
+  const centralRedPctComments: string[] = [];
+  const centralRedAmtComments: string[] = [];
+  for (let Y = 2027; Y <= N; Y++) {
+    const r = inputs.central_assumptions.find((g) => g.year === Y) as any;
+    if (!r) continue;
+    const cmt = r.comment as string | null | undefined;
+    const cmtAmt = r.comment_amount as string | null | undefined;
+    if ((r.central_reduction_pct ?? 0) !== 0 && cmt && !centralRedPctComments.includes(cmt)) {
+      centralRedPctComments.push(cmt);
+    }
+    if ((r.central_reduction_amount_tnok ?? 0) !== 0 && cmtAmt && !centralRedAmtComments.includes(cmtAmt)) {
+      centralRedAmtComments.push(cmtAmt);
+    }
+  }
+
   const incTot =
     Object.values(incByCat).reduce((a, b) => a + b, 0) + centralRedPctInc + centralRedAmtInc;
   const decTot =
@@ -449,11 +478,17 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   Object.entries(incByCat).forEach(([cat, v]) => {
     incDetails.push({ label: cat, value: v });
     (commentByCat[cat] ?? []).forEach((c) =>
-      incDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
+      incDetails.push({ label: c, value: 0, isComment: true }),
     );
   });
-  if (centralRedPctInc !== 0) incDetails.push({ label: "Sentral reduksjon %", value: centralRedPctInc });
-  if (centralRedAmtInc !== 0) incDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtInc });
+  if (centralRedPctInc !== 0) {
+    incDetails.push({ label: "Sentral reduksjon %", value: centralRedPctInc });
+    centralRedPctComments.forEach((c) => incDetails.push({ label: c, value: 0, isComment: true }));
+  }
+  if (centralRedAmtInc !== 0) {
+    incDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtInc });
+    centralRedAmtComments.forEach((c) => incDetails.push({ label: c, value: 0, isComment: true }));
+  }
   if (incDetails.length === 0) incDetails.push({ label: "Ingen positive justeringer", value: 0 });
   else incDetails.push({ label: "SUM", value: incTot, isHeader: true });
 
@@ -461,11 +496,17 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   Object.entries(decByCat).forEach(([cat, v]) => {
     decDetails.push({ label: cat, value: v });
     (commentByCat[cat] ?? []).forEach((c) =>
-      decDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
+      decDetails.push({ label: c, value: 0, isComment: true }),
     );
   });
-  if (centralRedPctDec !== 0) decDetails.push({ label: "Sentral reduksjon %", value: centralRedPctDec });
-  if (centralRedAmtDec !== 0) decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtDec });
+  if (centralRedPctDec !== 0) {
+    decDetails.push({ label: "Sentral reduksjon %", value: centralRedPctDec });
+    centralRedPctComments.forEach((c) => decDetails.push({ label: c, value: 0, isComment: true }));
+  }
+  if (centralRedAmtDec !== 0) {
+    decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtDec });
+    centralRedAmtComments.forEach((c) => decDetails.push({ label: c, value: 0, isComment: true }));
+  }
   if (decDetails.length === 0) decDetails.push({ label: "Ingen besparelser", value: 0 });
   else decDetails.push({ label: "SUM", value: decTot, isHeader: true });
 
@@ -762,6 +803,27 @@ function DrilldownTooltip({
                 >
                   <span>{d.label}</span>
                   <span>{fmtParen(d.value)}</span>
+                </div>
+              );
+            }
+            if (d.isComment) {
+              return (
+                <div
+                  key={di}
+                  style={{
+                    paddingLeft: 14,
+                    color: "#94a3b8",
+                    fontStyle: "italic",
+                    fontSize: 10.5,
+                    fontFamily: "Inter, system-ui, sans-serif",
+                    whiteSpace: "normal",
+                    maxWidth: 360,
+                    lineHeight: 1.4,
+                    paddingTop: 1,
+                    paddingBottom: 2,
+                  }}
+                >
+                  “{d.label}”
                 </div>
               );
             }

@@ -1,5 +1,5 @@
 // Edge function: Generate AI executive summary for a scenario.
-// Input: { scenario_name, baseline_name, comments[], totals_by_year, baseline_totals_by_year, top_category_deltas[] }
+// Input: { scenario_name, baseline_name, is_baseline, comments[], totals_by_year, baseline_totals_by_year, top_category_deltas[] }
 // Output: { summary: string }
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -10,7 +10,19 @@ const corsHeaders = {
 };
 
 const SYSTEM_PROMPT =
-  "Du er en FP&A-rådgiver. Skriv en kort executive summary (3–5 setninger) på norsk som forklarer hva som kjennetegner dette scenarioet sammenlignet med baseline (Steady State), hvilke hovedtiltak som er lagt inn, og hva netto-effekten er. Vær konkret med tall (MNOK eller %). Ikke bruk punktliste – kun løpende prosa. Ikke gjenta tallene fra konteksten ord-for-ord; sammenfatt.";
+  `Du er CFO-rådgiver. Skriv en knivskarp executive summary på norsk for en toppledergruppe.
+
+KRAV:
+- Maks 3-4 setninger. Direkte, konkret, datadrevet.
+- Start med nøkkeltallet: total endring i MNOK og %.
+- Trekk ut 2-3 største drivere med tall i MNOK.
+- Bruk tegnene "−" for reduksjon og "+" for økning. Tall med komma som desimal (norsk).
+- Skriv som en finansrapport, ikke som AI. Aktiv stemme.
+
+FORBUDTE ORD/FRASER: "demonstrerer", "primært gjennom", "forventes å levere", "viser at", "indikerer", "i lys av", "det er verdt å merke seg", "betydelig", "vesentlig" (med mindre helt nødvendig).
+
+EKSEMPEL PÅ ØNSKET STIL:
+"Moderate Saving gir en netto reduksjon på 19,4 MNOK (−3,9 %) i 2027, økende til −65,1 MNOK (−10,6 %) i 2031. Største drivere er ansettelsesstopp og nearshoring (−32 MNOK), reforhandling av eksterne avtaler (−18 MNOK) og IT-prisreduksjoner (−8 MNOK). Capex reduseres med 40 % gjennom utfasing av EOL-hardware."`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -23,6 +35,7 @@ serve(async (req) => {
     const {
       scenario_name,
       baseline_name = "Steady State",
+      is_baseline = false,
       comments = [],
       totals_by_year = {},
       baseline_totals_by_year = {},
@@ -40,23 +53,43 @@ serve(async (req) => {
       `${(n / 1000).toLocaleString("nb-NO", { maximumFractionDigits: 1 })} MNOK`;
 
     const years = Object.keys(totals_by_year).map(Number).sort();
-    const deltaLines = years
-      .map((y) => {
-        const a = Number(totals_by_year[y] ?? 0);
-        const b = Number(baseline_totals_by_year[y] ?? 0);
-        const d = a - b;
-        const pct = b ? (d / b) * 100 : 0;
-        return `  ${y}: ${fmt(a)} (vs baseline ${fmt(b)}, Δ ${d >= 0 ? "+" : ""}${fmt(d)} / ${pct.toFixed(1)}%)`;
-      })
-      .join("\n");
+
+    let trendBlock = "";
+    if (is_baseline) {
+      // Baseline: show trajectory year-over-year vs first year
+      const firstYear = years[0];
+      const firstVal = Number(totals_by_year[firstYear] ?? 0);
+      trendBlock = years
+        .map((y) => {
+          const a = Number(totals_by_year[y] ?? 0);
+          const d = a - firstVal;
+          const pct = firstVal ? (d / firstVal) * 100 : 0;
+          return `  ${y}: ${fmt(a)} (vs ${firstYear}: ${d >= 0 ? "+" : ""}${fmt(d)} / ${pct.toFixed(1)}%)`;
+        })
+        .join("\n");
+    } else {
+      trendBlock = years
+        .map((y) => {
+          const a = Number(totals_by_year[y] ?? 0);
+          const b = Number(baseline_totals_by_year[y] ?? 0);
+          const d = a - b;
+          const pct = b ? (d / b) * 100 : 0;
+          return `  ${y}: ${fmt(a)} (vs baseline ${fmt(b)}, Δ ${d >= 0 ? "+" : ""}${fmt(d)} / ${pct.toFixed(1)}%)`;
+        })
+        .join("\n");
+    }
+
+    const catHeader = is_baseline
+      ? "STØRSTE KOSTNADSKATEGORIER (siste år):"
+      : "STØRSTE KATEGORI-AVVIK (vs baseline):";
 
     const catLines = (top_category_deltas as any[])
       .slice(0, 5)
       .map(
         (c) =>
-          `  ${c.category}: Δ ${Number(c.delta) >= 0 ? "+" : ""}${fmt(Number(c.delta))} i ${c.year}`,
+          `  ${c.category}: ${Number(c.delta) >= 0 ? "+" : ""}${fmt(Number(c.delta))} i ${c.year}`,
       )
-      .join("\n") || "  (ingen vesentlige avvik)";
+      .join("\n") || "  (ingen data)";
 
     const commentLines =
       (comments as any[])
@@ -64,19 +97,32 @@ serve(async (req) => {
         .map((c) => `  - [${c.section}] ${c.label}: ${c.comment}`)
         .join("\n") || "  (ingen kommentarer registrert)";
 
-    const userMsg = `SCENARIO: ${scenario_name}
-BASELINE: ${baseline_name}
+    const userMsg = is_baseline
+      ? `SCENARIO (BASELINE): ${scenario_name}
 
-TOTAL PER ÅR:
-${deltaLines || "  (ingen tall tilgjengelig)"}
+UTVIKLING PER ÅR:
+${trendBlock || "  (ingen tall tilgjengelig)"}
 
-STØRSTE KATEGORI-AVVIK (vs baseline):
+${catHeader}
 ${catLines}
 
 KOMMENTARER LAGT INN AV BRUKEREN:
 ${commentLines}
 
-Skriv en kort executive summary (3–5 setninger) på norsk basert på dette.`;
+Skriv en knivskarp executive summary (3-4 setninger) som beskriver baseline-utviklingen: nivå, vekst og største kostnadskategorier. Følg eksempel-stilen i system-prompten.`
+      : `SCENARIO: ${scenario_name}
+BASELINE: ${baseline_name}
+
+TOTAL PER ÅR (vs baseline):
+${trendBlock || "  (ingen tall tilgjengelig)"}
+
+${catHeader}
+${catLines}
+
+KOMMENTARER LAGT INN AV BRUKEREN:
+${commentLines}
+
+Skriv en knivskarp executive summary (3-4 setninger) som forklarer hvordan dette scenarioet skiller seg fra baseline. Følg eksempel-stilen i system-prompten.`;
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
