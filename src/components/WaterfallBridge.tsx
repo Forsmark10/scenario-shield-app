@@ -457,13 +457,15 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const centralRedPctComments: string[] = [];
   const centralRedAmtComments: string[] = [];
   for (let Y = 2027; Y <= N; Y++) {
-    const r = inputs.central_assumptions.find((g) => g.year === Y);
+    const r = inputs.central_assumptions.find((g) => g.year === Y) as any;
     if (!r) continue;
-    if ((r.central_reduction_pct ?? 0) !== 0 && r.comment && !centralRedPctComments.includes(r.comment)) {
-      centralRedPctComments.push(r.comment);
+    const cmt = r.comment as string | null | undefined;
+    const cmtAmt = r.comment_amount as string | null | undefined;
+    if ((r.central_reduction_pct ?? 0) !== 0 && cmt && !centralRedPctComments.includes(cmt)) {
+      centralRedPctComments.push(cmt);
     }
-    if ((r.central_reduction_amount_tnok ?? 0) !== 0 && r.comment_amount && !centralRedAmtComments.includes(r.comment_amount)) {
-      centralRedAmtComments.push(r.comment_amount);
+    if ((r.central_reduction_amount_tnok ?? 0) !== 0 && cmtAmt && !centralRedAmtComments.includes(cmtAmt)) {
+      centralRedAmtComments.push(cmtAmt);
     }
   }
 
