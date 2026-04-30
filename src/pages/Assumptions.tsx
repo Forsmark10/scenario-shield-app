@@ -806,8 +806,12 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
 
   const upsertCommentField = async (
     year: number,
-    commentField: "comment" | "comment_amount" | "comment_rate",
-    atField: "comment_updated_at" | "comment_amount_updated_at" | "comment_rate_updated_at",
+    commentField: "comment" | "comment_amount" | "comment_rate" | "comment_price",
+    atField:
+      | "comment_updated_at"
+      | "comment_amount_updated_at"
+      | "comment_rate_updated_at"
+      | "comment_price_updated_at",
     value: string | null,
   ) => {
     const existing = get(year);
@@ -836,9 +840,17 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
     max?: number;
     errorHint?: string;
     info?: string;
-    commentField: "comment" | "comment_amount" | "comment_rate";
-    atField: "comment_updated_at" | "comment_amount_updated_at" | "comment_rate_updated_at";
-    byField: "comment_updated_by" | "comment_amount_updated_by" | "comment_rate_updated_by";
+    commentField: "comment" | "comment_amount" | "comment_rate" | "comment_price";
+    atField:
+      | "comment_updated_at"
+      | "comment_amount_updated_at"
+      | "comment_rate_updated_at"
+      | "comment_price_updated_at";
+    byField:
+      | "comment_updated_by"
+      | "comment_amount_updated_by"
+      | "comment_rate_updated_by"
+      | "comment_price_updated_by";
   };
 
   const drivers: DriverDef[] = [
@@ -847,7 +859,7 @@ function SectionCentral({ data, scenario, patch }: { data: AllData; scenario: Sc
       label: "Sentral prisvekst %",
       kind: "pct",
       info: "Underliggende prisøkning i EUR-avtalen, kumulativt år for år. Negativ verdi tillatt (deflasjon).",
-      commentField: "comment", atField: "comment_updated_at", byField: "comment_updated_by",
+      commentField: "comment_price", atField: "comment_price_updated_at", byField: "comment_price_updated_by",
     },
     {
       key: "central_reduction_pct",
