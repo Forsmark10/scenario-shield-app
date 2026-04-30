@@ -91,8 +91,8 @@ serve(async (req) => {
     }
 
     const catHeader = is_baseline
-      ? "STØRSTE KOSTNADSKATEGORIER (siste år):"
-      : "STØRSTE KATEGORI-AVVIK (vs baseline):";
+      ? "STØRSTE KOSTNADSKATEGORIER (siste år, kun til kontekst – ikke gjenta tall):"
+      : "STØRSTE KATEGORI-AVVIK (vs Steady State, kun til kontekst):";
 
     const catLines = (top_category_deltas as any[])
       .slice(0, 5)
@@ -109,31 +109,31 @@ serve(async (req) => {
         .join("\n") || "  (ingen kommentarer registrert)";
 
     const userMsg = is_baseline
-      ? `SCENARIO (BASELINE): ${scenario_name}
+      ? `SCENARIO (Steady State – videreføring av drift uten aktive tiltak): ${scenario_name}
 
-UTVIKLING PER ÅR:
+KONTEKST – utvikling per år (IKKE gjenta disse totaltallene i svaret):
 ${trendBlock || "  (ingen tall tilgjengelig)"}
 
 ${catHeader}
 ${catLines}
 
-KOMMENTARER LAGT INN AV BRUKEREN:
+KOMMENTARER LAGT INN PÅ ASSUMPTIONS (bruk disse aktivt – de forklarer HVORFOR):
 ${commentLines}
 
-Skriv en knivskarp executive summary (3-4 setninger) som beskriver baseline-utviklingen: nivå, vekst og største kostnadskategorier. Følg eksempel-stilen i system-prompten.`
+Skriv en knivskarp executive summary (3-4 setninger) som beskriver hva som DRIVER kostnadsutviklingen i Steady State: lønnsvekst-%, prisvekst-%, FTE-endringer (antall + nivå), nearshore-ressurser, kategori-justeringer (med kommentarer der relevant), og avskrivninger. IKKE start med totalkostnad eller total endring – de står allerede i dashboardet. IKKE bruk ordet "baseline". Følg stilen i system-prompten.`
       : `SCENARIO: ${scenario_name}
-BASELINE: ${baseline_name}
+SAMMENLIGNES MED: Steady State
 
-TOTAL PER ÅR (vs baseline):
+KONTEKST – total per år vs Steady State (IKKE gjenta disse totaltallene i svaret):
 ${trendBlock || "  (ingen tall tilgjengelig)"}
 
 ${catHeader}
 ${catLines}
 
-KOMMENTARER LAGT INN AV BRUKEREN:
+KOMMENTARER LAGT INN PÅ ASSUMPTIONS (bruk disse aktivt – de forklarer HVILKE TILTAK):
 ${commentLines}
 
-Skriv en knivskarp executive summary (3-4 setninger) som forklarer hvordan dette scenarioet skiller seg fra baseline. Følg eksempel-stilen i system-prompten.`;
+Skriv en knivskarp executive summary (3-4 setninger) som forklarer hvilke TILTAK og BESLUTNINGER som skiller dette scenarioet fra Steady State: antall FTE-er som reduseres/konverteres, hvilke avtaler som reforhandles, hvilke prisreduksjoner som er antatt. Vis effekten i både antall og MNOK. Skriv "Steady State" – aldri "baseline". IKKE start med totalkostnad. Følg stilen i system-prompten.`;
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
