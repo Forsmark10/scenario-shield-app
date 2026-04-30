@@ -12,17 +12,28 @@ const corsHeaders = {
 const SYSTEM_PROMPT =
   `Du er CFO-rådgiver. Skriv en knivskarp executive summary på norsk for en toppledergruppe.
 
-KRAV:
-- Maks 3-4 setninger. Direkte, konkret, datadrevet.
-- Start med nøkkeltallet: total endring i MNOK og %.
-- Trekk ut 2-3 største drivere med tall i MNOK.
-- Bruk tegnene "−" for reduksjon og "+" for økning. Tall med komma som desimal (norsk).
-- Skriv som en finansrapport, ikke som AI. Aktiv stemme.
+GENERELLE KRAV (gjelder ALLE scenarioer):
+- Maks 3-4 setninger. Direkte, konkret, datadrevet. Skriv på norsk.
+- ALDRI start med å gjenta totaltall (totalkostnad, total endring i MNOK/%) – brukeren ser disse i dashboardet.
+- ALDRI bruk ordet "baseline" om Steady State – det er forvirrende fordi FC 2026 allerede kalles Baseline i dashboardet. Skriv "Steady State" når du refererer til videreført drift.
+- Fokuser på de underliggende DRIVERNE og FORUTSETNINGENE – ikke bare beløpene. Hva skaper endringen? Hvilke beslutninger ligger bak?
+- Trekk inn kommentarer fra assumptions der de finnes – de forklarer HVORFOR en justering er gjort.
+- Bruk antall (FTE-er, konverteringer, antall avtaler) i tillegg til MNOK-effekt.
+- Bruk "−" for reduksjon, "+" for økning. Komma som desimal (norsk).
+- Skriv som en CFO-presentasjon, ikke som AI. Aktiv stemme.
 
-FORBUDTE ORD/FRASER: "demonstrerer", "primært gjennom", "forventes å levere", "viser at", "indikerer", "i lys av", "det er verdt å merke seg", "betydelig", "vesentlig" (med mindre helt nødvendig).
+FORBUDTE ORD/FRASER: "demonstrerer", "primært gjennom", "forventes å levere", "viser at", "indikerer", "i lys av", "det er verdt å merke seg", "betydelig", "vesentlig", "bidrar til en betydelig innstramming", "sammenlignet med baseline".
 
-EKSEMPEL PÅ ØNSKET STIL:
-"Moderate Saving gir en netto reduksjon på 19,4 MNOK (−3,9 %) i 2027, økende til −65,1 MNOK (−10,6 %) i 2031. Største drivere er ansettelsesstopp og nearshoring (−32 MNOK), reforhandling av eksterne avtaler (−18 MNOK) og IT-prisreduksjoner (−8 MNOK). Capex reduseres med 40 % gjennom utfasing av EOL-hardware."`;
+REGLER FOR STEADY STATE (videreføring uten aktive tiltak):
+- Fokuser på hva som driver kostnadsveksten: lønnsvekst-%, prisvekst-%, FTE-økninger (hvor mange, hvilket nivå), kategori-justeringer med kommentarer, avskrivninger.
+- IKKE sammenlign med andre scenarioer.
+- Eksempel på ønsket stil: "Kostnadsveksten drives av 4 % årlig lønnsvekst og 3 % prisvekst på lokale kostnader, kombinert med en netto økning på 11 interne FTE (Medium) og 3 nearshore-ressurser over perioden. IT-kostnader holdes flate gjennom en 2 % reforhandling av Dynamics-avtalen. Avskrivninger faller med 31,5 MNOK grunnet utfasing av eksisterende HW/SW uten full reinvestering."
+
+REGLER FOR MODERATE SAVING / AGGRESSIVE SAVING:
+- Sammenlign ALLTID eksplisitt mot Steady State (skriv "Steady State", ikke "baseline").
+- Fokuser på TILTAK og BESLUTNINGER: hvor mange FTE-er reduseres, hvor mange konverteres fra ekstern til intern, hvilke avtaler reforhandles, hvilke kommentarer er lagt inn.
+- Vis effekten i både antall og MNOK.
+- Eksempel på ønsket stil: "Sammenlignet med Steady State reduseres arbeidsstyrken med 4 interne og 3 eksterne FTE, og 6 eksterne konverteres til interne over 2027–2029. Reforhandling av IT-avtaler gir 5 % prisreduksjon fra 2027. Netto besparelse versus Steady State er 65 MNOK i 2031, der FTE-tiltak utgjør 40 MNOK og prisreduksjoner 15 MNOK."`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -80,8 +91,8 @@ serve(async (req) => {
     }
 
     const catHeader = is_baseline
-      ? "STØRSTE KOSTNADSKATEGORIER (siste år):"
-      : "STØRSTE KATEGORI-AVVIK (vs baseline):";
+      ? "STØRSTE KOSTNADSKATEGORIER (siste år, kun til kontekst – ikke gjenta tall):"
+      : "STØRSTE KATEGORI-AVVIK (vs Steady State, kun til kontekst):";
 
     const catLines = (top_category_deltas as any[])
       .slice(0, 5)
@@ -98,31 +109,31 @@ serve(async (req) => {
         .join("\n") || "  (ingen kommentarer registrert)";
 
     const userMsg = is_baseline
-      ? `SCENARIO (BASELINE): ${scenario_name}
+      ? `SCENARIO (Steady State – videreføring av drift uten aktive tiltak): ${scenario_name}
 
-UTVIKLING PER ÅR:
+KONTEKST – utvikling per år (IKKE gjenta disse totaltallene i svaret):
 ${trendBlock || "  (ingen tall tilgjengelig)"}
 
 ${catHeader}
 ${catLines}
 
-KOMMENTARER LAGT INN AV BRUKEREN:
+KOMMENTARER LAGT INN PÅ ASSUMPTIONS (bruk disse aktivt – de forklarer HVORFOR):
 ${commentLines}
 
-Skriv en knivskarp executive summary (3-4 setninger) som beskriver baseline-utviklingen: nivå, vekst og største kostnadskategorier. Følg eksempel-stilen i system-prompten.`
+Skriv en knivskarp executive summary (3-4 setninger) som beskriver hva som DRIVER kostnadsutviklingen i Steady State: lønnsvekst-%, prisvekst-%, FTE-endringer (antall + nivå), nearshore-ressurser, kategori-justeringer (med kommentarer der relevant), og avskrivninger. IKKE start med totalkostnad eller total endring – de står allerede i dashboardet. IKKE bruk ordet "baseline". Følg stilen i system-prompten.`
       : `SCENARIO: ${scenario_name}
-BASELINE: ${baseline_name}
+SAMMENLIGNES MED: Steady State
 
-TOTAL PER ÅR (vs baseline):
+KONTEKST – total per år vs Steady State (IKKE gjenta disse totaltallene i svaret):
 ${trendBlock || "  (ingen tall tilgjengelig)"}
 
 ${catHeader}
 ${catLines}
 
-KOMMENTARER LAGT INN AV BRUKEREN:
+KOMMENTARER LAGT INN PÅ ASSUMPTIONS (bruk disse aktivt – de forklarer HVILKE TILTAK):
 ${commentLines}
 
-Skriv en knivskarp executive summary (3-4 setninger) som forklarer hvordan dette scenarioet skiller seg fra baseline. Følg eksempel-stilen i system-prompten.`;
+Skriv en knivskarp executive summary (3-4 setninger) som forklarer hvilke TILTAK og BESLUTNINGER som skiller dette scenarioet fra Steady State: antall FTE-er som reduseres/konverteres, hvilke avtaler som reforhandles, hvilke prisreduksjoner som er antatt. Vis effekten i både antall og MNOK. Skriv "Steady State" – aldri "baseline". IKKE start med totalkostnad. Følg stilen i system-prompten.`;
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
