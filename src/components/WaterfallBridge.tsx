@@ -333,19 +333,32 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     extConvAmt +
     fteCatAdjAmount + intCatAdjPct;
 
+  // Splitt kategori-justering FTE i positiv (økning) og negativ (besparelse)
+  const fteCatAdjTotal = fteCatAdjAmount + intCatAdjPct;
+  const fteCatAdjInc = fteCatAdjTotal > 0 ? fteCatAdjTotal : 0;
+  const fteCatAdjDec = fteCatAdjTotal < 0 ? fteCatAdjTotal : 0;
+
+  const incTotFte = intIncTot + extInc + nsInc + fteCatAdjInc;
+  const decTotFte = intDecTot + extDec + nsDec + extConvAmt + fteCatAdjDec;
+
   const fteDetails: BridgeBreakdown["details"] = [
-    { label: "ØKNINGER", value: intIncTot + extInc + nsInc, isHeader: true },
+    { label: "ØKNINGER", value: incTotFte, isHeader: true },
     { label: "Interne FTE", value: intIncTot, indent: true },
     { label: "Eksterne FTE", value: extInc, indent: true },
     { label: "Nearshoring", value: nsInc, indent: true },
-    { label: "BESPARELSER", value: intDecTot + extDec + nsDec + extConvAmt, isHeader: true },
+  ];
+  if (fteCatAdjInc !== 0) {
+    fteDetails.push({ label: "Kategori-justering FTE", value: fteCatAdjInc, indent: true });
+  }
+  fteDetails.push(
+    { label: "BESPARELSER", value: decTotFte, isHeader: true },
     { label: "Interne FTE", value: intDecTot, indent: true },
     { label: "Eksterne FTE", value: extDec, indent: true },
     { label: "Nearshoring", value: nsDec, indent: true },
-    { label: "Konvertering (ekstern reduksjon)", value: extConvAmt, indent: true },
-  ];
-  if (fteCatAdjAmount !== 0 || intCatAdjPct !== 0) {
-    fteDetails.push({ label: "Kategori-justering FTE (tNOK + %)", value: fteCatAdjAmount + intCatAdjPct, indent: true });
+    { label: "Konvertering (ekstern red.)", value: extConvAmt, indent: true },
+  );
+  if (fteCatAdjDec !== 0) {
+    fteDetails.push({ label: "Kategori-justering FTE", value: fteCatAdjDec, indent: true });
   }
   fteDetails.push({ label: "NETTO", value: fteNet, isHeader: true });
 
