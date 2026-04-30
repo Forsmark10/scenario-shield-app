@@ -453,6 +453,20 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   let centralRedAmtInc = 0, centralRedAmtDec = 0;
   if (centralRedAmt > 0) centralRedAmtInc = centralRedAmt; else centralRedAmtDec = centralRedAmt;
 
+  // Kommentarer for sentrale reduksjoner (hentes fra cellene i Sentrale drivere)
+  const centralRedPctComments: string[] = [];
+  const centralRedAmtComments: string[] = [];
+  for (let Y = 2027; Y <= N; Y++) {
+    const r = inputs.central_assumptions.find((g) => g.year === Y);
+    if (!r) continue;
+    if ((r.central_reduction_pct ?? 0) !== 0 && r.comment && !centralRedPctComments.includes(r.comment)) {
+      centralRedPctComments.push(r.comment);
+    }
+    if ((r.central_reduction_amount_tnok ?? 0) !== 0 && r.comment_amount && !centralRedAmtComments.includes(r.comment_amount)) {
+      centralRedAmtComments.push(r.comment_amount);
+    }
+  }
+
   const incTot =
     Object.values(incByCat).reduce((a, b) => a + b, 0) + centralRedPctInc + centralRedAmtInc;
   const decTot =
@@ -462,11 +476,17 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   Object.entries(incByCat).forEach(([cat, v]) => {
     incDetails.push({ label: cat, value: v });
     (commentByCat[cat] ?? []).forEach((c) =>
-      incDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
+      incDetails.push({ label: c, value: 0, isComment: true }),
     );
   });
-  if (centralRedPctInc !== 0) incDetails.push({ label: "Sentral reduksjon %", value: centralRedPctInc });
-  if (centralRedAmtInc !== 0) incDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtInc });
+  if (centralRedPctInc !== 0) {
+    incDetails.push({ label: "Sentral reduksjon %", value: centralRedPctInc });
+    centralRedPctComments.forEach((c) => incDetails.push({ label: c, value: 0, isComment: true }));
+  }
+  if (centralRedAmtInc !== 0) {
+    incDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtInc });
+    centralRedAmtComments.forEach((c) => incDetails.push({ label: c, value: 0, isComment: true }));
+  }
   if (incDetails.length === 0) incDetails.push({ label: "Ingen positive justeringer", value: 0 });
   else incDetails.push({ label: "SUM", value: incTot, isHeader: true });
 
@@ -474,11 +494,17 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   Object.entries(decByCat).forEach(([cat, v]) => {
     decDetails.push({ label: cat, value: v });
     (commentByCat[cat] ?? []).forEach((c) =>
-      decDetails.push({ label: `  "${c}"`, value: 0, indent: true }),
+      decDetails.push({ label: c, value: 0, isComment: true }),
     );
   });
-  if (centralRedPctDec !== 0) decDetails.push({ label: "Sentral reduksjon %", value: centralRedPctDec });
-  if (centralRedAmtDec !== 0) decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtDec });
+  if (centralRedPctDec !== 0) {
+    decDetails.push({ label: "Sentral reduksjon %", value: centralRedPctDec });
+    centralRedPctComments.forEach((c) => decDetails.push({ label: c, value: 0, isComment: true }));
+  }
+  if (centralRedAmtDec !== 0) {
+    decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtDec });
+    centralRedAmtComments.forEach((c) => decDetails.push({ label: c, value: 0, isComment: true }));
+  }
   if (decDetails.length === 0) decDetails.push({ label: "Ingen besparelser", value: 0 });
   else decDetails.push({ label: "SUM", value: decTot, isHeader: true });
 
