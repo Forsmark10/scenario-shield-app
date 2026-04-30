@@ -806,6 +806,27 @@ function DrilldownTooltip({
                 </div>
               );
             }
+            if (d.isComment) {
+              return (
+                <div
+                  key={di}
+                  style={{
+                    paddingLeft: 14,
+                    color: "#94a3b8",
+                    fontStyle: "italic",
+                    fontSize: 10.5,
+                    fontFamily: "Inter, system-ui, sans-serif",
+                    whiteSpace: "normal",
+                    maxWidth: 360,
+                    lineHeight: 1.4,
+                    paddingTop: 1,
+                    paddingBottom: 2,
+                  }}
+                >
+                  “{d.label}”
+                </div>
+              );
+            }
             return (
               <div
                 key={di}
