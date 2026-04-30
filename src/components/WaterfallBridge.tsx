@@ -429,8 +429,9 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     for (let Y = 2027; Y <= N; Y++) {
       const r = inputs.category_adjustments.find(
         (a) => a.category === l.category && a.year === Y && (a.adjustment_amount_tnok ?? 0) !== 0,
-      );
-      if (r?.comment) addComment(l.category, r.comment);
+      ) as any;
+      const cmt = r?.comment_amount ?? r?.comment;
+      if (cmt) addComment(l.category, cmt);
     }
   }
 
