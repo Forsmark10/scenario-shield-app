@@ -206,12 +206,13 @@ function AiSummaryBlock({
   onUpdate,
 }: {
   bundle: ScenarioBundle;
-  baseline: ScenarioBundle;
+  baseline: ScenarioBundle | null;
   aiSummary: string;
   aiGeneratedAt: string | null;
   onUpdate: (text: string, at: string) => void;
 }) {
   const [generating, setGenerating] = useState(false);
+  const isBaselineCol = baseline === null;
 
   const generate = useCallback(async () => {
     setGenerating(true);
