@@ -177,15 +177,13 @@ function ScenarioColumn({
               <Skeleton className="h-24 w-full" />
             ) : (
               <>
-                {!isBaseline && baseline && (
-                  <AiSummaryBlock
-                    bundle={bundle}
-                    baseline={baseline}
-                    aiSummary={aiSummary}
-                    aiGeneratedAt={aiGeneratedAt}
-                    onUpdate={onAiUpdate}
-                  />
-                )}
+                <AiSummaryBlock
+                  bundle={bundle}
+                  baseline={isBaseline ? null : baseline ?? null}
+                  aiSummary={aiSummary}
+                  aiGeneratedAt={aiGeneratedAt}
+                  onUpdate={onAiUpdate}
+                />
                 <NarrativeEditor
                   scenarioId={bundle.meta.id}
                   value={narrative}
