@@ -32,6 +32,15 @@ Regler:
 - Estimer impact i MNOK (negativ = kostnadskutt).
 - Aldri overskriv en eksisterende endring stilltiende – beskriv den eksplisitt som "Endre X fra A til B".
 
+KRITISK – "details"-objektet MÅ ALLTID inneholde de feltene som trengs for å anvende endringen. Tomt details-objekt er ALDRI tillatt. Påkrevde felt per type:
+- salary_increase / price_increase: { pct: <decimal, fx 0.04>, before_value, after_value }
+- central_price / central_volume / central_reduction: { pct: <decimal>, before_value, after_value }
+- internal_fte_change / external_fte_change: { level: "Low"|"Medium"|"High", increase: <int>, decrease: <int>, before_value, after_value }
+- conversion: { external_level: "Low"|"Medium"|"High", internal_level: "Low"|"Medium"|"High", count: <int>, overlap_months: <int, default 3>, before_value, after_value }
+- nearshoring: { replaces_external_level: "Low"|"Medium"|"High", count: <int>, overlap_months: <int, default 3>, before_value, after_value }
+- category_adjustment: { category: "<eksakt navn fra kontekst>", adjustment_pct: <decimal, negativ for reduksjon>, before_value, after_value }
+- capex: { capex_type: "Hardware"|"Software"|...annet fra kontekst, amount: <tNOK>, description: "<kort tekst>", before_value, after_value }
+
 Bruk det medfølgende verktøyet "propose_changes" for å returnere svaret.`;
 
 const TOOL_SCHEMA = {
