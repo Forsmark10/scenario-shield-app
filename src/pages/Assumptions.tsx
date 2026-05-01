@@ -187,9 +187,61 @@ export default function Assumptions() {
     [setStoredScenario],
   );
 
+  // Mapping fra lokal TableKey til DB-tabellnavn (matcher SCOPED_TABLES i versioning.ts).
+  // nearshoringBase er global (ikke per scenario) og inngår derfor ikke i undo.
+  const TABLE_KEY_TO_DB: Partial<Record<TableKey, string>> = {
+    global: "global_assumptions",
+    central: "central_assumptions",
+    intChanges: "internal_fte_changes",
+    extChanges: "external_fte_changes",
+    conversions: "conversions",
+    nearshoringAdds: "nearshoring_additions",
+    nearshoringChanges: "nearshoring_changes",
+    catAdj: "category_adjustments",
+    capexPlan: "capex_plan",
+  };
+
+  // Bygg en AssumptionsSnapshot fra LOKAL state for et gitt scenario.
+  // Brukes som "før-bilde" når undo-stack pushes – speiler feltene som
+  // restoreAssumptionsSnapshot håndterer.
+  const buildLocalSnapshot = useCallback(
+    (sid: string, source: AllData): AssumptionsSnapshot => {
+      const tables: Record<string, any[]> = {};
+      for (const [key, dbName] of Object.entries(TABLE_KEY_TO_DB) as [TableKey, string][]) {
+        const rows = (source as any)[key] as any[] | undefined;
+        tables[dbName] = (rows ?? []).filter((r) => r?.scenario_id === sid);
+      }
+      return { scenario_id: sid, taken_at: new Date().toISOString(), tables };
+    },
+    [],
+  );
+
+  const pushUndo = useCallback(
+    (sid: string, snap: AssumptionsSnapshot) => {
+      const stack = undoStackRef.current[sid] ?? [];
+      stack.push(snap);
+      if (stack.length > UNDO_LIMIT) stack.shift();
+      undoStackRef.current[sid] = stack;
+      setUndoTick((t) => t + 1);
+    },
+    [],
+  );
+
   const patch = useCallback<Patch>((action) => {
+    // Capture pre-mutation snapshot for undo (basert på lokal state før setData).
+    const sid =
+      (action as any).row?.scenario_id ??
+      (action as any).changes?.scenario_id ??
+      activeScenario;
     setData((prev) => {
       if (!prev) return prev;
+      if (sid) {
+        try {
+          pushUndo(sid, buildLocalSnapshot(sid, prev));
+        } catch (e) {
+          console.warn("[Undo] Kunne ikke ta snapshot", e);
+        }
+      }
       const next = { ...prev } as AllData;
       if (action.type === "setSingleton") {
         (next as any)[action.table] = action.row;
@@ -215,12 +267,40 @@ export default function Assumptions() {
       return next;
     });
     // Trigger auto-versjonering – debounced + 5-min vindu håndteres i hooken.
-    const sid =
-      (action as any).row?.scenario_id ??
-      (action as any).changes?.scenario_id ??
-      activeScenario;
     if (sid) autoVersion.trigger(sid);
-  }, [autoVersion, activeScenario]);
+  }, [autoVersion, activeScenario, buildLocalSnapshot, pushUndo]);
+
+  const handleUndo = useCallback(async () => {
+    if (!activeScenario) return;
+    const stack = undoStackRef.current[activeScenario] ?? [];
+    const snap = stack.pop();
+    if (!snap) return;
+    undoStackRef.current[activeScenario] = stack;
+    setUndoing(true);
+    try {
+      // captureAssumptionsSnapshot henter fra DB (kan avvike litt fra lokal state pga
+      // nylige writes fra subkomponenter). restoreAssumptionsSnapshot bruker delete+insert
+      // og er trygg å kjøre.
+      await restoreAssumptionsSnapshot(snap);
+      sonnerToast.success("Siste endring angret");
+      autoVersion.resetWindow(activeScenario);
+      setUndoTick((t) => t + 1);
+      refresh();
+    } catch (e: any) {
+      console.error("[Undo] Feilet", e);
+      sonnerToast.error("Kunne ikke angre", { description: e?.message ?? String(e) });
+      // Hvis det feilet, push snapshot tilbake så brukeren kan prøve igjen.
+      stack.push(snap);
+      undoStackRef.current[activeScenario] = stack;
+      setUndoTick((t) => t + 1);
+    } finally {
+      setUndoing(false);
+    }
+  }, [activeScenario, autoVersion]);
+
+  const undoCount = activeScenario ? (undoStackRef.current[activeScenario]?.length ?? 0) : 0;
+  // referer til undoTick for å re-rendere når stack endres
+  void undoTick;
 
   const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
 
