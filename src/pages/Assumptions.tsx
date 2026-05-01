@@ -380,10 +380,15 @@ export default function Assumptions() {
                     console.log("[Reset] Start nullstilling for scenario:", sid);
                     try {
                       // Sekvensielle update-calls med .select() for å verifisere antall rader.
+                      // Alle kommentar-felter nullstilles også (krav fra brukeren).
                       const steps: Array<[string, () => any]> = [
                         ["global_assumptions", () =>
                           supabase.from("global_assumptions").update({
                             salary_increase_pct: 0, price_increase_pct: 0, eur_nok_rate: 11.3,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_salary: null, comment_salary_updated_at: null, comment_salary_updated_by: null,
+                            comment_price: null, comment_price_updated_at: null, comment_price_updated_by: null,
+                            comment_rate: null, comment_rate_updated_at: null, comment_rate_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["central_assumptions", () =>
                           supabase.from("central_assumptions").update({
@@ -392,26 +397,42 @@ export default function Assumptions() {
                             central_reduction_pct: 0,
                             central_reduction_amount_tnok: 0,
                             central_eur_nok_rate: 11.3,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_amount: null, comment_amount_updated_at: null, comment_amount_updated_by: null,
+                            comment_rate: null, comment_rate_updated_at: null, comment_rate_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["internal_fte_changes", () =>
                           supabase.from("internal_fte_changes").update({
                             increase: 0, decrease: 0,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_increase: null, comment_increase_updated_at: null, comment_increase_updated_by: null,
+                            comment_decrease: null, comment_decrease_updated_at: null, comment_decrease_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["external_fte_changes", () =>
                           supabase.from("external_fte_changes").update({
                             increase: 0, decrease: 0,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_increase: null, comment_increase_updated_at: null, comment_increase_updated_by: null,
+                            comment_decrease: null, comment_decrease_updated_at: null, comment_decrease_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["nearshoring_changes", () =>
                           supabase.from("nearshoring_changes").update({
                             increase: 0, decrease: 0,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_increase: null, comment_increase_updated_at: null, comment_increase_updated_by: null,
+                            comment_decrease: null, comment_decrease_updated_at: null, comment_decrease_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["category_adjustments", () =>
                           supabase.from("category_adjustments").update({
                             adjustment_pct: 0, adjustment_amount_tnok: 0,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_amount: null, comment_amount_updated_at: null, comment_amount_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["capex_plan (aggregert, amount=0)", () =>
-                          supabase.from("capex_plan").update({ amount: 0 } as any)
-                            .eq("scenario_id", sid).is("description", null).select("id")],
+                          supabase.from("capex_plan").update({
+                            amount: 0,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                          } as any).eq("scenario_id", sid).is("description", null).select("id")],
                       ];
                       for (const [label, fn] of steps) {
                         const { data: rows, error } = await fn();
