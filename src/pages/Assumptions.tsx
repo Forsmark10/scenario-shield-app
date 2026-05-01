@@ -115,6 +115,13 @@ export default function Assumptions() {
   const autoVersion = useAutoVersion();
   const initialFingerprint = useRef<Record<string, string>>({});
 
+  // Undo-stack: per-scenario stack med snapshot tatt RETT FØR siste mutering.
+  // Brukes av "Angre"-knappen for å rulle tilbake siste endring uten å gå via Historikk.
+  const undoStackRef = useRef<Record<string, AssumptionsSnapshot[]>>({});
+  const [undoTick, setUndoTick] = useState(0); // for å re-rendere knapp-state
+  const [undoing, setUndoing] = useState(false);
+  const UNDO_LIMIT = 50;
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
