@@ -122,6 +122,15 @@ export function GoalSeekPanel({ scenarioId, scenarioName, categories, onApplied 
       if (!data || !Array.isArray(data.changes)) {
         throw new Error("Kunne ikke tolke AI-svar, prøv igjen");
       }
+      if (data.changes.length === 0) {
+        toast({
+          title: "Ingen anvendbare forslag",
+          description: "AI-en returnerte forslag som manglet detaljer. Prøv å omformulere målet mer konkret.",
+          variant: "destructive",
+        });
+        setResponse(null);
+        return;
+      }
       setResponse(data as AiResponse);
       setSelected(new Set(data.changes.map((c: AiChange) => c.id)));
     } catch (e: any) {
