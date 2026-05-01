@@ -20,7 +20,7 @@ import { GoalSeekPanel } from "@/components/GoalSeekPanel";
 import { CommentPopover } from "@/components/CommentPopover";
 import { CommentsOverviewPanel } from "@/components/CommentsOverviewPanel";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
-import { captureAssumptionsSnapshot } from "@/lib/versioning";
+import { captureAssumptionsSnapshot, restoreAssumptionsSnapshot, type AssumptionsSnapshot } from "@/lib/versioning";
 import { useActiveScenario } from "@/hooks/useActiveScenario";
 import { cn } from "@/lib/utils";
 
