@@ -365,10 +365,10 @@ export default function Assumptions() {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>
-                  Tilbakestill alle forutsetninger for {data.scenarios.find((s) => s.id === activeScenario)?.name ?? "scenarioet"} til null?
+                  Nullstill {data.scenarios.find((s) => s.id === activeScenario)?.name ?? "scenarioet"}?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Dette nullstiller alle vekstrater, FTE-endringer, konverteringer, kategori-justeringer og Capex-planer. Kommentarer og Executive Summary beholdes. Handlingen kan angres via Historikk.
+                  Dette vil nullstille alle forutsetninger OG kommentarer for {data.scenarios.find((s) => s.id === activeScenario)?.name ?? "scenarioet"}. Er du sikker? Handlingen kan angres via Historikk.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
