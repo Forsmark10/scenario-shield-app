@@ -15,6 +15,51 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import type { ScenarioBundle } from "@/hooks/useAllScenarios";
 import { captureAssumptionsSnapshot } from "@/lib/versioning";
+import { calculateForecast } from "@/lib/forecast/engine";
+import type { CostLineRow, ForecastInputs } from "@/lib/forecast/types";
+
+/**
+ * Henter ferske inputs (fra DB) for ett scenario og bygger en ForecastInputs.
+ * Bruker de allerede-fangede assumptions-tabellene (per-scenario data) og henter
+ * delte basisrater/kostnadslinjer på nytt slik at vi alltid lagrer NÅVÆRENDE
+ * tilstand – ikke en stale snapshot fra app-mount.
+ */
+async function buildFreshInputs(
+  scenarioId: string,
+  tables: Record<string, any[]>,
+): Promise<ForecastInputs> {
+  const [cl, dr, intRates, extRates, nsBase] = await Promise.all([
+    supabase.from("cost_lines").select("*"),
+    supabase.from("depreciation_rules").select("*"),
+    supabase.from("internal_fte_base_rates").select("*"),
+    supabase.from("external_fte_base_rates").select("*"),
+    supabase.from("nearshoring_base").select("*").limit(1).maybeSingle(),
+  ]);
+  const errs = [cl, dr, intRates, extRates, nsBase].map((r) => r.error).filter(Boolean);
+  if (errs.length) throw new Error(errs.map((e) => e!.message).join("; "));
+
+  return {
+    scenario_id: scenarioId,
+    cost_lines: (cl.data ?? []) as unknown as CostLineRow[],
+    global_assumptions: tables.global_assumptions ?? [],
+    central_assumptions: tables.central_assumptions ?? [],
+    internal_fte_changes: (tables.internal_fte_changes ?? []) as ForecastInputs["internal_fte_changes"],
+    external_fte_changes: (tables.external_fte_changes ?? []) as ForecastInputs["external_fte_changes"],
+    conversions: (tables.conversions ?? []) as ForecastInputs["conversions"],
+    nearshoring_additions: (tables.nearshoring_additions ?? []) as ForecastInputs["nearshoring_additions"],
+    nearshoring_changes: (tables.nearshoring_changes ?? []) as ForecastInputs["nearshoring_changes"],
+    category_adjustments: tables.category_adjustments ?? [],
+    capex_plan: (tables.capex_plan ?? []) as ForecastInputs["capex_plan"],
+    depreciation_rules: (dr.data ?? []) as ForecastInputs["depreciation_rules"],
+    internal_fte_base_rates: (intRates.data ?? []) as ForecastInputs["internal_fte_base_rates"],
+    external_fte_base_rates: (extRates.data ?? []) as ForecastInputs["external_fte_base_rates"],
+    nearshoring_base:
+      (nsBase.data as ForecastInputs["nearshoring_base"]) ?? {
+        base_annual_cost_eur: 75000,
+        working_months: 12,
+      },
+  };
+}
 
 export function SaveSnapshotDialog({
   open,
@@ -46,14 +91,23 @@ export function SaveSnapshotDialog({
     setSaving(true);
     try {
       const savedAt = new Date().toISOString();
-      // Felles gruppe-ID slik at alle tre scenario-radene behandles som én snapshot.
       const groupId = (globalThis.crypto as any)?.randomUUID
         ? (globalThis.crypto as any).randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-      // Hent komplett assumptions-tilstand per scenario (alle tabellene + kommentarer).
+      // 1) Hent ferske assumptions (alle tabeller per scenario, inkl. kommentarer).
       const assumptionsByScenario = await Promise.all(
         scenarios.map((b) => captureAssumptionsSnapshot(b.meta.id)),
+      );
+
+      // 2) Bygg ferske inputs (fra DB, ikke fra stale prop) og rekjør beregningen
+      //    så lagret `result` reflekterer NÅVÆRENDE assumptions.
+      const freshBundles = await Promise.all(
+        scenarios.map(async (b, i) => {
+          const inputs = await buildFreshInputs(b.meta.id, assumptionsByScenario[i].tables);
+          const result = calculateForecast(inputs);
+          return { inputs, result };
+        }),
       );
 
       const rows = scenarios.map((bundle, i) => ({
@@ -62,10 +116,9 @@ export function SaveSnapshotDialog({
         scenario_id: bundle.meta.id,
         snapshot_group_id: groupId,
         data: {
-          inputs: bundle.inputs,
-          result: bundle.result,
+          inputs: freshBundles[i].inputs,
+          result: freshBundles[i].result,
           meta: bundle.meta,
-          // Komplett assumptions-tilstand for restore.
           tables: assumptionsByScenario[i].tables,
           saved_at: savedAt,
         } as any,
@@ -90,7 +143,7 @@ export function SaveSnapshotDialog({
         <DialogHeader>
           <DialogTitle>Lagre snapshot</DialogTitle>
           <DialogDescription>
-            Frys nåværende forutsetninger og resultater for alle {scenarios.length} scenarioer.
+            Frys nåværende forutsetninger og beregnede resultater for alle {scenarios.length} scenarioer.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
