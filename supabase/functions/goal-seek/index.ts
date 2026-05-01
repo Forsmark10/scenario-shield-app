@@ -32,6 +32,15 @@ Regler:
 - Estimer impact i MNOK (negativ = kostnadskutt).
 - Aldri overskriv en eksisterende endring stilltiende – beskriv den eksplisitt som "Endre X fra A til B".
 
+KRITISK – "details"-objektet MÅ ALLTID inneholde de feltene som trengs for å anvende endringen. Tomt details-objekt er ALDRI tillatt. Påkrevde felt per type:
+- salary_increase / price_increase: { pct: <decimal, fx 0.04>, before_value, after_value }
+- central_price / central_volume / central_reduction: { pct: <decimal>, before_value, after_value }
+- internal_fte_change / external_fte_change: { level: "Low"|"Medium"|"High", increase: <int>, decrease: <int>, before_value, after_value }
+- conversion: { external_level: "Low"|"Medium"|"High", internal_level: "Low"|"Medium"|"High", count: <int>, overlap_months: <int, default 3>, before_value, after_value }
+- nearshoring: { replaces_external_level: "Low"|"Medium"|"High", count: <int>, overlap_months: <int, default 3>, before_value, after_value }
+- category_adjustment: { category: "<eksakt navn fra kontekst>", adjustment_pct: <decimal, negativ for reduksjon>, before_value, after_value }
+- capex: { capex_type: "Hardware"|"Software"|...annet fra kontekst, amount: <tNOK>, description: "<kort tekst>", before_value, after_value }
+
 Bruk det medfølgende verktøyet "propose_changes" for å returnere svaret.`;
 
 const TOOL_SCHEMA = {
@@ -186,7 +195,7 @@ ${JSON.stringify(context, null, 2)}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
@@ -238,7 +247,36 @@ ${JSON.stringify(context, null, 2)}`;
       );
     }
 
-    return new Response(JSON.stringify(parsed), {
+    // Server-side validering: filtrer ut endringer med tomme/ugyldige details slik at
+    // klienten ikke viser umulige forslag (f.eks. category_adjustment uten "category").
+    const REQUIRED: Record<string, string[]> = {
+      salary_increase: ["pct"],
+      price_increase: ["pct"],
+      central_price: ["pct"],
+      central_volume: ["pct"],
+      central_reduction: ["pct"],
+      internal_fte_change: ["level"],
+      external_fte_change: ["level"],
+      conversion: ["external_level", "internal_level", "count"],
+      nearshoring: ["replaces_external_level", "count"],
+      category_adjustment: ["category", "adjustment_pct"],
+      capex: ["capex_type", "amount"],
+    };
+    const obj = parsed as any;
+    if (obj && Array.isArray(obj.changes)) {
+      const before = obj.changes.length;
+      obj.changes = obj.changes.filter((c: any) => {
+        const req = REQUIRED[c?.type];
+        if (!req) return false;
+        const d = c?.details ?? {};
+        return req.every((k) => d[k] !== undefined && d[k] !== null && d[k] !== "");
+      });
+      if (obj.changes.length < before) {
+        console.warn(`goal-seek filtered out ${before - obj.changes.length} ufullstendige forslag`);
+      }
+    }
+
+    return new Response(JSON.stringify(obj), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

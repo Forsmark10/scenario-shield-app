@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAllScenarios, type ScenarioBundle } from "@/hooks/useAllScenarios";
 import { useAppSettings } from "@/hooks/useAppSettings";
@@ -29,6 +29,16 @@ function value(bundle: ScenarioBundle, category: string, project: string | null,
   );
   return lines.reduce((a, l) => a + (l.amounts[year] ?? 0), 0);
 }
+
+// Token klasser per scenario-indeks – brukes til topplinje/header-farge.
+const SCENARIO_COLOR_VAR = [
+  "hsl(var(--scenario-steady))",
+  "hsl(var(--scenario-moderate))",
+  "hsl(var(--scenario-aggressive))",
+];
+
+// Bakgrunn for låst FC2026-kolonne (gjelder alle scenarioer).
+const LOCKED_BG = "bg-slate-100 dark:bg-slate-800/40";
 
 export default function ScenarioComparison() {
   const { loading, error, scenarios } = useAllScenarios();
@@ -113,7 +123,7 @@ export default function ScenarioComparison() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Scenario Comparison</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Pivot-tabell – tre scenarioer side ved side, alle tall i MNOK.
+            Pivot-tabell – tre scenarioer side ved side, alle tall i MNOK. FC 2026 er låst baseline.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -137,10 +147,11 @@ export default function ScenarioComparison() {
       <Card>
         <CardContent className="pt-4">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs border-separate border-spacing-0">
               <thead className="sticky top-0 bg-card z-10">
-                <tr className="border-b">
-                  <th className="sticky left-0 bg-card text-left font-medium px-3 py-2 z-20 min-w-[260px]">
+                {/* Topp-rad: scenario-navn med farget topplinje, separasjon mellom blokker */}
+                <tr>
+                  <th className="sticky left-0 bg-card text-left font-medium px-3 py-2 z-20 min-w-[260px] border-b">
                     Kategori / Project
                   </th>
                   {scenarios.map((b, i) => (
@@ -148,80 +159,157 @@ export default function ScenarioComparison() {
                       key={b.meta.id}
                       colSpan={YEARS.length}
                       className={cn(
-                        "text-center font-semibold px-2 py-2 border-l",
-                        i === 0 && "text-[hsl(var(--scenario-steady))]",
-                        i === 1 && "text-[hsl(var(--scenario-moderate))]",
-                        i === 2 && "text-[hsl(var(--scenario-aggressive))]",
+                        "text-center px-2 py-3 border-b",
+                        i > 0 && "border-l-4 border-l-border",
                       )}
+                      style={{
+                        borderTop: `3px solid ${SCENARIO_COLOR_VAR[i] ?? "transparent"}`,
+                      }}
                     >
-                      {b.meta.name}
-                      {mode === "delta" && i > 0 && <span className="text-muted-foreground font-normal ml-1">(Δ)</span>}
+                      <span
+                        className="text-base font-bold tracking-tight"
+                        style={{ color: SCENARIO_COLOR_VAR[i] ?? undefined }}
+                      >
+                        {b.meta.name}
+                      </span>
+                      {mode === "delta" && i > 0 && (
+                        <span className="text-muted-foreground font-normal ml-1.5 text-xs">(Δ vs Steady)</span>
+                      )}
                     </th>
                   ))}
                 </tr>
-                <tr className="border-b bg-muted/40">
-                  <th className="sticky left-0 bg-muted/40 px-3 py-1.5 z-20"></th>
-                  {scenarios.map((b) =>
-                    YEARS.map((y) => (
-                      <th
-                        key={`${b.meta.id}-${y}`}
-                        className="text-right font-normal text-muted-foreground px-2 py-1.5 whitespace-nowrap"
-                      >
-                        {y}
-                      </th>
-                    )),
+                {/* År-rad */}
+                <tr className="bg-muted/40">
+                  <th className="sticky left-0 bg-muted/40 px-3 py-1.5 z-20 border-b"></th>
+                  {scenarios.map((b, si) =>
+                    YEARS.map((y, yi) => {
+                      const isLocked = y === 2026;
+                      return (
+                        <th
+                          key={`${b.meta.id}-${y}`}
+                          className={cn(
+                            "text-right font-medium text-muted-foreground px-2 py-1.5 whitespace-nowrap border-b",
+                            si > 0 && yi === 0 && "border-l-4 border-l-border",
+                            isLocked && LOCKED_BG,
+                          )}
+                        >
+                          {isLocked ? (
+                            <span className="inline-flex items-center gap-1 justify-end">
+                              <Lock className="h-3 w-3 opacity-60" />
+                              <span>{y}</span>
+                            </span>
+                          ) : (
+                            y
+                          )}
+                        </th>
+                      );
+                    }),
                   )}
                 </tr>
               </thead>
               <tbody>
-                {tree.map((g) => {
+                {tree.map((g, gIdx) => {
                   const open = expanded.has(g.category);
+                  const zebra = gIdx % 2 === 1;
                   return (
                     <Fragment key={g.category}>
                       <tr
-                        className="border-b bg-secondary/40 hover:bg-secondary/70 cursor-pointer font-medium"
+                        className={cn(
+                          "hover:bg-secondary/70 cursor-pointer font-medium",
+                          zebra ? "bg-secondary/50" : "bg-secondary/30",
+                        )}
                         onClick={() => {
                           const next = new Set(expanded);
                           if (open) next.delete(g.category); else next.add(g.category);
                           setExpanded(next);
                         }}
                       >
-                        <td className="sticky left-0 bg-secondary/40 px-3 py-1.5 z-10">
+                        <td
+                          className={cn(
+                            "sticky left-0 px-3 py-1.5 z-10 border-b",
+                            zebra ? "bg-secondary/50" : "bg-secondary/30",
+                          )}
+                        >
                           <span className="inline-flex items-center gap-1.5">
                             {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                             {g.category}
                           </span>
                         </td>
-                        {scenarios.map((b) =>
-                          YEARS.map((y) => {
+                        {scenarios.map((b, si) =>
+                          YEARS.map((y, yi) => {
                             const v = cellValue(b, g.category, null, y);
-                            return <NumTd key={`${b.meta.id}-${g.category}-${y}`} value={v} delta={mode === "delta" && b.meta.id !== baseScenario.meta.id} />;
+                            const isLocked = y === 2026;
+                            return (
+                              <NumTd
+                                key={`${b.meta.id}-${g.category}-${y}`}
+                                value={v}
+                                delta={mode === "delta" && b.meta.id !== baseScenario.meta.id}
+                                locked={isLocked}
+                                separator={si > 0 && yi === 0}
+                              />
+                            );
                           }),
                         )}
                       </tr>
                       {open &&
-                        g.projects.map((proj) => (
-                          <tr key={`${g.category}-${proj}`} className="border-b hover:bg-muted/30">
-                            <td className="sticky left-0 bg-card px-3 py-1.5 pl-9 text-muted-foreground z-10">{proj}</td>
-                            {scenarios.map((b) =>
-                              YEARS.map((y) => {
-                                const v = cellValue(b, g.category, proj, y);
-                                return <NumTd key={`${b.meta.id}-${proj}-${y}`} value={v} delta={mode === "delta" && b.meta.id !== baseScenario.meta.id} />;
-                              }),
-                            )}
-                          </tr>
-                        ))}
+                        g.projects.map((proj, pIdx) => {
+                          const pZebra = pIdx % 2 === 1;
+                          return (
+                            <tr
+                              key={`${g.category}-${proj}`}
+                              className={cn(
+                                "hover:bg-muted/40",
+                                pZebra ? "bg-muted/20" : "bg-card",
+                              )}
+                            >
+                              <td
+                                className={cn(
+                                  "sticky left-0 px-3 py-1.5 pl-9 text-muted-foreground z-10 border-b",
+                                  pZebra ? "bg-muted/20" : "bg-card",
+                                )}
+                              >
+                                {proj}
+                              </td>
+                              {scenarios.map((b, si) =>
+                                YEARS.map((y, yi) => {
+                                  const v = cellValue(b, g.category, proj, y);
+                                  const isLocked = y === 2026;
+                                  return (
+                                    <NumTd
+                                      key={`${b.meta.id}-${proj}-${y}`}
+                                      value={v}
+                                      delta={mode === "delta" && b.meta.id !== baseScenario.meta.id}
+                                      locked={isLocked}
+                                      separator={si > 0 && yi === 0}
+                                    />
+                                  );
+                                }),
+                              )}
+                            </tr>
+                          );
+                        })}
                     </Fragment>
                   );
                 })}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 font-semibold">
-                  <td className="sticky left-0 bg-card px-3 py-2 z-10">Grand Total</td>
-                  {scenarios.map((b) =>
-                    YEARS.map((y) => {
+                <tr className="font-semibold">
+                  <td className="sticky left-0 bg-card px-3 py-2 z-10 border-t-2 border-foreground/20">Grand Total</td>
+                  {scenarios.map((b, si) =>
+                    YEARS.map((y, yi) => {
                       const v = totalRow(b, y);
-                      return <NumTd key={`total-${b.meta.id}-${y}`} value={v} delta={mode === "delta" && b.meta.id !== baseScenario.meta.id} bold />;
+                      const isLocked = y === 2026;
+                      return (
+                        <NumTd
+                          key={`total-${b.meta.id}-${y}`}
+                          value={v}
+                          delta={mode === "delta" && b.meta.id !== baseScenario.meta.id}
+                          bold
+                          locked={isLocked}
+                          separator={si > 0 && yi === 0}
+                          topBorder
+                        />
+                      );
                     }),
                   )}
                 </tr>
@@ -231,32 +319,49 @@ export default function ScenarioComparison() {
         </CardContent>
       </Card>
 
-      <div className="text-xs text-muted-foreground">
-        Alle tall i MNOK. Negative tall i parentes og rødt. — = null.
+      <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span>Alle tall i MNOK. Negative tall i parentes og rødt. — = null.</span>
+        <span className="inline-flex items-center gap-1">
+          <Lock className="h-3 w-3 opacity-60" /> = låst FC 2026 baseline
+        </span>
       </div>
     </div>
   );
 }
 
-function NumTd({ value: v, delta, bold }: { value: number; delta: boolean; bold?: boolean }) {
+function NumTd({
+  value: v,
+  delta,
+  bold,
+  locked,
+  separator,
+  topBorder,
+}: {
+  value: number;
+  delta: boolean;
+  bold?: boolean;
+  locked?: boolean;
+  separator?: boolean;
+  topBorder?: boolean;
+}) {
   const m = toM(v);
+  const baseCls = cn(
+    "text-right tabular-nums px-2 py-1.5 font-mono border-b",
+    bold && "font-bold",
+    locked && LOCKED_BG,
+    separator && "border-l-4 border-l-border",
+    topBorder && "border-t-2 border-t-foreground/20",
+  );
   if (m === 0) {
-    return (
-      <td className={cn("text-right tabular-nums px-2 py-1.5 font-mono text-muted-foreground", bold && "font-bold")}>
-        —
-      </td>
-    );
+    return <td className={cn(baseCls, "text-muted-foreground")}>—</td>;
   }
   const negative = m < 0;
   const formatted = formatNumberNO(m, 1);
   let cls = "";
   if (delta) {
-    // For delta, negative = saving (good) shown green; positive = extra cost shown red
     cls = negative ? "text-[hsl(var(--positive))]" : "text-[hsl(var(--negative))]";
   } else if (negative) {
     cls = "text-destructive";
   }
-  return (
-    <td className={cn("text-right tabular-nums px-2 py-1.5 font-mono", cls, bold && "font-bold")}>{formatted}</td>
-  );
+  return <td className={cn(baseCls, cls)}>{formatted}</td>;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, History, MessageSquare, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ChevronDown, History, MessageSquare, Plus, RotateCcw, Trash2, Undo2 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -20,7 +20,7 @@ import { GoalSeekPanel } from "@/components/GoalSeekPanel";
 import { CommentPopover } from "@/components/CommentPopover";
 import { CommentsOverviewPanel } from "@/components/CommentsOverviewPanel";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
-import { captureAssumptionsSnapshot } from "@/lib/versioning";
+import { captureAssumptionsSnapshot, restoreAssumptionsSnapshot, type AssumptionsSnapshot } from "@/lib/versioning";
 import { useActiveScenario } from "@/hooks/useActiveScenario";
 import { cn } from "@/lib/utils";
 
@@ -115,6 +115,13 @@ export default function Assumptions() {
   const autoVersion = useAutoVersion();
   const initialFingerprint = useRef<Record<string, string>>({});
 
+  // Undo-stack: per-scenario stack med snapshot tatt RETT FØR siste mutering.
+  // Brukes av "Angre"-knappen for å rulle tilbake siste endring uten å gå via Historikk.
+  const undoStackRef = useRef<Record<string, AssumptionsSnapshot[]>>({});
+  const [undoTick, setUndoTick] = useState(0); // for å re-rendere knapp-state
+  const [undoing, setUndoing] = useState(false);
+  const UNDO_LIMIT = 50;
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -180,9 +187,61 @@ export default function Assumptions() {
     [setStoredScenario],
   );
 
+  // Mapping fra lokal TableKey til DB-tabellnavn (matcher SCOPED_TABLES i versioning.ts).
+  // nearshoringBase er global (ikke per scenario) og inngår derfor ikke i undo.
+  const TABLE_KEY_TO_DB: Partial<Record<TableKey, string>> = {
+    global: "global_assumptions",
+    central: "central_assumptions",
+    intChanges: "internal_fte_changes",
+    extChanges: "external_fte_changes",
+    conversions: "conversions",
+    nearshoringAdds: "nearshoring_additions",
+    nearshoringChanges: "nearshoring_changes",
+    catAdj: "category_adjustments",
+    capexPlan: "capex_plan",
+  };
+
+  // Bygg en AssumptionsSnapshot fra LOKAL state for et gitt scenario.
+  // Brukes som "før-bilde" når undo-stack pushes – speiler feltene som
+  // restoreAssumptionsSnapshot håndterer.
+  const buildLocalSnapshot = useCallback(
+    (sid: string, source: AllData): AssumptionsSnapshot => {
+      const tables: Record<string, any[]> = {};
+      for (const [key, dbName] of Object.entries(TABLE_KEY_TO_DB) as [TableKey, string][]) {
+        const rows = (source as any)[key] as any[] | undefined;
+        tables[dbName] = (rows ?? []).filter((r) => r?.scenario_id === sid);
+      }
+      return { scenario_id: sid, taken_at: new Date().toISOString(), tables };
+    },
+    [],
+  );
+
+  const pushUndo = useCallback(
+    (sid: string, snap: AssumptionsSnapshot) => {
+      const stack = undoStackRef.current[sid] ?? [];
+      stack.push(snap);
+      if (stack.length > UNDO_LIMIT) stack.shift();
+      undoStackRef.current[sid] = stack;
+      setUndoTick((t) => t + 1);
+    },
+    [],
+  );
+
   const patch = useCallback<Patch>((action) => {
+    // Capture pre-mutation snapshot for undo (basert på lokal state før setData).
+    const sid =
+      (action as any).row?.scenario_id ??
+      (action as any).changes?.scenario_id ??
+      activeScenario;
     setData((prev) => {
       if (!prev) return prev;
+      if (sid) {
+        try {
+          pushUndo(sid, buildLocalSnapshot(sid, prev));
+        } catch (e) {
+          console.warn("[Undo] Kunne ikke ta snapshot", e);
+        }
+      }
       const next = { ...prev } as AllData;
       if (action.type === "setSingleton") {
         (next as any)[action.table] = action.row;
@@ -208,12 +267,40 @@ export default function Assumptions() {
       return next;
     });
     // Trigger auto-versjonering – debounced + 5-min vindu håndteres i hooken.
-    const sid =
-      (action as any).row?.scenario_id ??
-      (action as any).changes?.scenario_id ??
-      activeScenario;
     if (sid) autoVersion.trigger(sid);
-  }, [autoVersion, activeScenario]);
+  }, [autoVersion, activeScenario, buildLocalSnapshot, pushUndo]);
+
+  const handleUndo = useCallback(async () => {
+    if (!activeScenario) return;
+    const stack = undoStackRef.current[activeScenario] ?? [];
+    const snap = stack.pop();
+    if (!snap) return;
+    undoStackRef.current[activeScenario] = stack;
+    setUndoing(true);
+    try {
+      // captureAssumptionsSnapshot henter fra DB (kan avvike litt fra lokal state pga
+      // nylige writes fra subkomponenter). restoreAssumptionsSnapshot bruker delete+insert
+      // og er trygg å kjøre.
+      await restoreAssumptionsSnapshot(snap);
+      sonnerToast.success("Siste endring angret");
+      autoVersion.resetWindow(activeScenario);
+      setUndoTick((t) => t + 1);
+      refresh();
+    } catch (e: any) {
+      console.error("[Undo] Feilet", e);
+      sonnerToast.error("Kunne ikke angre", { description: e?.message ?? String(e) });
+      // Hvis det feilet, push snapshot tilbake så brukeren kan prøve igjen.
+      stack.push(snap);
+      undoStackRef.current[activeScenario] = stack;
+      setUndoTick((t) => t + 1);
+    } finally {
+      setUndoing(false);
+    }
+  }, [activeScenario, autoVersion]);
+
+  const undoCount = activeScenario ? (undoStackRef.current[activeScenario]?.length ?? 0) : 0;
+  // referer til undoTick for å re-rendere når stack endres
+  void undoTick;
 
   const refresh = useCallback(() => setReloadKey((k) => k + 1), []);
 
@@ -254,6 +341,20 @@ export default function Assumptions() {
             <History className="h-4 w-4 mr-2" />
             Historikk
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUndo}
+            disabled={!activeScenario || undoCount === 0 || undoing}
+            title={
+              undoCount === 0
+                ? "Ingen endringer å angre"
+                : `Angre siste endring (${undoCount} tilgjengelig)`
+            }
+          >
+            <Undo2 className="h-4 w-4 mr-2" />
+            Angre
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={!activeScenario}>
@@ -264,10 +365,10 @@ export default function Assumptions() {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>
-                  Tilbakestill alle forutsetninger for {data.scenarios.find((s) => s.id === activeScenario)?.name ?? "scenarioet"} til null?
+                  Nullstill {data.scenarios.find((s) => s.id === activeScenario)?.name ?? "scenarioet"}?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Dette nullstiller alle vekstrater, FTE-endringer, konverteringer, kategori-justeringer og Capex-planer. Kommentarer og Executive Summary beholdes. Handlingen kan angres via Historikk.
+                  Dette vil nullstille alle forutsetninger OG kommentarer for {data.scenarios.find((s) => s.id === activeScenario)?.name ?? "scenarioet"}. Er du sikker? Handlingen kan angres via Historikk.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -279,10 +380,15 @@ export default function Assumptions() {
                     console.log("[Reset] Start nullstilling for scenario:", sid);
                     try {
                       // Sekvensielle update-calls med .select() for å verifisere antall rader.
+                      // Alle kommentar-felter nullstilles også (krav fra brukeren).
                       const steps: Array<[string, () => any]> = [
                         ["global_assumptions", () =>
                           supabase.from("global_assumptions").update({
                             salary_increase_pct: 0, price_increase_pct: 0, eur_nok_rate: 11.3,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_salary: null, comment_salary_updated_at: null, comment_salary_updated_by: null,
+                            comment_price: null, comment_price_updated_at: null, comment_price_updated_by: null,
+                            comment_rate: null, comment_rate_updated_at: null, comment_rate_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["central_assumptions", () =>
                           supabase.from("central_assumptions").update({
@@ -291,26 +397,42 @@ export default function Assumptions() {
                             central_reduction_pct: 0,
                             central_reduction_amount_tnok: 0,
                             central_eur_nok_rate: 11.3,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_amount: null, comment_amount_updated_at: null, comment_amount_updated_by: null,
+                            comment_rate: null, comment_rate_updated_at: null, comment_rate_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["internal_fte_changes", () =>
                           supabase.from("internal_fte_changes").update({
                             increase: 0, decrease: 0,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_increase: null, comment_increase_updated_at: null, comment_increase_updated_by: null,
+                            comment_decrease: null, comment_decrease_updated_at: null, comment_decrease_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["external_fte_changes", () =>
                           supabase.from("external_fte_changes").update({
                             increase: 0, decrease: 0,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_increase: null, comment_increase_updated_at: null, comment_increase_updated_by: null,
+                            comment_decrease: null, comment_decrease_updated_at: null, comment_decrease_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["nearshoring_changes", () =>
                           supabase.from("nearshoring_changes").update({
                             increase: 0, decrease: 0,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_increase: null, comment_increase_updated_at: null, comment_increase_updated_by: null,
+                            comment_decrease: null, comment_decrease_updated_at: null, comment_decrease_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["category_adjustments", () =>
                           supabase.from("category_adjustments").update({
                             adjustment_pct: 0, adjustment_amount_tnok: 0,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                            comment_amount: null, comment_amount_updated_at: null, comment_amount_updated_by: null,
                           } as any).eq("scenario_id", sid).select("id")],
                         ["capex_plan (aggregert, amount=0)", () =>
-                          supabase.from("capex_plan").update({ amount: 0 } as any)
-                            .eq("scenario_id", sid).is("description", null).select("id")],
+                          supabase.from("capex_plan").update({
+                            amount: 0,
+                            comment: null, comment_updated_at: null, comment_updated_by: null,
+                          } as any).eq("scenario_id", sid).is("description", null).select("id")],
                       ];
                       for (const [label, fn] of steps) {
                         const { data: rows, error } = await fn();
