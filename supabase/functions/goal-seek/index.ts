@@ -247,7 +247,36 @@ ${JSON.stringify(context, null, 2)}`;
       );
     }
 
-    return new Response(JSON.stringify(parsed), {
+    // Server-side validering: filtrer ut endringer med tomme/ugyldige details slik at
+    // klienten ikke viser umulige forslag (f.eks. category_adjustment uten "category").
+    const REQUIRED: Record<string, string[]> = {
+      salary_increase: ["pct"],
+      price_increase: ["pct"],
+      central_price: ["pct"],
+      central_volume: ["pct"],
+      central_reduction: ["pct"],
+      internal_fte_change: ["level"],
+      external_fte_change: ["level"],
+      conversion: ["external_level", "internal_level", "count"],
+      nearshoring: ["replaces_external_level", "count"],
+      category_adjustment: ["category", "adjustment_pct"],
+      capex: ["capex_type", "amount"],
+    };
+    const obj = parsed as any;
+    if (obj && Array.isArray(obj.changes)) {
+      const before = obj.changes.length;
+      obj.changes = obj.changes.filter((c: any) => {
+        const req = REQUIRED[c?.type];
+        if (!req) return false;
+        const d = c?.details ?? {};
+        return req.every((k) => d[k] !== undefined && d[k] !== null && d[k] !== "");
+      });
+      if (obj.changes.length < before) {
+        console.warn(`goal-seek filtered out ${before - obj.changes.length} ufullstendige forslag`);
+      }
+    }
+
+    return new Response(JSON.stringify(obj), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
