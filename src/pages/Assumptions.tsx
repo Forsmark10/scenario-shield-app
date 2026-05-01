@@ -341,6 +341,20 @@ export default function Assumptions() {
             <History className="h-4 w-4 mr-2" />
             Historikk
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleUndo}
+            disabled={!activeScenario || undoCount === 0 || undoing}
+            title={
+              undoCount === 0
+                ? "Ingen endringer å angre"
+                : `Angre siste endring (${undoCount} tilgjengelig)`
+            }
+          >
+            <Undo2 className="h-4 w-4 mr-2" />
+            Angre
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={!activeScenario}>
