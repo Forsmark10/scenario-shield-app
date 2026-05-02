@@ -562,6 +562,8 @@ export default function Assumptions() {
             <SectionCategoryAdj data={data} scenario={s} patch={patch} />
             <SectionCapex data={data} scenario={s} patch={patch} />
 
+            <KontrollTab scenarioId={s.id} />
+
             <div className="pt-2">
               <p className="text-xs text-muted-foreground">Endringer lagres automatisk (debounce 500 ms).</p>
             </div>
