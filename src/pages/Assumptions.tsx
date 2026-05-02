@@ -19,6 +19,7 @@ import { VersionHistoryPanel } from "@/components/VersionHistoryPanel";
 import { GoalSeekPanel } from "@/components/GoalSeekPanel";
 import { CommentPopover } from "@/components/CommentPopover";
 import { CommentsOverviewPanel } from "@/components/CommentsOverviewPanel";
+import { KontrollTab } from "@/components/KontrollTab";
 import { useAutoVersion } from "@/hooks/useAutoVersion";
 import { captureAssumptionsSnapshot, restoreAssumptionsSnapshot, type AssumptionsSnapshot } from "@/lib/versioning";
 import { useActiveScenario } from "@/hooks/useActiveScenario";
