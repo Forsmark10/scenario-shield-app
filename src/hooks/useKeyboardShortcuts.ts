@@ -35,10 +35,9 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers = {}) {
       if (mod) {
         const map: Record<string, string> = {
           "1": "/",
-          "2": "/scenario",
+          "2": "/comparison",
           "3": "/assumptions",
-          "4": "/comparison",
-          "5": "/om-modellen",
+          "4": "/om-modellen",
         };
         if (map[e.key]) {
           e.preventDefault();

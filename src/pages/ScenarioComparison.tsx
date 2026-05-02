@@ -1,17 +1,26 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Download, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAllScenarios, type ScenarioBundle } from "@/hooks/useAllScenarios";
 import { useAppSettings } from "@/hooks/useAppSettings";
+import { useActiveScenario } from "@/hooks/useActiveScenario";
 import { formatNumberNO } from "@/lib/format";
 import { exportWorkbook } from "@/lib/excelExport";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 type Mode = "absolute" | "delta";
+type View = "all" | "single";
 const YEARS = [2026, 2027, 2028, 2029, 2030, 2031];
 
 // All amounts shown in MNOK
@@ -30,29 +39,43 @@ function value(bundle: ScenarioBundle, category: string, project: string | null,
   return lines.reduce((a, l) => a + (l.amounts[year] ?? 0), 0);
 }
 
-// Token klasser per scenario-indeks – brukes til topplinje/header-farge.
 const SCENARIO_COLOR_VAR = [
   "hsl(var(--scenario-steady))",
   "hsl(var(--scenario-moderate))",
   "hsl(var(--scenario-aggressive))",
 ];
 
-// Bakgrunn for låst FC2026-kolonne (gjelder alle scenarioer).
 const LOCKED_BG = "bg-slate-100 dark:bg-slate-800/40";
 
 export default function ScenarioComparison() {
   const { loading, error, scenarios } = useAllScenarios();
   const settings = useAppSettings();
+  const [view, setView] = useState<View>("all");
   const [mode, setMode] = useState<Mode>("absolute");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [storedScenario, setStoredScenario] = useActiveScenario();
+  const [singleId, setSingleId] = useState<string | null>(null);
+
+  // Initialiser valgt enkelt-scenario fra lagret valg når data er klar.
+  useEffect(() => {
+    if (!scenarios.length) return;
+    if (singleId && scenarios.some((s) => s.meta.id === singleId)) return;
+    const valid = storedScenario && scenarios.some((s) => s.meta.id === storedScenario);
+    const initial = valid ? storedScenario! : scenarios[0].meta.id;
+    setSingleId(initial);
+  }, [scenarios, storedScenario, singleId]);
 
   const handleExport = async () => {
     if (!scenarios.length) return;
     setExporting(true);
     try {
       await new Promise((r) => setTimeout(r, 30));
-      exportWorkbook({ scenarios, costCenterName: settings?.cost_center_name ?? "Kostnadssenter" });
+      exportWorkbook({
+        scenarios,
+        costCenterName: settings?.cost_center_name ?? "Kostnadssenter",
+        focusedScenarioId: view === "single" ? singleId ?? undefined : undefined,
+      });
       toast.success("Excel-fil lastet ned");
     } catch (e: any) {
       toast.error("Eksport feilet", { description: e?.message ?? String(e) });
@@ -98,9 +121,18 @@ export default function ScenarioComparison() {
 
   const baseScenario = scenarios[0]; // Steady State (sort_order = 0)
 
+  // Hvilke scenarioer som vises i tabellen
+  const displayedScenarios =
+    view === "single"
+      ? scenarios.filter((s) => s.meta.id === singleId)
+      : scenarios;
+
+  // Indeks i den fulle scenarios-listen for fargekoding
+  const colorIndexFor = (id: string) => scenarios.findIndex((s) => s.meta.id === id);
+
   const cellValue = (b: ScenarioBundle, cat: string, project: string | null, y: number): number => {
     const v = value(b, cat, project, y);
-    if (mode === "delta" && b.meta.id !== baseScenario.meta.id) {
+    if (view === "all" && mode === "delta" && b.meta.id !== baseScenario.meta.id) {
       return v - value(baseScenario, cat, project, y);
     }
     return v;
@@ -110,29 +142,62 @@ export default function ScenarioComparison() {
     const v = scenarios.length
       ? tree.reduce((a, g) => a + value(b, g.category, null, y), 0)
       : 0;
-    if (mode === "delta" && b.meta.id !== baseScenario.meta.id) {
+    if (view === "all" && mode === "delta" && b.meta.id !== baseScenario.meta.id) {
       const baseV = tree.reduce((a, g) => a + value(baseScenario, g.category, null, y), 0);
       return v - baseV;
     }
     return v;
   };
 
+  const isDeltaMode = view === "all" && mode === "delta";
+
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Scenario Comparison</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Scenarioer</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Pivot-tabell – tre scenarioer side ved side, alle tall i MNOK. FC 2026 er låst baseline.
+            Pivot-tabell – alle tall i MNOK. FC 2026 er låst baseline.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Tabs value={view} onValueChange={(v) => setView(v as View)}>
             <TabsList className="h-9">
-              <TabsTrigger value="absolute" className="text-xs px-3">Absolute</TabsTrigger>
-              <TabsTrigger value="delta" className="text-xs px-3">Delta vs Steady</TabsTrigger>
+              <TabsTrigger value="all" className="text-xs px-3">Alle scenarioer</TabsTrigger>
+              <TabsTrigger value="single" className="text-xs px-3">Enkelt scenario</TabsTrigger>
             </TabsList>
           </Tabs>
+
+          {view === "single" && (
+            <Select
+              value={singleId ?? ""}
+              onValueChange={(v) => {
+                setSingleId(v);
+                setStoredScenario(v);
+              }}
+            >
+              <SelectTrigger className="w-[220px] h-9">
+                <SelectValue placeholder="Velg scenario" />
+              </SelectTrigger>
+              <SelectContent>
+                {scenarios.map((s) => (
+                  <SelectItem key={s.meta.id} value={s.meta.id}>
+                    {s.meta.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {view === "all" && (
+            <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
+              <TabsList className="h-9">
+                <TabsTrigger value="absolute" className="text-xs px-3">Absolute</TabsTrigger>
+                <TabsTrigger value="delta" className="text-xs px-3">Delta vs Steady</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
+
           <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || loading}>
             {exporting ? (
               <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
@@ -154,34 +219,37 @@ export default function ScenarioComparison() {
                   <th className="sticky left-0 bg-card text-left font-medium px-3 py-2 z-20 min-w-[260px] border-b">
                     Kategori / Project
                   </th>
-                  {scenarios.map((b, i) => (
-                    <th
-                      key={b.meta.id}
-                      colSpan={YEARS.length}
-                      className={cn(
-                        "text-center px-2 py-3 border-b",
-                        i > 0 && "border-l-4 border-l-border",
-                      )}
-                      style={{
-                        borderTop: `3px solid ${SCENARIO_COLOR_VAR[i] ?? "transparent"}`,
-                      }}
-                    >
-                      <span
-                        className="text-base font-bold tracking-tight"
-                        style={{ color: SCENARIO_COLOR_VAR[i] ?? undefined }}
+                  {displayedScenarios.map((b, i) => {
+                    const colorIdx = colorIndexFor(b.meta.id);
+                    return (
+                      <th
+                        key={b.meta.id}
+                        colSpan={YEARS.length}
+                        className={cn(
+                          "text-center px-2 py-3 border-b",
+                          i > 0 && "border-l-4 border-l-border",
+                        )}
+                        style={{
+                          borderTop: `3px solid ${SCENARIO_COLOR_VAR[colorIdx] ?? "transparent"}`,
+                        }}
                       >
-                        {b.meta.name}
-                      </span>
-                      {mode === "delta" && i > 0 && (
-                        <span className="text-muted-foreground font-normal ml-1.5 text-xs">(Δ vs Steady)</span>
-                      )}
-                    </th>
-                  ))}
+                        <span
+                          className="text-base font-bold tracking-tight"
+                          style={{ color: SCENARIO_COLOR_VAR[colorIdx] ?? undefined }}
+                        >
+                          {b.meta.name}
+                        </span>
+                        {isDeltaMode && b.meta.id !== baseScenario.meta.id && (
+                          <span className="text-muted-foreground font-normal ml-1.5 text-xs">(Δ vs Steady)</span>
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
                 {/* År-rad */}
                 <tr className="bg-muted/40">
                   <th className="sticky left-0 bg-muted/40 px-3 py-1.5 z-20 border-b"></th>
-                  {scenarios.map((b, si) =>
+                  {displayedScenarios.map((b, si) =>
                     YEARS.map((y, yi) => {
                       const isLocked = y === 2026;
                       return (
@@ -235,7 +303,7 @@ export default function ScenarioComparison() {
                             {g.category}
                           </span>
                         </td>
-                        {scenarios.map((b, si) =>
+                        {displayedScenarios.map((b, si) =>
                           YEARS.map((y, yi) => {
                             const v = cellValue(b, g.category, null, y);
                             const isLocked = y === 2026;
@@ -243,7 +311,7 @@ export default function ScenarioComparison() {
                               <NumTd
                                 key={`${b.meta.id}-${g.category}-${y}`}
                                 value={v}
-                                delta={mode === "delta" && b.meta.id !== baseScenario.meta.id}
+                                delta={isDeltaMode && b.meta.id !== baseScenario.meta.id}
                                 locked={isLocked}
                                 separator={si > 0 && yi === 0}
                               />
@@ -270,7 +338,7 @@ export default function ScenarioComparison() {
                               >
                                 {proj}
                               </td>
-                              {scenarios.map((b, si) =>
+                              {displayedScenarios.map((b, si) =>
                                 YEARS.map((y, yi) => {
                                   const v = cellValue(b, g.category, proj, y);
                                   const isLocked = y === 2026;
@@ -278,7 +346,7 @@ export default function ScenarioComparison() {
                                     <NumTd
                                       key={`${b.meta.id}-${proj}-${y}`}
                                       value={v}
-                                      delta={mode === "delta" && b.meta.id !== baseScenario.meta.id}
+                                      delta={isDeltaMode && b.meta.id !== baseScenario.meta.id}
                                       locked={isLocked}
                                       separator={si > 0 && yi === 0}
                                     />
@@ -295,7 +363,7 @@ export default function ScenarioComparison() {
               <tfoot>
                 <tr className="font-semibold">
                   <td className="sticky left-0 bg-card px-3 py-2 z-10 border-t-2 border-foreground/20">Grand Total</td>
-                  {scenarios.map((b, si) =>
+                  {displayedScenarios.map((b, si) =>
                     YEARS.map((y, yi) => {
                       const v = totalRow(b, y);
                       const isLocked = y === 2026;
@@ -303,7 +371,7 @@ export default function ScenarioComparison() {
                         <NumTd
                           key={`total-${b.meta.id}-${y}`}
                           value={v}
-                          delta={mode === "delta" && b.meta.id !== baseScenario.meta.id}
+                          delta={isDeltaMode && b.meta.id !== baseScenario.meta.id}
                           bold
                           locked={isLocked}
                           separator={si > 0 && yi === 0}
