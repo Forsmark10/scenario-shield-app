@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import AppLayout from "@/components/AppLayout";
 import Dashboard from "./pages/Dashboard";
-import Scenario from "./pages/Scenario";
 import Assumptions from "./pages/Assumptions";
 import ScenarioComparison from "./pages/ScenarioComparison";
 import Admin from "./pages/Admin";
@@ -33,7 +32,6 @@ const App = () => (
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/scenario" element={<Scenario />} />
               <Route path="/assumptions" element={<Assumptions />} />
               <Route path="/comparison" element={<ScenarioComparison />} />
               <Route
