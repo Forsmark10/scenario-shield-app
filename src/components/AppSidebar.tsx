@@ -1,4 +1,4 @@
-import { LayoutDashboard, Table2, Sliders, GitCompare, Info, Wrench, History as HistoryIcon } from "lucide-react";
+import { LayoutDashboard, GitCompare, Sliders, Info, Wrench, History as HistoryIcon } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -14,9 +14,8 @@ import {
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Scenario", url: "/scenario", icon: Table2 },
+  { title: "Scenarioer", url: "/comparison", icon: GitCompare },
   { title: "Assumptions", url: "/assumptions", icon: Sliders },
-  { title: "Scenario Comparison", url: "/comparison", icon: GitCompare },
   { title: "Om modellen", url: "/om-modellen", icon: Info },
 ];
 
