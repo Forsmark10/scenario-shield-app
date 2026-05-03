@@ -420,20 +420,18 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     baseByCat[cl.category] = (baseByCat[cl.category] ?? 0) + base;
   }
 
-  // %-justeringseffekt per kategori = baseSum × cumPrice × (f - 1)
-  // Isolert effekt av selve %-justeringen, prisvekst er allerede i Prisvekst-søylen.
+  // %-justeringseffekt per kategori: negative justeringer er konstante mot FC 2026-basis,
+  // positive justeringer vokser med prisvekst fra tiltaksåret.
   for (const cat of Object.keys(baseByCat)) {
-    let f = 1;
     for (let Y = 2027; Y <= N; Y++) {
       const r = inputs.category_adjustments.find((a) => a.category === cat && a.year === Y);
-      if (r?.adjustment_pct) {
-        f *= 1 + r.adjustment_pct;
-        if (r.comment) addComment(cat, r.comment);
-      }
+      const pct = Number(r?.adjustment_pct ?? 0);
+      if (!pct) continue;
+      if (r?.comment) addComment(cat, r.comment);
+      const growthFactor = pct > 0 ? cumFactor(Y, N, priceRate) : 1;
+      const pctEffect = baseByCat[cat] * pct * growthFactor;
+      addComponent(cat, pctEffect);
     }
-    if (f === 1) continue;
-    const pctEffect = baseByCat[cat] * cumPrice * (f - 1);
-    addComponent(cat, pctEffect);
   }
 
   // tNOK-justeringer (faste beløp, vokser IKKE med prisvekst)
@@ -642,6 +640,18 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
 
   const sumBridges = bridges.reduce((a, b) => a + b.value, 0);
   const rest = end - (start + sumBridges);
+
+  if (typeof window !== "undefined") {
+    console.log("[Waterfall] Rest values", {
+      scenario: bundle.meta.name,
+      year: N,
+      view,
+      start,
+      end,
+      sumBridges,
+      rest,
+    });
+  }
 
   // Rest legges til som residual-driver rett før FC-N, slik at briden alltid stemmer per definisjon.
   bridges.push({
