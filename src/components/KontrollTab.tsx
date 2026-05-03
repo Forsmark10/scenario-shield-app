@@ -580,7 +580,7 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Alle tall i MNOK (P&L-perspektiv). Positivt = økt kostnad, negativt = besparelse.
+          Alle tall i MNOK ({view === "PL" ? "P&L-perspektiv: Capex som avskrivninger over levetid" : "Spend-perspektiv: Capex som direkte utgift i investeringsåret"}). Positivt = økt kostnad, negativt = besparelse.
         </p>
       </CardContent>
     </Card>
