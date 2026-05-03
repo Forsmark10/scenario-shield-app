@@ -481,10 +481,16 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
               Kontroll – isolert effekt per forutsetning
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Hver rad viser hva forutsetningen alene bidrar med på P&L-totalen,
+              Hver rad viser hva forutsetningen alene bidrar med på {view === "PL" ? "P&L-totalen" : "Spend (kontant utgift)"},
               alt annet likt. Sum nederst skal tilnærmet matche modellens totale endring 2026 → 2031.
             </p>
           </div>
+          <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
+            <TabsList>
+              <TabsTrigger value="PL">P&amp;L</TabsTrigger>
+              <TabsTrigger value="Spend">Spend</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         <div className="overflow-x-auto rounded-md border">
