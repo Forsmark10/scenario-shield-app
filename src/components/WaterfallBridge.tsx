@@ -336,6 +336,7 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     extInc + extDec +
     nsInc + nsDec +
     extConvAmt +
+    i2nNet +
     fteCatAdjAmount + intCatAdjPct;
 
   // Splitt kategori-justering FTE i positiv (økning) og negativ (besparelse)
@@ -343,8 +344,12 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const fteCatAdjInc = fteCatAdjTotal > 0 ? fteCatAdjTotal : 0;
   const fteCatAdjDec = fteCatAdjTotal < 0 ? fteCatAdjTotal : 0;
 
-  const incTotFte = intIncTot + extInc + nsInc + fteCatAdjInc;
-  const decTotFte = intDecTot + extDec + nsDec + extConvAmt + fteCatAdjDec;
+  // Klassifiser intern→nearshoring konvertering basert på NETTO effekt
+  const i2nInc = i2nNet > 0 ? i2nNet : 0;
+  const i2nDec = i2nNet < 0 ? i2nNet : 0;
+
+  const incTotFte = intIncTot + extInc + nsInc + fteCatAdjInc + i2nInc;
+  const decTotFte = intDecTot + extDec + nsDec + extConvAmt + fteCatAdjDec + i2nDec;
 
   const fteDetails: BridgeBreakdown["details"] = [
     { label: "ØKNINGER", value: incTotFte, isHeader: true },
@@ -352,6 +357,9 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     { label: "Eksterne FTE", value: extInc, indent: true },
     { label: "Nearshoring", value: nsInc, indent: true },
   ];
+  if (i2nInc !== 0) {
+    fteDetails.push({ label: "Konvertering intern→nearshoring", value: i2nInc, indent: true });
+  }
   if (fteCatAdjInc !== 0) {
     fteDetails.push({ label: "Kategori-justering FTE", value: fteCatAdjInc, indent: true });
   }
@@ -362,6 +370,9 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     { label: "Nearshoring", value: nsDec, indent: true },
     { label: "Konvertering (ekstern red.)", value: extConvAmt, indent: true },
   );
+  if (i2nDec !== 0) {
+    fteDetails.push({ label: "Konvertering intern→nearshoring", value: i2nDec, indent: true });
+  }
   if (fteCatAdjDec !== 0) {
     fteDetails.push({ label: "Kategori-justering FTE", value: fteCatAdjDec, indent: true });
   }
