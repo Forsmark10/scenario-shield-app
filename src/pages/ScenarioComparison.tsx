@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { ChevronDown, ChevronRight, Download, Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAllScenarios, type ScenarioBundle } from "@/hooks/useAllScenarios";
