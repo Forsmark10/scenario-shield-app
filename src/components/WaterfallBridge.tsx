@@ -963,7 +963,7 @@ function WaterfallChart({
   const viewBadge = view === "PL" ? "P&L-modus" : "Spend-modus";
 
   return (
-    <div style={{ position: "relative", maxWidth: 1080, margin: "0 auto" }}>
+    <div style={{ position: "relative", width: "100%" }}>
       <div className="flex items-center justify-between mb-3 px-2">
         <h3 className="font-bold" style={{ color, fontSize: 14 }}>
           {bundle.meta.name}
