@@ -937,19 +937,19 @@ function WaterfallChart({
   const yMax = maxV + span * 0.12;
   const yMin = minV - span * 0.04;
 
-  // Layout — generous spacing, flat clean bars matching bar-chart style
-  const W = 960;
-  const H = 220;
-  const PAD_L = 18;
-  const PAD_R = 18;
-  const PAD_T = 34;
-  const PAD_B = 40;
+  // Layout — original generous proportions, full-width container
+  const W = 1200;
+  const H = 240;
+  const PAD_L = 20;
+  const PAD_R = 20;
+  const PAD_T = 36;
+  const PAD_B = 42;
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
   const n = bars.length;
   const slot = innerW / n;
-  const driverBarW = Math.min(56, slot * 0.58);
-  const totalBarW = Math.min(60, slot * 0.62);
+  const driverBarW = Math.min(72, slot * 0.7);
+  const totalBarW = Math.min(80, slot * 0.78);
   const barWidthFor = (b: BarSpec) =>
     b.type === "start" || b.type === "end" ? totalBarW : driverBarW;
 
