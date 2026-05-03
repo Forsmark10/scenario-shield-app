@@ -473,7 +473,9 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         sortKey: r.year,
         name: `${net > 0 ? "+" : ""}${net} Nearshoring ${r.year}`,
         type: "Nearshoring-endring",
-        details: `Inkl. kumulativ prisvekst på endringen`,
+        details: net > 0
+          ? "Inkl. kumulativ prisvekst fra FC 2026-basis"
+          : "Konstant besparelse mot FC 2026-basis",
         yearly: netYearly,
         comment: (r as any).comment ?? (r as any).comment_increase ?? (r as any).comment_decrease,
       });
