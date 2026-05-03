@@ -432,7 +432,7 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         sortKey: 10000 + r.year,
         name: `${r.count} ${r.internal_level} Intern→Nearshoring ${r.year}`,
         type: "Intern→Nearshoring",
-        details: `${r.overlap_months ?? 3} mnd overlapp`,
+        details: `${r.overlap_months ?? 3} mnd overlapp. Intern besparelse konstant, nearshoring vokser med prisvekst`,
         yearly: netYearly,
         comment: (r as any).comment,
       });
