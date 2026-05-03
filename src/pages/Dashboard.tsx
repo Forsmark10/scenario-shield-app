@@ -545,13 +545,6 @@ function ScenarioSection({
           <h2 className="text-[13px] font-semibold tracking-tight" style={{ color }}>
             {bundle.meta.name}
           </h2>
-          <p className="text-[11px] text-muted-foreground">
-            Totalkostnad 2031: <span className="font-medium text-foreground">{formatNumberNO(total2031M, 1)} MNOK</span>{" "}
-            · CAGR 2026–2031:{" "}
-            <span className={cn("font-medium", cagr < 0 ? "text-[hsl(var(--positive))]" : "text-foreground")}>
-              {formatPercentNO(cagr * 100, 1)} %
-            </span>
-          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-3">
@@ -636,36 +629,73 @@ function ScenarioSection({
           </div>
 
           {/* YoY */}
-          <div className="h-[210px]">
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">YoY-vekst %</div>
+          <div className="h-[210px] relative">
+            <div className="flex items-center justify-between mb-0.5">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">YoY-vekst %</div>
+              <div
+                className="text-[13px] font-bold tabular-nums"
+                style={{
+                  color,
+                  backgroundColor: `${color}1a`,
+                  padding: "2px 10px",
+                  borderRadius: 6,
+                }}
+              >
+                CAGR 2026–2031: {formatPercentNO(cagr * 100, 1)} %
+              </div>
+            </div>
             <ResponsiveContainer width="100%" height="92%">
-              <LineChart data={yoyData} margin={{ top: 18, right: 24, bottom: 4, left: 16 }}>
-                <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} padding={{ left: 12, right: 12 }} />
+              <ComposedChart data={yoyData} margin={{ top: 18, right: 24, bottom: 4, left: 16 }}>
+                <defs>
+                  <linearGradient id={`yoy-grad-${bundle.meta.id}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity={0.06} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 4" vertical={false} />
+                <XAxis dataKey="year" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} padding={{ left: 12, right: 12 }} />
                 <YAxis hide />
                 <Tooltip
                   formatter={(v: number | null) => (v == null ? "" : `${formatPercentNO(v, 1)} %`)}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="none"
+                  fill={`url(#yoy-grad-${bundle.meta.id})`}
+                  isAnimationActive={false}
                 />
                 <Line
                   type="monotone"
                   dataKey="value"
                   stroke={color}
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   connectNulls={false}
                   dot={(props: any) => {
                     const { cx, cy, payload, index } = props;
                     if (payload?.value == null) return <g key={`empty-${index}`} />;
-                    return <circle key={`dot-${index}`} cx={cx} cy={cy} r={3} fill={color} />;
+                    return (
+                      <circle
+                        key={`dot-${index}`}
+                        cx={cx}
+                        cy={cy}
+                        r={3.5}
+                        fill="#ffffff"
+                        stroke={color}
+                        strokeWidth={2.5}
+                      />
+                    );
                   }}
-                  activeDot={{ r: 5 }}
+                  activeDot={{ r: 5, fill: "#ffffff", stroke: color, strokeWidth: 2.5 }}
                 >
                   <LabelList
                     dataKey="value"
                     position="top"
                     formatter={(v: number | null) => (v == null ? "" : formatPercentNO(v, 1))}
-                    style={{ fontSize: 10, fill: "hsl(var(--foreground))" }}
+                    style={{ fontSize: 10, fill: "#64748b" }}
                   />
                 </Line>
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -731,33 +761,65 @@ function ScenarioComparisonChart({
       <CardContent className="pt-5">
         <h2 className="text-[15px] font-medium tracking-tight mb-1">Scenario-sammenligning</h2>
         <p className="text-xs text-muted-foreground mb-3">Totalkostnad per år (MNOK)</p>
-        <div className="h-[320px]">
+        <div className="h-[340px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 12, right: 24, bottom: 4, left: 0 }}>
-              <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="year" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+            <ComposedChart data={data} margin={{ top: 18, right: 28, bottom: 4, left: 8 }}>
+              <defs>
+                {scenarios.map((b, i) => {
+                  const c = SCENARIO_COLOR[i % SCENARIO_COLOR.length];
+                  return (
+                    <linearGradient key={b.meta.id} id={`scen-grad-${b.meta.id}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={c} stopOpacity={0.06} />
+                      <stop offset="100%" stopColor={c} stopOpacity={0} />
+                    </linearGradient>
+                  );
+                })}
+              </defs>
+              <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 4" vertical={false} />
+              <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
               <YAxis
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 11, fill: "#64748b" }}
                 axisLine={false}
                 tickLine={false}
                 domain={yDomain}
                 allowDataOverflow={false}
+                tickCount={4}
                 tickFormatter={(v) => formatNumberNO(v, 0)}
               />
-              <Tooltip formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`} />
-              <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={10} />
-              {scenarios.map((b, i) => (
-                <Line
-                  key={b.meta.id}
-                  type="monotone"
-                  dataKey={b.meta.name}
-                  stroke={SCENARIO_COLOR[i % SCENARIO_COLOR.length]}
-                  strokeWidth={2.5}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
-                />
-              ))}
-            </LineChart>
+              <Tooltip
+                contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }}
+                formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="circle" iconSize={10} />
+              {scenarios.map((b, i) => {
+                const c = SCENARIO_COLOR[i % SCENARIO_COLOR.length];
+                return (
+                  <Area
+                    key={`area-${b.meta.id}`}
+                    type="monotone"
+                    dataKey={b.meta.name}
+                    stroke="none"
+                    fill={`url(#scen-grad-${b.meta.id})`}
+                    isAnimationActive={false}
+                    legendType="none"
+                  />
+                );
+              })}
+              {scenarios.map((b, i) => {
+                const c = SCENARIO_COLOR[i % SCENARIO_COLOR.length];
+                return (
+                  <Line
+                    key={b.meta.id}
+                    type="monotone"
+                    dataKey={b.meta.name}
+                    stroke={c}
+                    strokeWidth={2.5}
+                    dot={{ r: 3.5, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
+                    activeDot={{ r: 5.5, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
+                  />
+                );
+              })}
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
         <p className="text-[11px] text-muted-foreground mt-2 italic">
@@ -1079,48 +1141,24 @@ function SavingsSection({
             <div className="text-xs font-medium text-muted-foreground mb-2">Besparelser per år (MNOK)</div>
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={lineData} margin={{ top: 16, right: 20, bottom: 4, left: 0 }}>
-                  <defs>
-                    {others.map((sc, i) => {
-                      const idx = scenarios.findIndex((s) => s.meta.id === sc.meta.id);
-                      const c = SCENARIO_COLOR[idx >= 0 ? idx : i + 1];
-                      return (
-                        <linearGradient key={sc.meta.id} id={`grad-${sc.meta.id}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={c} stopOpacity={0.18} />
-                          <stop offset="100%" stopColor={c} stopOpacity={0} />
-                        </linearGradient>
-                      );
-                    })}
-                  </defs>
-                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} opacity={0.5} />
-                  <XAxis dataKey="year" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <LineChart data={lineData} margin={{ top: 16, right: 20, bottom: 4, left: 0 }}>
+                  <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 4" vertical={false} />
+                  <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
                   <YAxis
-                    tick={{ fontSize: 11 }}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
                     axisLine={false}
                     tickLine={false}
                     domain={lineYDomain}
                     tickFormatter={(v) => formatNumberNO(v, 0)}
                   />
-                  <Tooltip formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={10} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }}
+                    formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="circle" iconSize={10} />
                   {lineYDomain && typeof lineYDomain[0] === "number" && typeof lineYDomain[1] === "number" && lineYDomain[0] < 0 && lineYDomain[1] > 0 && (
-                    <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.4} strokeWidth={1} />
+                    <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
                   )}
-                  {others.map((sc, i) => {
-                    const idx = scenarios.findIndex((s) => s.meta.id === sc.meta.id);
-                    const c = SCENARIO_COLOR[idx >= 0 ? idx : i + 1];
-                    return (
-                      <Area
-                        key={`area-${sc.meta.id}`}
-                        type="monotone"
-                        dataKey={sc.meta.name}
-                        stroke="none"
-                        fill={`url(#grad-${sc.meta.id})`}
-                        isAnimationActive={false}
-                        legendType="none"
-                      />
-                    );
-                  })}
                   {others.map((sc, i) => {
                     const idx = scenarios.findIndex((s) => s.meta.id === sc.meta.id);
                     const c = SCENARIO_COLOR[idx >= 0 ? idx : i + 1];
@@ -1130,13 +1168,13 @@ function SavingsSection({
                         type="monotone"
                         dataKey={sc.meta.name}
                         stroke={c}
-                        strokeWidth={2.75}
-                        dot={{ r: 4, fill: "#ffffff", stroke: c, strokeWidth: 2 }}
-                        activeDot={{ r: 6, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
+                        activeDot={{ r: 5.5, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
                       />
                     );
                   })}
-                </ComposedChart>
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
