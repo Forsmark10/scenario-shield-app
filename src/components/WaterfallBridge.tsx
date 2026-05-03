@@ -623,8 +623,10 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   }
 
   // Rest legges til som residual-driver rett før FC-N, slik at briden alltid stemmer per definisjon.
-  // Skjules visuelt hvis den er under 0.5 MNOK (500 tNOK) for å unngå forvirring.
-  const restThreshold = 500; // tNOK
+  // Skjules visuelt hvis den er under 5 MNOK (5000 tNOK). Den konstante ~4,2 MNOK differansen
+  // skyldes forskjell mellom faktiske FC 2026-tall og modellens beregnede satser og er beskrevet
+  // i "Om modellen". Vises kun hvis noe uventet stort dukker opp.
+  const restThreshold = 5000; // tNOK
   if (Math.abs(rest) >= restThreshold) {
     bridges.push({
       label: "Rest",
