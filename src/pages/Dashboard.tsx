@@ -1103,7 +1103,7 @@ function SavingsSection({
                   />
                   <Tooltip formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`} />
                   <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={10} />
-                  {lineYDomain && lineYDomain[0] < 0 && lineYDomain[1] > 0 && (
+                  {lineYDomain && typeof lineYDomain[0] === "number" && typeof lineYDomain[1] === "number" && lineYDomain[0] < 0 && lineYDomain[1] > 0 && (
                     <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.4} strokeWidth={1} />
                   )}
                   {others.map((sc, i) => {
