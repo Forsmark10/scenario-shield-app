@@ -289,20 +289,24 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
     // ───────── FTE-ENDRINGER ─────────
     // Sub-sort: interne økninger → interne reduksjoner → eksterne økninger → eksterne reduksjoner; deretter år
     for (const r of base.internal_fte_changes) {
-      const net = (Number(r.increase) || 0) - (Number(r.decrease) || 0);
+      const inc = Number(r.increase) || 0;
+      const dec = Number(r.decrease) || 0;
+      const net = inc - dec;
       if (net === 0) continue;
       const netYearly: Record<number, number> = {};
+      const absNet = Math.abs(net);
       for (const Y of FC_YEARS) {
         if (Y < r.year) {
           netYearly[Y] = 0;
           continue;
         }
-        const inc = Number(r.increase) || 0;
-        const dec = Number(r.decrease) || 0;
-        const deltaInc = inc * annualInternalFteCost(base, r.level, Y);
-        const frozenDecrease = annualInternalFteCost(base, r.level, r.year);
-        const deltaDec = -dec * frozenDecrease;
-        netYearly[Y] = deltaInc + deltaDec;
+        if (net > 0) {
+          // Økning: vokser med lønnsvekst hvert år
+          netYearly[Y] = absNet * annualInternalFteCost(base, r.level, Y) / 1000;
+        } else {
+          // Besparelse: frosset på kostnadsnivået i startåret, KONSTANT
+          netYearly[Y] = -(absNet * annualInternalFteCost(base, r.level, r.year) / 1000);
+        }
       }
       rows.push({
         key: `intfte:${r.year}:${r.level}`,
@@ -318,20 +322,24 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       });
     }
     for (const r of base.external_fte_changes) {
-      const net = (Number(r.increase) || 0) - (Number(r.decrease) || 0);
+      const inc = Number(r.increase) || 0;
+      const dec = Number(r.decrease) || 0;
+      const net = inc - dec;
       if (net === 0) continue;
       const netYearly: Record<number, number> = {};
+      const absNet = Math.abs(net);
       for (const Y of FC_YEARS) {
         if (Y < r.year) {
           netYearly[Y] = 0;
           continue;
         }
-        const inc = Number(r.increase) || 0;
-        const dec = Number(r.decrease) || 0;
-        const deltaInc = inc * annualExternalFteCost(base, r.level, Y);
-        const frozenDecrease = annualExternalFteCost(base, r.level, r.year);
-        const deltaDec = -dec * frozenDecrease;
-        netYearly[Y] = deltaInc + deltaDec;
+        if (net > 0) {
+          // Økning: vokser med prisvekst hvert år
+          netYearly[Y] = absNet * annualExternalFteCost(base, r.level, Y) / 1000;
+        } else {
+          // Besparelse: frosset på kostnadsnivået i startåret, KONSTANT
+          netYearly[Y] = -(absNet * annualExternalFteCost(base, r.level, r.year) / 1000);
+        }
       }
       rows.push({
         key: `extfte:${r.year}:${r.level}`,
@@ -406,20 +414,24 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
 
     // ───────── NEARSHORING ─────────
     for (const r of base.nearshoring_changes) {
-      const net = (Number(r.increase) || 0) - (Number(r.decrease) || 0);
+      const inc = Number(r.increase) || 0;
+      const dec = Number(r.decrease) || 0;
+      const net = inc - dec;
       if (net === 0) continue;
       const netYearly: Record<number, number> = {};
+      const absNet = Math.abs(net);
       for (const Y of FC_YEARS) {
         if (Y < r.year) {
           netYearly[Y] = 0;
           continue;
         }
-        const inc = Number(r.increase) || 0;
-        const dec = Number(r.decrease) || 0;
-        const deltaInc = inc * annualNearshoringCost(base, Y);
-        const frozenDecrease = annualNearshoringCost(base, r.year);
-        const deltaDec = -dec * frozenDecrease;
-        netYearly[Y] = deltaInc + deltaDec;
+        if (net > 0) {
+          // Økning: vokser med prisvekst hvert år
+          netYearly[Y] = absNet * annualNearshoringCost(base, Y);
+        } else {
+          // Besparelse: frosset på kostnadsnivået i startåret, KONSTANT
+          netYearly[Y] = -(absNet * annualNearshoringCost(base, r.year));
+        }
       }
       rows.push({
         key: `ns:${r.year}`,
