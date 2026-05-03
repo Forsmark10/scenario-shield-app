@@ -761,33 +761,65 @@ function ScenarioComparisonChart({
       <CardContent className="pt-5">
         <h2 className="text-[15px] font-medium tracking-tight mb-1">Scenario-sammenligning</h2>
         <p className="text-xs text-muted-foreground mb-3">Totalkostnad per år (MNOK)</p>
-        <div className="h-[320px]">
+        <div className="h-[340px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 12, right: 24, bottom: 4, left: 0 }}>
-              <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} />
-              <XAxis dataKey="year" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+            <ComposedChart data={data} margin={{ top: 18, right: 28, bottom: 4, left: 8 }}>
+              <defs>
+                {scenarios.map((b, i) => {
+                  const c = SCENARIO_COLOR[i % SCENARIO_COLOR.length];
+                  return (
+                    <linearGradient key={b.meta.id} id={`scen-grad-${b.meta.id}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={c} stopOpacity={0.06} />
+                      <stop offset="100%" stopColor={c} stopOpacity={0} />
+                    </linearGradient>
+                  );
+                })}
+              </defs>
+              <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 4" vertical={false} />
+              <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
               <YAxis
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 11, fill: "#64748b" }}
                 axisLine={false}
                 tickLine={false}
                 domain={yDomain}
                 allowDataOverflow={false}
+                tickCount={4}
                 tickFormatter={(v) => formatNumberNO(v, 0)}
               />
-              <Tooltip formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`} />
-              <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={10} />
-              {scenarios.map((b, i) => (
-                <Line
-                  key={b.meta.id}
-                  type="monotone"
-                  dataKey={b.meta.name}
-                  stroke={SCENARIO_COLOR[i % SCENARIO_COLOR.length]}
-                  strokeWidth={2.5}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
-                />
-              ))}
-            </LineChart>
+              <Tooltip
+                contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }}
+                formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="circle" iconSize={10} />
+              {scenarios.map((b, i) => {
+                const c = SCENARIO_COLOR[i % SCENARIO_COLOR.length];
+                return (
+                  <Area
+                    key={`area-${b.meta.id}`}
+                    type="monotone"
+                    dataKey={b.meta.name}
+                    stroke="none"
+                    fill={`url(#scen-grad-${b.meta.id})`}
+                    isAnimationActive={false}
+                    legendType="none"
+                  />
+                );
+              })}
+              {scenarios.map((b, i) => {
+                const c = SCENARIO_COLOR[i % SCENARIO_COLOR.length];
+                return (
+                  <Line
+                    key={b.meta.id}
+                    type="monotone"
+                    dataKey={b.meta.name}
+                    stroke={c}
+                    strokeWidth={2.5}
+                    dot={{ r: 3.5, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
+                    activeDot={{ r: 5.5, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
+                  />
+                );
+              })}
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
         <p className="text-[11px] text-muted-foreground mt-2 italic">
