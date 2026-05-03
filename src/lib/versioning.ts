@@ -13,6 +13,8 @@ const SCOPED_TABLES = [
   "nearshoring_changes",
   "category_adjustments",
   "capex_plan",
+  "internal_to_nearshoring_conversions",
+  "one_off_effects",
 ] as const;
 
 export type AssumptionsSnapshot = {
@@ -52,6 +54,8 @@ export function diffSummary(
     nearshoring_changes: "Nearshoring",
     category_adjustments: "Kategori-justeringer",
     capex_plan: "Capex-plan",
+    internal_to_nearshoring_conversions: "Intern→Nearshoring konv.",
+    one_off_effects: "Engangseffekter",
   };
   const changed: string[] = [];
   for (const t of SCOPED_TABLES) {
