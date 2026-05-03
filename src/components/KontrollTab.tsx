@@ -13,14 +13,48 @@ import { cn } from "@/lib/utils";
 type ViewMode = "PL" | "Spend";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031] as const;
+const CENTRAL_BASE_FX = 11.3;
+
+type GroupKey =
+  | "GLOBAL"
+  | "CENTRAL"
+  | "FTE"
+  | "CONVERSION"
+  | "NEARSHORING"
+  | "CATEGORY"
+  | "ONEOFF"
+  | "CAPEX";
+
+const GROUP_LABEL: Record<GroupKey, string> = {
+  GLOBAL: "GLOBALE DRIVERE",
+  CENTRAL: "SENTRALE DRIVERE",
+  FTE: "FTE-ENDRINGER",
+  CONVERSION: "KONVERTERINGER",
+  NEARSHORING: "NEARSHORING",
+  CATEGORY: "KATEGORI-JUSTERINGER",
+  ONEOFF: "ENGANGSEFFEKTER",
+  CAPEX: "CAPEX",
+};
+
+const GROUP_ORDER: GroupKey[] = [
+  "GLOBAL",
+  "CENTRAL",
+  "FTE",
+  "CONVERSION",
+  "NEARSHORING",
+  "CATEGORY",
+  "ONEOFF",
+  "CAPEX",
+];
 
 type Row = {
   key: string;
+  group: GroupKey;
+  sortKey: number; // for ordering within group
   name: string;
   type: string;
   details: string;
   yearly: Record<number, number>; // MNOK
-  acc2031: number; // MNOK
   comment?: string | null;
 };
 
@@ -32,7 +66,7 @@ function emptyDriverInputs(base: ForecastInputs): ForecastInputs {
       ...g,
       salary_increase_pct: 0,
       price_increase_pct: 0,
-      eur_nok_rate: 11.3,
+      eur_nok_rate: CENTRAL_BASE_FX,
     })),
     central_assumptions: base.central_assumptions.map((c) => ({
       ...c,
@@ -40,7 +74,7 @@ function emptyDriverInputs(base: ForecastInputs): ForecastInputs {
       central_volume_increase_pct: 0,
       central_reduction_pct: 0,
       central_reduction_amount_tnok: 0,
-      central_eur_nok_rate: 11.3,
+      central_eur_nok_rate: CENTRAL_BASE_FX,
     })),
     internal_fte_changes: base.internal_fte_changes.map((r) => ({ ...r, increase: 0, decrease: 0 })),
     external_fte_changes: base.external_fte_changes.map((r) => ({ ...r, increase: 0, decrease: 0 })),
@@ -74,7 +108,6 @@ function totalsByYear(inputs: ForecastInputs, view: ViewMode): Record<number, nu
   return out;
 }
 
-/** Diff: scenario − baseline, per år. */
 function diff(a: Record<number, number>, b: Record<number, number>): Record<number, number> {
   const out: Record<number, number> = {};
   for (const Y of FC_YEARS) out[Y] = (a[Y] ?? 0) - (b[Y] ?? 0);
@@ -86,7 +119,6 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
   const bundle = scenarios.find((s) => s.meta.id === scenarioId);
   const [view, setView] = useState<ViewMode>("PL");
 
-  // Beregn baseline (alle drivere = 0) og total-diff samt per-driver isolert diff.
   const calc = useMemo(() => {
     if (!bundle) return null;
     const base = bundle.inputs;
@@ -97,7 +129,6 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
 
     const rows: Row[] = [];
 
-    // Helper: lag isolert input ved å kun overskrive felter på "empty"
     const isolate = (mutate: (i: ForecastInputs) => ForecastInputs): Record<number, number> => {
       const iso = mutate({
         ...empty,
@@ -115,75 +146,71 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       return diff(totalsByYear(iso, view), baseTotals);
     };
 
-    // ---- Globale drivere (per år, men slå sammen til én rad per type) ----
-    {
-      const salaryAny = base.global_assumptions.some((g) => Number(g.salary_increase_pct) !== 0);
-      if (salaryAny) {
-        const yearly = isolate((i) => {
-          i.global_assumptions = base.global_assumptions.map((g) => ({
-            ...g,
-            salary_increase_pct: Number(g.salary_increase_pct) || 0,
-            price_increase_pct: 0,
-            eur_nok_rate: 11.3,
-          }));
-          return i;
-        });
-        const last = base.global_assumptions.find((g) => g.year === 2031);
-        rows.push({
-          key: "global:salary",
-          name: "Lønnsvekst",
-          type: "Global driver",
-          details: `${(Number(last?.salary_increase_pct ?? 0) * 100).toFixed(1)} % per år på interne FTE`,
-          yearly,
-          acc2031: yearly[2031],
-          comment: base.global_assumptions.find((g) => (g as any).comment_salary)?.["comment_salary" as any] as string | undefined,
-        });
-      }
-      const priceAny = base.global_assumptions.some((g) => Number(g.price_increase_pct) !== 0);
-      if (priceAny) {
-        const yearly = isolate((i) => {
-          i.global_assumptions = base.global_assumptions.map((g) => ({
-            ...g,
-            salary_increase_pct: 0,
-            price_increase_pct: Number(g.price_increase_pct) || 0,
-            eur_nok_rate: 11.3,
-          }));
-          return i;
-        });
-        const last = base.global_assumptions.find((g) => g.year === 2031);
-        rows.push({
-          key: "global:price",
-          name: "Prisvekst",
-          type: "Global driver",
-          details: `${(Number(last?.price_increase_pct ?? 0) * 100).toFixed(1)} % per år på lokale eksterne kostnader`,
-          yearly,
-          acc2031: yearly[2031],
-          comment: base.global_assumptions.find((g) => (g as any).comment_price)?.["comment_price" as any] as string | undefined,
-        });
-      }
-      const fxAny = base.global_assumptions.some((g) => Number(g.eur_nok_rate) !== 11.3);
-      if (fxAny) {
-        const yearly = isolate((i) => {
-          i.global_assumptions = base.global_assumptions.map((g) => ({
-            ...g,
-            salary_increase_pct: 0,
-            price_increase_pct: 0,
-            eur_nok_rate: Number(g.eur_nok_rate) || 11.3,
-          }));
-          return i;
-        });
-        rows.push({
-          key: "global:fx",
-          name: "EUR/NOK-kurs (Nearshoring)",
-          type: "Global driver",
-          details: "Avvik fra default 11,3",
-          yearly,
-          acc2031: yearly[2031],
-        });
-      }
+    // ───────── GLOBAL ─────────
+    if (base.global_assumptions.some((g) => Number(g.salary_increase_pct) !== 0)) {
+      const yearly = isolate((i) => {
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: Number(g.salary_increase_pct) || 0,
+          price_increase_pct: 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
+        return i;
+      });
+      const last = base.global_assumptions.find((g) => g.year === 2031);
+      rows.push({
+        key: "global:salary",
+        group: "GLOBAL",
+        sortKey: 1,
+        name: "Lønnsvekst",
+        type: "Global driver",
+        details: `${(Number(last?.salary_increase_pct ?? 0) * 100).toFixed(1)} % per år på eksisterende interne FTE fra FC 2026`,
+        yearly,
+      });
+    }
+    if (base.global_assumptions.some((g) => Number(g.price_increase_pct) !== 0)) {
+      const yearly = isolate((i) => {
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: 0,
+          price_increase_pct: Number(g.price_increase_pct) || 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
+        return i;
+      });
+      const last = base.global_assumptions.find((g) => g.year === 2031);
+      rows.push({
+        key: "global:price",
+        group: "GLOBAL",
+        sortKey: 2,
+        name: "Prisvekst",
+        type: "Global driver",
+        details: `${(Number(last?.price_increase_pct ?? 0) * 100).toFixed(1)} % per år på lokale ikke-FTE-kostnader`,
+        yearly,
+      });
+    }
+    if (base.global_assumptions.some((g) => Number(g.eur_nok_rate) !== CENTRAL_BASE_FX)) {
+      const yearly = isolate((i) => {
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: 0,
+          price_increase_pct: 0,
+          eur_nok_rate: Number(g.eur_nok_rate) || CENTRAL_BASE_FX,
+        }));
+        return i;
+      });
+      rows.push({
+        key: "global:fx",
+        group: "GLOBAL",
+        sortKey: 3,
+        name: "EUR/NOK-kurs (Nearshoring)",
+        type: "Global driver",
+        details: "Avvik fra default 11,3",
+        yearly,
+      });
     }
 
-    // ---- Sentrale drivere ----
+    // ───────── CENTRAL ─────────
     const cAssumps = base.central_assumptions;
     const setCentral = (field: string) => (i: ForecastInputs) => {
       i.central_assumptions = cAssumps.map((c) => ({
@@ -192,7 +219,7 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         central_volume_increase_pct: 0,
         central_reduction_pct: 0,
         central_reduction_amount_tnok: 0,
-        central_eur_nok_rate: 11.3,
+        central_eur_nok_rate: CENTRAL_BASE_FX,
         [field]: (c as any)[field] ?? 0,
       }));
       return i;
@@ -202,22 +229,24 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       const last = cAssumps.find((c) => c.year === 2031);
       rows.push({
         key: "central:price",
+        group: "CENTRAL",
+        sortKey: 1,
         name: "Sentral prisvekst",
         type: "Sentral driver",
         details: `${(Number(last?.central_price_increase_pct ?? 0) * 100).toFixed(1)} % per år (EUR-basis)`,
         yearly,
-        acc2031: yearly[2031],
       });
     }
     if (cAssumps.some((c) => Number(c.central_reduction_pct) !== 0)) {
       const yearly = isolate(setCentral("central_reduction_pct"));
       rows.push({
         key: "central:redpct",
+        group: "CENTRAL",
+        sortKey: 2,
         name: "Sentral reduksjon %",
         type: "Sentral driver",
         details: "Permanent multiplikativ reforhandling",
         yearly,
-        acc2031: yearly[2031],
       });
     }
     if (cAssumps.some((c) => Number(c.central_reduction_amount_tnok ?? 0) !== 0)) {
@@ -231,26 +260,29 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         .reduce((s, c) => s + Number(c.central_reduction_amount_tnok ?? 0), 0);
       rows.push({
         key: "central:redamt",
+        group: "CENTRAL",
+        sortKey: 3,
         name: "Sentral reduksjon tNOK",
         type: "Sentral driver",
         details: `Permanent fra ${firstYear ?? "—"}, ${formatNumberNO(annualAmt, 0)} tNOK/år`,
         yearly,
-        acc2031: yearly[2031],
       });
     }
-    if (cAssumps.some((c) => Number(c.central_eur_nok_rate ?? 11.3) !== 11.3)) {
+    if (cAssumps.some((c) => Number(c.central_eur_nok_rate ?? CENTRAL_BASE_FX) !== CENTRAL_BASE_FX)) {
       const yearly = isolate(setCentral("central_eur_nok_rate"));
       rows.push({
         key: "central:fx",
+        group: "CENTRAL",
+        sortKey: 4,
         name: "Sentral EUR/NOK-kurs",
         type: "Sentral driver",
         details: "Avvik fra default 11,3",
         yearly,
-        acc2031: yearly[2031],
       });
     }
 
-    // ---- Internal FTE-endringer ----
+    // ───────── FTE-ENDRINGER ─────────
+    // Sub-sort: interne økninger → interne reduksjoner → eksterne økninger → eksterne reduksjoner; deretter år
     for (const r of base.internal_fte_changes) {
       const net = (Number(r.increase) || 0) - (Number(r.decrease) || 0);
       if (net === 0) continue;
@@ -260,20 +292,38 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
             ? { ...x, increase: Number(r.increase) || 0, decrease: Number(r.decrease) || 0 }
             : { ...x, increase: 0, decrease: 0 },
         );
+        // Inkluder lønnsvekst slik at den nye/fjernede FTE-en akkumulerer korrekt
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: Number(g.salary_increase_pct) || 0,
+          price_increase_pct: 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
         return i;
       });
+      // Trekk ut den rene lønnsvekst-effekten på eksisterende workforce
+      const salaryOnly = isolate((i) => {
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: Number(g.salary_increase_pct) || 0,
+          price_increase_pct: 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
+        return i;
+      });
+      const netYearly: Record<number, number> = {};
+      for (const Y of FC_YEARS) netYearly[Y] = (yearly[Y] ?? 0) - (salaryOnly[Y] ?? 0);
       rows.push({
         key: `intfte:${r.year}:${r.level}`,
+        group: "FTE",
+        sortKey: (net > 0 ? 0 : 1) * 1000 + r.year, // interne økn først (0xxx), så red (1xxx); eksterne får 2xxx/3xxx
         name: `${net > 0 ? "+" : ""}${net} ${r.level} Intern FTE ${r.year}`,
         type: "Intern FTE-endring",
-        details: `Increase=${r.increase}, Decrease=${r.decrease}`,
-        yearly,
-        acc2031: yearly[2031],
+        details: `Inkl. kumulativ lønnsvekst på endringen`,
+        yearly: netYearly,
         comment: (r as any).comment ?? (r as any).comment_increase ?? (r as any).comment_decrease,
       });
     }
-
-    // ---- External FTE-endringer ----
     for (const r of base.external_fte_changes) {
       const net = (Number(r.increase) || 0) - (Number(r.decrease) || 0);
       if (net === 0) continue;
@@ -283,38 +333,108 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
             ? { ...x, increase: Number(r.increase) || 0, decrease: Number(r.decrease) || 0 }
             : { ...x, increase: 0, decrease: 0 },
         );
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: 0,
+          price_increase_pct: Number(g.price_increase_pct) || 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
         return i;
       });
+      const priceOnly = isolate((i) => {
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: 0,
+          price_increase_pct: Number(g.price_increase_pct) || 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
+        return i;
+      });
+      const netYearly: Record<number, number> = {};
+      for (const Y of FC_YEARS) netYearly[Y] = (yearly[Y] ?? 0) - (priceOnly[Y] ?? 0);
       rows.push({
         key: `extfte:${r.year}:${r.level}`,
+        group: "FTE",
+        sortKey: (net > 0 ? 2 : 3) * 1000 + r.year,
         name: `${net > 0 ? "+" : ""}${net} ${r.level} Ekstern FTE ${r.year}`,
         type: "Ekstern FTE-endring",
-        details: `Increase=${r.increase}, Decrease=${r.decrease}`,
-        yearly,
-        acc2031: yearly[2031],
+        details: `Inkl. kumulativ prisvekst på endringen`,
+        yearly: netYearly,
         comment: (r as any).comment ?? (r as any).comment_increase ?? (r as any).comment_decrease,
       });
     }
 
-    // ---- Konverteringer ----
+    // ───────── KONVERTERINGER ─────────
     for (const r of base.conversions) {
       if (!Number(r.count)) continue;
       const yearly = isolate((i) => {
         i.conversions = [{ ...r }];
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: Number(g.salary_increase_pct) || 0,
+          price_increase_pct: Number(g.price_increase_pct) || 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
         return i;
       });
+      const growthOnly = isolate((i) => {
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: Number(g.salary_increase_pct) || 0,
+          price_increase_pct: Number(g.price_increase_pct) || 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
+        return i;
+      });
+      const netYearly: Record<number, number> = {};
+      for (const Y of FC_YEARS) netYearly[Y] = (yearly[Y] ?? 0) - (growthOnly[Y] ?? 0);
       rows.push({
         key: `conv:${r.year}:${r.external_level}:${r.internal_level}`,
+        group: "CONVERSION",
+        sortKey: r.year,
         name: `${r.count} konv. ${r.external_level}→${r.internal_level} ${r.year}`,
-        type: "Konvertering",
+        type: "Ekstern→Intern",
         details: `${r.overlap_months} mnd overlapp`,
-        yearly,
-        acc2031: yearly[2031],
+        yearly: netYearly,
+        comment: (r as any).comment,
+      });
+    }
+    for (const r of base.internal_to_nearshoring_conversions ?? []) {
+      if (!Number(r.count)) continue;
+      const yearly = isolate((i) => {
+        i.internal_to_nearshoring_conversions = [{ ...r }];
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: Number(g.salary_increase_pct) || 0,
+          price_increase_pct: Number(g.price_increase_pct) || 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
+        return i;
+      });
+      const growthOnly = isolate((i) => {
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: Number(g.salary_increase_pct) || 0,
+          price_increase_pct: Number(g.price_increase_pct) || 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
+        return i;
+      });
+      const netYearly: Record<number, number> = {};
+      for (const Y of FC_YEARS) netYearly[Y] = (yearly[Y] ?? 0) - (growthOnly[Y] ?? 0);
+      rows.push({
+        key: `i2n:${r.year}:${r.internal_level}:${(r as any).id ?? Math.random()}`,
+        group: "CONVERSION",
+        sortKey: 10000 + r.year,
+        name: `${r.count} ${r.internal_level} Intern→Nearshoring ${r.year}`,
+        type: "Intern→Nearshoring",
+        details: `${r.overlap_months ?? 3} mnd overlapp`,
+        yearly: netYearly,
         comment: (r as any).comment,
       });
     }
 
-    // ---- Nearshoring-endringer ----
+    // ───────── NEARSHORING ─────────
     for (const r of base.nearshoring_changes) {
       const net = (Number(r.increase) || 0) - (Number(r.decrease) || 0);
       if (net === 0) continue;
@@ -324,64 +444,104 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
             ? { ...x, increase: Number(r.increase) || 0, decrease: Number(r.decrease) || 0 }
             : { ...x, increase: 0, decrease: 0 },
         );
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: 0,
+          price_increase_pct: Number(g.price_increase_pct) || 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
         return i;
       });
+      const priceOnly = isolate((i) => {
+        i.global_assumptions = base.global_assumptions.map((g) => ({
+          ...g,
+          salary_increase_pct: 0,
+          price_increase_pct: Number(g.price_increase_pct) || 0,
+          eur_nok_rate: CENTRAL_BASE_FX,
+        }));
+        return i;
+      });
+      const netYearly: Record<number, number> = {};
+      for (const Y of FC_YEARS) netYearly[Y] = (yearly[Y] ?? 0) - (priceOnly[Y] ?? 0);
       rows.push({
         key: `ns:${r.year}`,
+        group: "NEARSHORING",
+        sortKey: r.year,
         name: `${net > 0 ? "+" : ""}${net} Nearshoring ${r.year}`,
         type: "Nearshoring-endring",
-        details: `Increase=${r.increase}, Decrease=${r.decrease}`,
-        yearly,
-        acc2031: yearly[2031],
+        details: `Inkl. kumulativ prisvekst på endringen`,
+        yearly: netYearly,
         comment: (r as any).comment ?? (r as any).comment_increase ?? (r as any).comment_decrease,
       });
     }
 
-    // ---- Kategori-justeringer (% og tNOK – én rad per (kategori, år, type)) ----
+    // ───────── KATEGORI-JUSTERINGER ─────────
+    // %-justering beregnes på basis ETTER prisvekst (waterfall-konsistent)
+    // tNOK-justering er fast og vokser ikke
     for (const r of base.category_adjustments) {
       const pct = Number(r.adjustment_pct) || 0;
       const amt = Number((r as any).adjustment_amount_tnok ?? 0);
       if (pct !== 0) {
-        const yearly = isolate((i) => {
-          i.category_adjustments = base.category_adjustments.map((x) =>
-            x.year === r.year && x.category === r.category
-              ? { ...x, adjustment_pct: pct, adjustment_amount_tnok: 0 }
-              : { ...x, adjustment_pct: 0, adjustment_amount_tnok: 0 },
-          );
-          return i;
-        });
+        // Direkte beregning: baseSum_cat × cumPrice(2027..Y) × pct (kun for Y >= r.year)
+        const baseSum = base.cost_lines
+          .filter((c) => c.category === r.category && c.cost_type === "Local")
+          .reduce(
+            (s, c) => s + (c.fc_2026_monthly ?? []).reduce((x, m) => x + Number(m || 0), 0),
+            0,
+          ) / 1000; // MNOK
+        const yearly: Record<number, number> = {};
+        let cumPrice = 1;
+        for (const Y of FC_YEARS) {
+          const p = base.global_assumptions.find((g) => g.year === Y)?.price_increase_pct ?? 0;
+          cumPrice *= 1 + p;
+          yearly[Y] = Y >= r.year ? baseSum * cumPrice * pct : 0;
+        }
         rows.push({
           key: `cat:${r.category}:${r.year}:pct`,
+          group: "CATEGORY",
+          sortKey: r.year,
           name: `${(pct * 100).toFixed(1)} % ${r.category} ${r.year}`,
           type: "Kategori-justering %",
-          details: `Permanent fra ${r.year}`,
+          details: `På basis etter prisvekst, permanent fra ${r.year}`,
           yearly,
-          acc2031: yearly[2031],
           comment: (r as any).comment,
         });
       }
       if (amt !== 0) {
-        const yearly = isolate((i) => {
-          i.category_adjustments = base.category_adjustments.map((x) =>
-            x.year === r.year && x.category === r.category
-              ? { ...x, adjustment_pct: 0, adjustment_amount_tnok: amt }
-              : { ...x, adjustment_pct: 0, adjustment_amount_tnok: 0 },
-          );
-          return i;
-        });
+        const yearly: Record<number, number> = {};
+        for (const Y of FC_YEARS) yearly[Y] = Y >= r.year ? amt / 1000 : 0;
         rows.push({
           key: `cat:${r.category}:${r.year}:amt`,
+          group: "CATEGORY",
+          sortKey: 10000 + r.year,
           name: `${amt > 0 ? "+" : ""}${formatNumberNO(amt, 0)} tNOK ${r.category} ${r.year}`,
           type: "Kategori-justering tNOK",
-          details: `Permanent fra ${r.year}`,
+          details: `Fast beløp, permanent fra ${r.year}`,
           yearly,
-          acc2031: yearly[2031],
           comment: (r as any).comment_amount ?? (r as any).comment,
         });
       }
     }
 
-    // ---- Capex-plan ----
+    // ───────── ENGANGSEFFEKTER ─────────
+    for (const r of base.one_off_effects ?? []) {
+      if (!Number(r.amount_tnok)) continue;
+      const yearly: Record<number, number> = {};
+      for (const Y of FC_YEARS) yearly[Y] = Y === r.year ? Number(r.amount_tnok) / 1000 : 0;
+      rows.push({
+        key: `oneoff:${r.year}:${r.category}:${(r as any).id ?? Math.random()}`,
+        group: "ONEOFF",
+        sortKey: r.year,
+        name: `${r.description || "Engangseffekt"} (${r.category}) ${r.year}`,
+        type: "Engangseffekt",
+        details: `${formatNumberNO(Number(r.amount_tnok) / 1000, 1)} MNOK kun ${r.year}`,
+        yearly,
+        comment: (r as any).comment,
+      });
+    }
+
+    // ───────── CAPEX ─────────
+    const capexTypeOrder: Record<string, number> = { Hardware: 0, Software: 1, Prosjekt: 2 };
     for (const r of base.capex_plan) {
       if (!Number(r.amount)) continue;
       const yearly = isolate((i) => {
@@ -390,60 +550,39 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       });
       rows.push({
         key: `capex:${r.year}:${r.capex_type}:${(r as any).id ?? Math.random()}`,
+        group: "CAPEX",
+        sortKey: (capexTypeOrder[r.capex_type] ?? 9) * 10000 + r.year,
         name: `Capex ${r.capex_type} ${r.year} (${formatNumberNO(Number(r.amount) / 1000, 1)} MNOK)`,
-        type: "Capex-investering",
+        type: view === "PL" ? "Avskrivning over levetid" : "Direkte utgift",
         details: r.description ?? "—",
         yearly,
-        acc2031: yearly[2031],
         comment: (r as any).comment,
       });
     }
 
-    // ---- Internal → Nearshoring konvertering ----
-    for (const r of base.internal_to_nearshoring_conversions ?? []) {
-      if (!Number(r.count)) continue;
-      const yearly = isolate((i) => {
-        i.internal_to_nearshoring_conversions = [{ ...r }];
-        return i;
-      });
-      rows.push({
-        key: `i2n:${r.year}:${r.internal_level}:${(r as any).id ?? Math.random()}`,
-        name: `${r.count} ${r.internal_level} Intern→Nearshoring ${r.year}`,
-        type: "Intern→Nearshoring",
-        details: `${r.overlap_months ?? 3} mnd overlapp`,
-        yearly,
-        acc2031: yearly[2031],
-        comment: (r as any).comment,
-      });
+    // Sortér innenfor grupper
+    rows.sort((a, b) => {
+      const ga = GROUP_ORDER.indexOf(a.group);
+      const gb = GROUP_ORDER.indexOf(b.group);
+      if (ga !== gb) return ga - gb;
+      return a.sortKey - b.sortKey;
+    });
+
+    // Subtotaler per gruppe
+    const groupSubtotals: Record<GroupKey, Record<number, number>> = {} as any;
+    for (const g of GROUP_ORDER) {
+      const sub: Record<number, number> = {};
+      for (const Y of FC_YEARS) sub[Y] = 0;
+      for (const r of rows.filter((x) => x.group === g)) {
+        for (const Y of FC_YEARS) sub[Y] += r.yearly[Y] ?? 0;
+      }
+      groupSubtotals[g] = sub;
     }
 
-    // ---- Engangseffekter ----
-    for (const r of base.one_off_effects ?? []) {
-      if (!Number(r.amount_tnok)) continue;
-      const yearly = isolate((i) => {
-        i.one_off_effects = [{ ...r }];
-        return i;
-      });
-      rows.push({
-        key: `oneoff:${r.year}:${r.category}:${(r as any).id ?? Math.random()}`,
-        name: `${r.description || "Engangseffekt"} (${r.category}) ${r.year}`,
-        type: "Engangseffekt",
-        details: `${formatNumberNO(Number(r.amount_tnok) / 1000, 1)} MNOK kun ${r.year}`,
-        yearly,
-        acc2031: yearly[2031],
-        comment: (r as any).comment,
-      });
-    }
-
-    // Sum-rad
     const sumYearly: Record<number, number> = {};
     for (const Y of FC_YEARS) sumYearly[Y] = rows.reduce((s, r) => s + (r.yearly[Y] ?? 0), 0);
 
-    return {
-      rows: rows.sort((a, b) => Math.abs(b.acc2031) - Math.abs(a.acc2031)),
-      sumYearly,
-      totalDiff,
-    };
+    return { rows, groupSubtotals, sumYearly, totalDiff };
   }, [bundle, view]);
 
   if (loading) {
@@ -467,9 +606,8 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
     );
   }
 
-  const { rows, sumYearly, totalDiff } = calc;
-  const matchPct =
-    totalDiff[2031] !== 0 ? (sumYearly[2031] / totalDiff[2031]) * 100 : 0;
+  const { rows, groupSubtotals, sumYearly, totalDiff } = calc;
+  const matchPct = totalDiff[2031] !== 0 ? (sumYearly[2031] / totalDiff[2031]) * 100 : 0;
 
   return (
     <Card>
@@ -481,8 +619,9 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
               Kontroll – isolert effekt per forutsetning
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Hver rad viser hva forutsetningen alene bidrar med på {view === "PL" ? "P&L-totalen" : "Spend (kontant utgift)"},
-              alt annet likt. Sum nederst skal tilnærmet matche modellens totale endring 2026 → 2031.
+              Hver rad viser hva forutsetningen alene bidrar med på{" "}
+              {view === "PL" ? "P&L-totalen" : "Spend (kontant utgift)"}, beregnet samme måte som
+              waterfall-briden. Sum nederst skal tilnærmet matche modellens totale endring.
             </p>
           </div>
           <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
@@ -493,86 +632,75 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
           </Tabs>
         </div>
 
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-xs">
-            <thead className="bg-muted/60 sticky top-0">
+        <div className="rounded-md border overflow-hidden">
+          <table className="w-full text-xs table-fixed">
+            <colgroup>
+              <col style={{ width: "32%" }} />
+              <col style={{ width: "16%" }} />
+              <col style={{ width: "22%" }} />
+              {FC_YEARS.map((y) => (
+                <col key={y} style={{ width: "6%" }} />
+              ))}
+            </colgroup>
+            <thead className="bg-muted/60">
               <tr>
-                <th className="text-left font-medium px-3 py-2 min-w-[280px]">Forutsetning</th>
+                <th className="text-left font-medium px-3 py-2">Forutsetning</th>
                 <th className="text-left font-medium px-3 py-2">Type</th>
-                <th className="text-left font-medium px-3 py-2 min-w-[180px]">Detaljer</th>
+                <th className="text-left font-medium px-3 py-2">Detaljer</th>
                 {FC_YEARS.map((y) => (
                   <th key={y} className="text-right font-medium px-2 py-2 whitespace-nowrap">
                     {y}
                   </th>
                 ))}
-                <th className="text-right font-medium px-3 py-2 whitespace-nowrap bg-muted">
-                  Akk. 2031
-                </th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">
+                  <td colSpan={3 + FC_YEARS.length} className="px-3 py-6 text-center text-muted-foreground">
                     Ingen forutsetninger satt for dette scenarioet.
                   </td>
                 </tr>
               )}
-              {rows.map((r, idx) => (
-                <tr
-                  key={r.key}
-                  className={cn(idx % 2 === 1 ? "bg-muted/20" : "bg-card", "hover:bg-muted/40")}
-                >
-                  <td className="px-3 py-1.5">
-                    <span className="inline-flex items-center gap-1.5">
-                      {r.name}
-                      {r.comment && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <MessageSquare className="h-3 w-3 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p className="text-xs whitespace-pre-wrap">{r.comment}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-3 py-1.5 text-muted-foreground">{r.type}</td>
-                  <td className="px-3 py-1.5 text-muted-foreground">{r.details}</td>
-                  {FC_YEARS.map((y) => (
-                    <NumCell key={y} value={r.yearly[y]} />
-                  ))}
-                  <NumCell value={r.acc2031} bold />
-                </tr>
-              ))}
+              {GROUP_ORDER.map((g) => {
+                const groupRows = rows.filter((r) => r.group === g);
+                if (groupRows.length === 0) return null;
+                return (
+                  <GroupBlock
+                    key={g}
+                    group={g}
+                    rows={groupRows}
+                    subtotal={groupSubtotals[g]}
+                  />
+                );
+              })}
             </tbody>
             {rows.length > 0 && (
               <tfoot>
-                <tr className="font-semibold bg-muted/40 border-t-2 border-foreground/20">
+                <tr
+                  className="font-bold"
+                  style={{ background: "#edf2f7", borderTop: "2px solid #334155" }}
+                >
                   <td className="px-3 py-2" colSpan={3}>
                     Sum isolerte effekter
                   </td>
                   {FC_YEARS.map((y) => (
                     <NumCell key={y} value={sumYearly[y]} bold />
                   ))}
-                  <NumCell value={sumYearly[2031]} bold />
                 </tr>
-                <tr className="text-muted-foreground">
+                <tr className="text-muted-foreground" style={{ background: "#f8fafc" }}>
                   <td className="px-3 py-2" colSpan={3}>
-                    Modellens totale endring (FC 2031 − baseline)
+                    Modellens totale endring (FC vs. baseline)
                   </td>
                   {FC_YEARS.map((y) => (
                     <NumCell key={y} value={totalDiff[y]} />
                   ))}
-                  <NumCell value={totalDiff[2031]} />
                 </tr>
-                <tr className="text-xs text-muted-foreground">
-                  <td className="px-3 py-1.5" colSpan={8}>
-                    Sum/total-match: {formatNumberNO(matchPct, 1)} % – avvik skyldes interaksjon
-                    mellom drivere (f.eks. lønnsvekst på FTE-endringer).
+                <tr className="text-xs text-muted-foreground" style={{ background: "#f8fafc" }}>
+                  <td className="px-3 py-1.5" colSpan={3 + FC_YEARS.length}>
+                    Sum/total-match 2031: {formatNumberNO(matchPct, 1)} % – avvik skyldes interaksjon
+                    mellom drivere.
                   </td>
-                  <td />
                 </tr>
               </tfoot>
             )}
@@ -580,27 +708,92 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Alle tall i MNOK ({view === "PL" ? "P&L-perspektiv: Capex som avskrivninger over levetid" : "Spend-perspektiv: Capex som direkte utgift i investeringsåret"}). Positivt = økt kostnad, negativt = besparelse.
+          Alle tall i MNOK –{" "}
+          {view === "PL"
+            ? "P&L-perspektiv: Capex som avskrivninger over levetid"
+            : "Spend-perspektiv: Capex som direkte utgift i investeringsåret"}
+          . Negative tall (besparelser) i grønt og parentes; positive (kostnadsøkninger) i rødt.
         </p>
       </CardContent>
     </Card>
   );
 }
 
+function GroupBlock({
+  group,
+  rows,
+  subtotal,
+}: {
+  group: GroupKey;
+  rows: Row[];
+  subtotal: Record<number, number>;
+}) {
+  return (
+    <>
+      <tr style={{ background: "#edf2f7" }}>
+        <td
+          className="px-3 py-2 uppercase"
+          colSpan={3}
+          style={{ fontWeight: 700, fontSize: 12, letterSpacing: "0.03em", color: "#1e293b" }}
+        >
+          {GROUP_LABEL[group]}
+        </td>
+        {FC_YEARS.map((y) => (
+          <NumCell key={y} value={subtotal[y]} bold />
+        ))}
+      </tr>
+      {rows.map((r, idx) => (
+        <tr
+          key={r.key}
+          style={{ background: idx % 2 === 1 ? "#f8fafc" : "#ffffff" }}
+          className="hover:bg-muted/40"
+        >
+          <td className="py-1.5 pr-3" style={{ paddingLeft: 20 }}>
+            <span className="inline-flex items-center gap-1.5">
+              {r.name}
+              {r.comment && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs whitespace-pre-wrap">{r.comment}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </span>
+          </td>
+          <td className="px-3 py-1.5 text-muted-foreground truncate">{r.type}</td>
+          <td className="px-3 py-1.5 text-muted-foreground truncate">{r.details}</td>
+          {FC_YEARS.map((y) => (
+            <NumCell key={y} value={r.yearly[y]} />
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
 function NumCell({ value, bold }: { value: number; bold?: boolean }) {
   if (Math.abs(value) < 0.05) {
-    return <td className={cn("px-2 py-1.5 text-right text-muted-foreground tabular-nums", bold && "font-bold")}>—</td>;
+    return (
+      <td
+        className={cn("px-2 py-1.5 text-right tabular-nums", bold && "font-bold")}
+        style={{ color: "#94a3b8" }}
+      >
+        —
+      </td>
+    );
   }
   const negative = value < 0;
+  const formatted = formatNumberNO(Math.abs(value), 1);
+  const display = negative ? `(${formatted})` : formatted;
   return (
     <td
-      className={cn(
-        "px-2 py-1.5 text-right tabular-nums font-mono",
-        bold && "font-bold",
-        negative ? "text-[hsl(var(--positive))]" : "text-foreground",
-      )}
+      className={cn("px-2 py-1.5 text-right tabular-nums font-mono", bold && "font-bold")}
+      style={{ color: negative ? "#16a34a" : "#dc2626" }}
     >
-      {formatNumberNO(value, 1)}
+      {display}
     </td>
   );
 }
