@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
   Legend,
   Line,
   LineChart,
-  
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
