@@ -962,15 +962,23 @@ function WaterfallChart({
 
   const viewBadge = view === "PL" ? "P&L-modus" : "Spend-modus";
 
+  // Reference line at FC 2026 baseline value (across full width)
+  const baselineY = yScale(start);
+  const gradId = `bar-grad-${bundle.meta.id}`;
+
   return (
     <div style={{ position: "relative" }}>
-      <div className="flex items-center justify-between mb-0.5 px-2">
+      <div className="flex items-center justify-between mb-1 px-2">
         <h3 className="text-[12px] font-semibold" style={{ color }}>
           {bundle.meta.name}
         </h3>
         <div
-          className="text-[10px] font-bold rounded px-2 py-0 text-white tabular-nums"
-          style={{ backgroundColor: totalChangeColor }}
+          className="text-[11px] font-bold rounded-full px-2.5 py-0.5 text-white tabular-nums"
+          style={{
+            backgroundColor: totalChangeColor,
+            boxShadow: "0 2px 6px rgba(15,23,42,0.18)",
+            letterSpacing: "0.01em",
+          }}
           title={`FC 2026 → FC ${year}`}
         >
           {fmtPctSigned(totalChangePct)}
@@ -979,6 +987,31 @@ function WaterfallChart({
 
       <div className="w-full overflow-x-auto">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 560, display: "block" }}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2c4a6b" />
+              <stop offset="100%" stopColor={COLOR_TOTAL} />
+            </linearGradient>
+            <filter id={`${gradId}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur in="SourceAlpha" stdDeviation="1.2" />
+              <feOffset dx="0" dy="1" result="off" />
+              <feComponentTransfer><feFuncA type="linear" slope="0.25" /></feComponentTransfer>
+              <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+
+          {/* baseline reference line: FC 2026 top → end */}
+          <line
+            x1={PAD_L}
+            x2={W - PAD_R}
+            y1={baselineY}
+            y2={baselineY}
+            stroke="#cbd5e1"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+            opacity={0.5}
+          />
+
           {/* zero line */}
           {yMin < 0 && yMax > 0 && (
             <line
@@ -1011,10 +1044,10 @@ function WaterfallChart({
                 x2={x2}
                 y1={y}
                 y2={y}
-                stroke={COLOR_CONNECTOR}
-                strokeWidth={1}
+                stroke="#94a3b8"
+                strokeWidth={1.5}
                 strokeDasharray="5 4"
-                opacity={0.7}
+                opacity={0.85}
               />
             );
           })}
@@ -1037,7 +1070,7 @@ function WaterfallChart({
               : b.raw < 0
                 ? COLOR_TEXT_DEC
                 : COLOR_TEXT_INC;
-            const labelY = yTop - 5;
+            const labelY = yTop - 9;
             const xLabelY = H - PAD_B + 14;
             const isActive = activeBar?.name === b.name && activeBar?.type === b.type;
             return (
@@ -1065,7 +1098,7 @@ function WaterfallChart({
                   textAnchor="middle"
                   style={{
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: isTotal ? 12 : 10,
+                    fontSize: isTotal ? 13 : 10.5,
                     fontWeight: 700,
                     fill: labelColor,
                   }}
@@ -1078,8 +1111,9 @@ function WaterfallChart({
                   width={w}
                   height={h}
                   rx={isTotal ? 3 : 2}
-                  fill={b.color}
-                  opacity={isActive ? 1 : 0.9}
+                  fill={isTotal ? `url(#${gradId})` : b.color}
+                  opacity={isActive ? 1 : 0.92}
+                  filter={isTotal ? `url(#${gradId}-shadow)` : undefined}
                 />
                 <text
                   x={xCenter(i)}
@@ -1087,9 +1121,9 @@ function WaterfallChart({
                   textAnchor="middle"
                   style={{
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: 9,
+                    fontSize: 9.5,
                     fill: "hsl(var(--muted-foreground))",
-                    fontWeight: isTotal ? 600 : 400,
+                    fontWeight: isTotal ? 700 : 400,
                   }}
                 >
                   {b.name}
