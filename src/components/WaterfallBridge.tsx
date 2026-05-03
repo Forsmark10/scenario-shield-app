@@ -11,6 +11,7 @@ import type { ScenarioBundle } from "@/hooks/useAllScenarios";
 import type { Level } from "@/lib/forecast/types";
 import {
   annualExternalFteCost,
+  annualInternalFteCost,
   annualNearshoringCost,
 } from "@/lib/forecast/fteCost";
 import { formatNumberNO } from "@/lib/format";
@@ -217,26 +218,18 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const i2nNsAddAmt = i2nNsAddLine?.amounts[N] ?? 0;   // positive (kost)
   const i2nNet = i2nIntRedAmt + i2nNsAddAmt;
 
-  // Internal FTE: use engine-consistent calculation (base rate × salary factor, WITHOUT social costs).
-  // Social costs (AGA, feriepenger, pensjon) flow automatically via driver lines in engine,
-  // so including them here would double-count.
-  const intRate = (lvl: Level) =>
-    inputs.internal_fte_base_rates.find((r) => r.level === lvl)?.base_annual_cost ?? 0;
-
   let intInc = 0;
   let intDec = 0;
   for (let Y = 2027; Y <= N; Y++) {
-    const currentYearFactor = cumFactor(2027, N, salaryRate);
-    const frozenYearFactor = cumFactor(2027, Y, salaryRate);
     for (const lvl of LEVELS) {
       const rows = inputs.internal_fte_changes.filter((c) => c.year === Y && c.level === lvl);
       const inc = rows.reduce((a, r) => a + Number(r.increase ?? 0), 0);
       const dec = rows.reduce((a, r) => a + Number(r.decrease ?? 0), 0);
-      if (inc !== 0) intInc += inc * intRate(lvl) * currentYearFactor;
-      if (dec !== 0) intDec += -dec * intRate(lvl) * frozenYearFactor;
+      if (inc !== 0) intInc += inc * annualInternalFteCost(inputs, lvl, N);
+      if (dec !== 0) intDec += -dec * annualInternalFteCost(inputs, lvl, Y);
     }
     for (const conv of inputs.conversions.filter((c) => c.year === Y)) {
-      intInc += conv.count * intRate(conv.internal_level) * currentYearFactor;
+      intInc += conv.count * annualInternalFteCost(inputs, conv.internal_level, N);
     }
   }
   const intIncTot = intInc;
