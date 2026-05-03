@@ -102,24 +102,16 @@ export function SaveSnapshotDialog({
         scenarios.map((b) => captureAssumptionsSnapshot(b.meta.id)),
       );
 
-      // 2) Bygg ferske inputs (fra DB, ikke fra stale prop) og rekjør beregningen
-      //    så lagret `result` reflekterer NÅVÆRENDE assumptions.
-      const freshBundles = await Promise.all(
-        scenarios.map(async (b, i) => {
-          const inputs = await buildFreshInputs(b.meta.id, assumptionsByScenario[i].tables);
-          const result = calculateForecast(inputs);
-          return { inputs, result };
-        }),
-      );
-
+      // 2) Bruk result direkte fra useAllScenarios (allerede beregnet med calculateForecast).
+      //    Dette sikrer at lagret result er IDENTISK med det som vises i appen.
       const rows = scenarios.map((bundle, i) => ({
         name: name.trim(),
         description: description.trim() || null,
         scenario_id: bundle.meta.id,
         snapshot_group_id: groupId,
         data: {
-          inputs: freshBundles[i].inputs,
-          result: freshBundles[i].result,
+          inputs: bundle.inputs,
+          result: bundle.result,
           meta: bundle.meta,
           tables: assumptionsByScenario[i].tables,
           saved_at: savedAt,
