@@ -618,6 +618,7 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
               {view === "PL" ? "P&L-totalen" : "Spend (kontant utgift)"}, beregnet samme måte som
               waterfallen (total endring fra FC 2026-basis). Merk: Stolpediagrammet viser absolutt
               kostnad per år, mens waterfallen og kontrollen viser akkumulert endring fra baseline.
+              NB: Naturlig utfasing av historiske avskrivninger (investeringer gjort før FC 2026) vises ikke her – kun nye forutsetninger. Utfasingseffekten vises i waterfallens Avskrivning-søyle.
             </p>
           </div>
           <div className="flex items-center gap-2">
