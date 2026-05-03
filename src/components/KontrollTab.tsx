@@ -122,32 +122,27 @@ function diff(a: Record<number, number>, b: Record<number, number>): Record<numb
 }
 
 export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
-  const [isOpen, setIsOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Only load data when opened; bump reloadKey each time to get fresh data
-  const handleToggle = useCallback(() => {
-    setIsOpen((prev) => {
-      if (!prev) setReloadKey((k) => k + 1);
-      return !prev;
-    });
+  const handleRefresh = useCallback(() => {
+    setReloadKey((k) => k + 1);
   }, []);
 
   return (
     <div className="border rounded-lg mt-6">
-      <button
-        onClick={handleToggle}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted/50 transition-colors"
-      >
+      <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="text-lg">⊙</span>
-          <div>
-            <span className="font-semibold text-sm">Kontroll – isolert effekt per forutsetning</span>
-          </div>
+          <span className="font-semibold text-sm">Kontroll – isolert effekt per forutsetning</span>
         </div>
-        <span className="text-muted-foreground text-xs">{isOpen ? "▲ Lukk" : "▼ Åpne"}</span>
-      </button>
-      {isOpen && <KontrollTabInner scenarioId={scenarioId} reloadKey={reloadKey} />}
+        <button
+          onClick={handleRefresh}
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border hover:bg-muted/50"
+        >
+          ↻ Oppdater
+        </button>
+      </div>
+      <KontrollTabInner scenarioId={scenarioId} reloadKey={reloadKey} />
     </div>
   );
 }
