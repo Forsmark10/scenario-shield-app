@@ -109,8 +109,10 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         nearshoring_changes: empty.nearshoring_changes.map((r) => ({ ...r })),
         category_adjustments: empty.category_adjustments.map((r) => ({ ...r })),
         capex_plan: [],
+        internal_to_nearshoring_conversions: [],
+        one_off_effects: [],
       });
-      return diff(totalsByYear(iso), baseTotals);
+      return diff(totalsByYear(iso, view), baseTotals);
     };
 
     // ---- Globale drivere (per år, men slå sammen til én rad per type) ----
