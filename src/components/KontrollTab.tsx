@@ -129,25 +129,13 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
   }, []);
 
   return (
-    <div className="border rounded-lg mt-6">
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">⊙</span>
-          <span className="font-semibold text-sm">Kontroll – isolert effekt per forutsetning</span>
-        </div>
-        <button
-          onClick={handleRefresh}
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border hover:bg-muted/50"
-        >
-          ↻ Oppdater
-        </button>
-      </div>
-      <KontrollTabInner scenarioId={scenarioId} reloadKey={reloadKey} />
+    <div className="mt-6">
+      <KontrollTabInner scenarioId={scenarioId} reloadKey={reloadKey} onRefresh={handleRefresh} />
     </div>
   );
 }
 
-function KontrollTabInner({ scenarioId, reloadKey }: { scenarioId: string | null; reloadKey: number }) {
+function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: string | null; reloadKey: number; onRefresh: () => void }) {
   const { loading, scenarios, error } = useAllScenarios(reloadKey);
   const bundle = scenarios.find((s) => s.meta.id === scenarioId);
   const [view, setView] = useState<ViewMode>("PL");
@@ -632,12 +620,20 @@ function KontrollTabInner({ scenarioId, reloadKey }: { scenarioId: string | null
               kostnad per år, mens waterfallen og kontrollen viser akkumulert endring fra baseline.
             </p>
           </div>
-          <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
-            <TabsList>
-              <TabsTrigger value="PL">P&amp;L</TabsTrigger>
-              <TabsTrigger value="Spend">Spend</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="flex items-center gap-2">
+            <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
+              <TabsList>
+                <TabsTrigger value="PL">P&amp;L</TabsTrigger>
+                <TabsTrigger value="Spend">Spend</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <button
+              onClick={onRefresh}
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md border hover:bg-muted/50"
+            >
+              ↻ Oppdater
+            </button>
+          </div>
         </div>
 
         <div className="rounded-md border overflow-hidden">
