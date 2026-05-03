@@ -592,13 +592,6 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   );
 
   for (const N of YEARS) {
-    const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
-      category_adjustments,
-      scenario_id,
-      "External FTE",
-      N,
-    );
-
     // 1) FTE-endringer
     {
       let amt = 0;
@@ -619,9 +612,9 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           if (dec !== 0) parts.push(`Y${Y} ${lvl} dec=${dec} × annual=${annual} (konstant) = ${round2(deltaDec)}`);
         }
       }
-      extChangesLine.amounts[N] = amt * catFactor;
+      extChangesLine.amounts[N] = amt;
       extChangesLine.breakdown_source[N] = parts.length
-        ? `${parts.join("\n")}\n× cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amt * catFactor)}`
+        ? parts.join("\n")
         : "Ingen ekstern FTE-endring";
     }
 
