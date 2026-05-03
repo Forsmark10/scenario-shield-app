@@ -711,6 +711,48 @@ export type Database = {
           },
         ]
       }
+      internal_to_nearshoring_conversions: {
+        Row: {
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
+          count: number
+          created_at: string
+          id: string
+          internal_level: string
+          overlap_months: number
+          scenario_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
+          count?: number
+          created_at?: string
+          id?: string
+          internal_level: string
+          overlap_months?: number
+          scenario_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
+          count?: number
+          created_at?: string
+          id?: string
+          internal_level?: string
+          overlap_months?: number
+          scenario_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       nearshoring_additions: {
         Row: {
           comment: string | null
@@ -836,6 +878,48 @@ export type Database = {
           decrease?: number
           id?: string
           increase?: number
+          scenario_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      one_off_effects: {
+        Row: {
+          amount_tnok: number
+          category: string
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
+          created_at: string
+          description: string | null
+          id: string
+          scenario_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          amount_tnok?: number
+          category: string
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          scenario_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          amount_tnok?: number
+          category?: string
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
           scenario_id?: string
           updated_at?: string
           year?: number

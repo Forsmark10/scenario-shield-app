@@ -208,12 +208,18 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
     }
     if (cAssumps.some((c) => Number(c.central_reduction_amount_tnok ?? 0) !== 0)) {
       const yearly = isolate(setCentral("central_reduction_amount_tnok"));
-      const total = cAssumps.reduce((s, c) => s + Number(c.central_reduction_amount_tnok ?? 0), 0);
+      const firstYear = cAssumps
+        .filter((c) => Number(c.central_reduction_amount_tnok ?? 0) !== 0)
+        .map((c) => c.year)
+        .sort((a, b) => a - b)[0];
+      const annualAmt = cAssumps
+        .filter((c) => Number(c.central_reduction_amount_tnok ?? 0) !== 0)
+        .reduce((s, c) => s + Number(c.central_reduction_amount_tnok ?? 0), 0);
       rows.push({
         key: "central:redamt",
         name: "Sentral reduksjon tNOK",
         type: "Sentral driver",
-        details: `Akkumulerer til ${formatNumberNO(total / 1000, 1)} MNOK fra 2031`,
+        details: `Permanent fra ${firstYear ?? "—"}, ${formatNumberNO(annualAmt, 0)} tNOK/år`,
         yearly,
         acc2031: yearly[2031],
       });

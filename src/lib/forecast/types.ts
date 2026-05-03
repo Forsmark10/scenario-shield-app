@@ -80,6 +80,26 @@ export interface CategoryAdjustment {
   comment?: string | null;
 }
 
+/** Internal → Nearshoring conversion. Intern FTE fjernes, nearshoring legges til, 3 mnd overlapp. */
+export interface InternalToNearshoringConversion {
+  scenario_id: string;
+  year: number;
+  internal_level: Level;
+  count: number;
+  overlap_months: number;
+  comment?: string | null;
+}
+
+/** Engangseffekt (one-off): gjelder kun ett år, vokser ikke, additivt på kategori. */
+export interface OneOffEffect {
+  scenario_id: string;
+  year: number;
+  category: string;
+  description?: string | null;
+  amount_tnok: number;
+  comment?: string | null;
+}
+
 export interface CapexPlan {
   scenario_id: string;
   year: number;
@@ -153,6 +173,8 @@ export interface ForecastInputs {
   conversions: Conversion[];
   nearshoring_additions: NearshoringAddition[];
   nearshoring_changes: NearshoringChange[];
+  internal_to_nearshoring_conversions?: InternalToNearshoringConversion[];
+  one_off_effects?: OneOffEffect[];
   category_adjustments: CategoryAdjustment[];
   capex_plan: CapexPlan[];
   depreciation_rules: DepreciationRule[];
