@@ -818,18 +818,18 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       for (let Y = 2027; Y <= N; Y++) {
         for (const r of i2n.filter((c) => c.year === Y)) {
           const rate = intRate(r.internal_level);
-          const grownSalary = cumulativeFactor(scenario_id, Y, N, salaryRate);
-          const annualInt = r.count * rate * grownSalary;
+          // Intern besparelse er KONSTANT mot FC2026 (ingen lønnsvekst)
+          const annualIntFlat = r.count * rate;
           const overlapMonths = Math.max(0, Math.min(12, r.overlap_months ?? 3));
           if (Y === N) {
             // Konverteringsåret: behold (overlapMonths/12) av intern-kost.
             const monthsRemoved = 12 - overlapMonths;
-            const reduction = -(annualInt * monthsRemoved) / 12;
+            const reduction = -(annualIntFlat * monthsRemoved) / 12;
             intRed += reduction;
-            intParts.push(`Konv-år Y${Y} ${r.internal_level} ×${r.count}: -${monthsRemoved}/12 av annual=${round2(annualInt)} = ${round2(reduction)}`);
+            intParts.push(`Konv-år Y${Y} ${r.internal_level} x${r.count}: -${monthsRemoved}/12 av annual=${round2(annualIntFlat)} (konstant) = ${round2(reduction)}`);
           } else {
-            intRed += -annualInt;
-            intParts.push(`Etter Y${Y} ${r.internal_level} ×${r.count}: -annual=${round2(annualInt)}`);
+            intRed += -annualIntFlat;
+            intParts.push(`Etter Y${Y} ${r.internal_level} x${r.count}: -annual=${round2(annualIntFlat)} (konstant)`);
           }
           // Nearshoring-kost: full årseffekt fra Y, ingen overlapp på nearshoring-siden
           // (overlapp gjelder kun intern). Pris vokser med global price_rate.
