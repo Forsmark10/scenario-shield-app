@@ -937,19 +937,19 @@ function WaterfallChart({
   const yMax = maxV + span * 0.12;
   const yMin = minV - span * 0.04;
 
-  // Layout — compact, totals slightly wider than driver bars
+  // Layout — generous spacing, flat clean bars matching bar-chart style
   const W = 960;
-  const H = 210;
-  const PAD_L = 14;
-  const PAD_R = 14;
-  const PAD_T = 30;
-  const PAD_B = 38;
+  const H = 220;
+  const PAD_L = 18;
+  const PAD_R = 18;
+  const PAD_T = 34;
+  const PAD_B = 40;
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
   const n = bars.length;
   const slot = innerW / n;
-  const driverBarW = Math.min(64, slot * 0.7);
-  const totalBarW = Math.min(58, slot * 0.55);
+  const driverBarW = Math.min(56, slot * 0.58);
+  const totalBarW = Math.min(60, slot * 0.62);
   const barWidthFor = (b: BarSpec) =>
     b.type === "start" || b.type === "end" ? totalBarW : driverBarW;
 
@@ -962,21 +962,19 @@ function WaterfallChart({
 
   const viewBadge = view === "PL" ? "P&L-modus" : "Spend-modus";
 
-  // Reference line at FC 2026 baseline value (across full width)
-  const baselineY = yScale(start);
-  const gradId = `bar-grad-${bundle.meta.id}`;
-
   return (
     <div style={{ position: "relative" }}>
-      <div className="flex items-center justify-between mb-1 px-2">
+      <div className="flex items-center justify-between mb-1.5 px-2">
         <h3 className="text-[12px] font-semibold" style={{ color }}>
           {bundle.meta.name}
         </h3>
         <div
-          className="text-[11px] font-bold rounded-full px-2.5 py-0.5 text-white tabular-nums"
+          className="text-[11px] font-bold tabular-nums"
           style={{
             backgroundColor: totalChangeColor,
-            boxShadow: "0 2px 6px rgba(15,23,42,0.18)",
+            color: "#ffffff",
+            padding: "3px 10px",
+            borderRadius: 4,
             letterSpacing: "0.01em",
           }}
           title={`FC 2026 → FC ${year}`}
@@ -987,31 +985,6 @@ function WaterfallChart({
 
       <div className="w-full overflow-x-auto">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 560, display: "block" }}>
-          <defs>
-            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#2c4a6b" />
-              <stop offset="100%" stopColor={COLOR_TOTAL} />
-            </linearGradient>
-            <filter id={`${gradId}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur in="SourceAlpha" stdDeviation="1.2" />
-              <feOffset dx="0" dy="1" result="off" />
-              <feComponentTransfer><feFuncA type="linear" slope="0.25" /></feComponentTransfer>
-              <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-          </defs>
-
-          {/* baseline reference line: FC 2026 top → end */}
-          <line
-            x1={PAD_L}
-            x2={W - PAD_R}
-            y1={baselineY}
-            y2={baselineY}
-            stroke="#cbd5e1"
-            strokeWidth={1}
-            strokeDasharray="4 4"
-            opacity={0.5}
-          />
-
           {/* zero line */}
           {yMin < 0 && yMax > 0 && (
             <line
@@ -1019,12 +992,12 @@ function WaterfallChart({
               x2={W - PAD_R}
               y1={yScale(0)}
               y2={yScale(0)}
-              stroke="hsl(var(--border))"
+              stroke="#e2e8f0"
               strokeWidth={1}
             />
           )}
 
-          {/* connector dashed lines */}
+          {/* connector dashed lines — thin and discreet */}
           {bars.map((b, i) => {
             if (i === bars.length - 1) return null;
             const nextBar = bars[i + 1];
@@ -1045,14 +1018,13 @@ function WaterfallChart({
                 y1={y}
                 y2={y}
                 stroke="#94a3b8"
-                strokeWidth={1.5}
-                strokeDasharray="5 4"
-                opacity={0.85}
+                strokeWidth={1}
+                strokeDasharray="4 3"
               />
             );
           })}
 
-          {/* bars */}
+          {/* bars — flat, rounded corners, matches stolpediagrammene */}
           {bars.map((b, i) => {
             const w = barWidthFor(b);
             const x = xCenter(i) - w / 2;
@@ -1070,8 +1042,8 @@ function WaterfallChart({
               : b.raw < 0
                 ? COLOR_TEXT_DEC
                 : COLOR_TEXT_INC;
-            const labelY = yTop - 9;
-            const xLabelY = H - PAD_B + 14;
+            const labelY = yTop - 10;
+            const xLabelY = H - PAD_B + 16;
             const isActive = activeBar?.name === b.name && activeBar?.type === b.type;
             return (
               <g
@@ -1098,7 +1070,7 @@ function WaterfallChart({
                   textAnchor="middle"
                   style={{
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: isTotal ? 13 : 10.5,
+                    fontSize: isTotal ? 12 : 11,
                     fontWeight: 700,
                     fill: labelColor,
                   }}
@@ -1110,10 +1082,9 @@ function WaterfallChart({
                   y={yTop}
                   width={w}
                   height={h}
-                  rx={isTotal ? 3 : 2}
-                  fill={isTotal ? `url(#${gradId})` : b.color}
-                  opacity={isActive ? 1 : 0.92}
-                  filter={isTotal ? `url(#${gradId}-shadow)` : undefined}
+                  rx={2.5}
+                  fill={b.color}
+                  opacity={isActive ? 1 : 0.96}
                 />
                 <text
                   x={xCenter(i)}
@@ -1121,9 +1092,9 @@ function WaterfallChart({
                   textAnchor="middle"
                   style={{
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: 9.5,
+                    fontSize: 10.5,
                     fill: "hsl(var(--muted-foreground))",
-                    fontWeight: isTotal ? 700 : 400,
+                    fontWeight: isTotal ? 600 : 400,
                   }}
                 >
                   {b.name}
