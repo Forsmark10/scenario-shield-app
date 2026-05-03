@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAllScenarios } from "@/hooks/useAllScenarios";
+import { calculateForecast } from "@/lib/forecast/engine";
 import {
   Dialog,
   DialogContent,
@@ -565,7 +566,15 @@ function CompareSnapshotDialog({
 
   const diff = useMemo(() => {
     if (!snapshot || !currentBundle) return [];
-    const snap = aggregate(snapshot.data?.result?.lines ?? []);
+    // Re-beregn snapshot fra lagrede inputs for å unngå avvik fra kodeendringer
+    let snapLines = snapshot.data?.result?.lines ?? [];
+    if (snapshot.data?.inputs) {
+      try {
+        const recomputed = calculateForecast(snapshot.data.inputs);
+        snapLines = recomputed.lines;
+      } catch { /* fallback til lagret result */ }
+    }
+    const snap = aggregate(snapLines);
     const cur = aggregate(currentBundle.result.lines as any[]);
     const cats = new Set<string>([...snap.keys(), ...cur.keys()]);
     return Array.from(cats)
