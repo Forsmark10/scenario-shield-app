@@ -443,14 +443,16 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
         // linjer lenger ned (slik at de ikke fordeles per cost_line).
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
         const amt = base * priceFactor;
-        const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
+        const { amount: catAdjAmount, desc: catAdjDesc } = categoryAdjustmentEffect(
           category_adjustments,
           scenario_id,
           "External FTE",
-          N
+          base,
+          N,
+          priceRate,
         );
-        amount = amt * catFactor;
-        bd = `External FTE (linje): base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amount)}`;
+        amount = amt + catAdjAmount;
+        bd = `External FTE (linje): base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} = ${round2(amt)}; cat_adj=${catAdjDesc} → ${round2(catAdjAmount)}; sum=${round2(amount)}`;
       } else if (cl.category === "Depreciation") {
         // ===== DEPRECIATION (existing) =====
         if (cl.is_existing_depreciation_alfa) {
@@ -524,14 +526,17 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       } else {
         // ===== ØVRIGE LOKALE (Operations, IT Costs, Consultancy, Other operating income) =====
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
-        const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
+        const pricedBase = base * priceFactor;
+        const { amount: catAdjAmount, desc: catAdjDesc } = categoryAdjustmentEffect(
           category_adjustments,
           scenario_id,
           cl.category,
-          N
+          base,
+          N,
+          priceRate,
         );
-        amount = base * priceFactor * catFactor;
-        bd = `${cl.category}: ${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cum_cat_adj(2027..${N})=${catDesc}=${round2(catFactor)} = ${round2(amount)}`;
+        amount = pricedBase + catAdjAmount;
+        bd = `${cl.category}: ${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} = ${round2(pricedBase)}; cat_adj=${catAdjDesc} → ${round2(catAdjAmount)}; sum=${round2(amount)}`;
       }
 
       line.amounts[N] = amount;
