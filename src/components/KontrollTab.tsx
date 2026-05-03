@@ -1,13 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CheckCircle2, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAllScenarios } from "@/hooks/useAllScenarios";
 import { calculateForecast } from "@/lib/forecast/engine";
 import type { ForecastInputs } from "@/lib/forecast/types";
 import { formatNumberNO } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+type ViewMode = "PL" | "Spend";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031] as const;
 
