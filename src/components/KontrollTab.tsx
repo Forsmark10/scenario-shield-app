@@ -28,14 +28,12 @@ type Row = {
 function emptyDriverInputs(base: ForecastInputs): ForecastInputs {
   return {
     ...base,
-    // Globale: 0 lønns-/prisvekst, default kurs
     global_assumptions: base.global_assumptions.map((g) => ({
       ...g,
       salary_increase_pct: 0,
       price_increase_pct: 0,
       eur_nok_rate: 11.3,
     })),
-    // Sentrale: alle drivere på 0, default kurs
     central_assumptions: base.central_assumptions.map((c) => ({
       ...c,
       central_price_increase_pct: 0,
@@ -55,14 +53,24 @@ function emptyDriverInputs(base: ForecastInputs): ForecastInputs {
       adjustment_amount_tnok: 0,
     })),
     capex_plan: [],
+    internal_to_nearshoring_conversions: [],
+    one_off_effects: [],
   };
 }
 
-/** Beregn årlige totaler (P&L, MNOK) for et input-sett. */
-function totalsByYear(inputs: ForecastInputs): Record<number, number> {
+/** Beregn årlige totaler for et input-sett, P&L eller Spend. */
+function totalsByYear(inputs: ForecastInputs, view: ViewMode): Record<number, number> {
   const r = calculateForecast(inputs);
   const out: Record<number, number> = {};
-  for (const Y of FC_YEARS) out[Y] = (r.totals.by_year[Y] ?? 0) / 1000;
+  for (const Y of FC_YEARS) out[Y] = 0;
+  for (const line of r.lines) {
+    if (view === "PL" && line.is_capex) continue;
+    if (view === "Spend" && line.is_depreciation) continue;
+    if (view === "Spend" && line.category === "Other operating income") continue;
+    for (const Y of FC_YEARS) {
+      out[Y] += (line.amounts[Y] ?? 0) / 1000;
+    }
+  }
   return out;
 }
 
