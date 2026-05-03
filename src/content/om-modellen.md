@@ -4,6 +4,37 @@ En komplett guide til hva appen gjør, hvordan kostnadsmodellen er bygget opp, o
 
 ---
 
+## Beregningsprinsipper – økninger vs. besparelser
+
+**Grunnprinsipp:** FC 2026 er baseline og er **frosset** – den vokser ikke. Alle endringer i waterfall og Kontroll-tabben måles mot denne frosne baseline.
+
+- **Økninger** (nye FTE-er, nearshoring-økninger) **vokser** med kumulativ lønnsvekst/prisvekst fra året de inntreffer.
+- **Besparelser** (FTE-reduksjoner, nearshoring-reduksjoner) er **permanente og konstante** – de vokser ikke, fordi baseline ikke vokser.
+- **Konverteringer** (Ekstern→Intern, Intern→Nearshoring) har en **konstant** besparelse på den fjernede ressursen og en **voksende** kostnad på den nye. Netto besparelse krymper derfor over tid.
+- **Kategori-justeringer i tNOK** og **engangseffekter**: konstant beløp, vokser ikke. %-justeringer regnes på basis etter prisvekst.
+
+### Eksempler
+
+**+1 Medium Intern FTE 2027** (rate 1 000 tNOK, lønnsvekst 4 %):
+2027: 1 040 · 2028: 1 082 · 2029: 1 125 · 2030: 1 170 · 2031: 1 217 tNOK.
+
+**−2 Medium Intern FTE 2027** (rate 1 000 tNOK):
+2027–2031: konstant (2 000) tNOK/år.
+
+**3 konv. Medium Ekstern→Medium Intern 2027** (ekstern 270 × 11 = 2 970, intern 1 000, lønnsvekst 4 %):
+- Ekstern besparelse −8 910 tNOK/år (konstant).
+- Intern økning vokser fra ~3 120 (2027) til ~3 650 (2031).
+- Netto besparelse krymper fra ca. (3 360) i 2027 mot ca. (5 260) i 2031.
+
+### Forskjell mellom stolpediagram og waterfall
+
+- **Stolpediagram**: viser absolutt kostnad per år. En ny FTE i 2027 ligger i 2027-søylen; i 2028-søylen vises bare differansen (lønnsveksten) i forhold til 2027.
+- **Waterfall**: viser **total endring fra FC 2026-baseline** til valgt sluttår. En ny FTE i 2027 viser hele årskosten (inkl. kumulativ lønnsvekst) i hvert år, fordi den ikke fantes i baseline.
+- **Kontroll-tabben**: samme perspektiv som waterfall – isolert effekt mot baseline.
+
+---
+
+
 ## a) Formål
 
 Appen er et verktøy for **langsiktig kostnadsplanlegging (LTP)** for et kostnadssenter. Den tar utgangspunkt i prognosen for FC 2026 og beregner hvordan kostnadene utvikler seg fra **FC 2026 til FC 2031** under tre ulike scenarioer. Målet er å gjøre det enkelt å forstå *hvilke drivere* som forklarer kostnadsendringer fra år til år, og å sammenligne effekten av ulike tiltak side ved side.
