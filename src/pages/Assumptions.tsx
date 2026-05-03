@@ -462,6 +462,10 @@ export default function Assumptions() {
                         ["capex_plan (detaljerte)", () =>
                           supabase.from("capex_plan").delete()
                             .eq("scenario_id", sid).not("description", "is", null)],
+                        ["internal_to_nearshoring_conversions", () =>
+                          supabase.from("internal_to_nearshoring_conversions").delete().eq("scenario_id", sid)],
+                        ["one_off_effects", () =>
+                          supabase.from("one_off_effects").delete().eq("scenario_id", sid)],
                       ];
                       for (const [label, fn] of deletes) {
                         const { error } = await fn();
