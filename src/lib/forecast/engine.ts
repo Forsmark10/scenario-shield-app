@@ -11,6 +11,13 @@ import {
   YEARS,
   ForecastYear,
 } from "./types";
+import {
+  annualExternalFteCost,
+  annualInternalFteCost,
+  annualNearshoringCost,
+  cumulativeInputFactor,
+  externalWorkingMonths,
+} from "./fteCost";
 
 const LEVELS: Level[] = ["Low", "Medium", "High"];
 const sum = (arr: number[]) => arr.reduce((a, b) => a + (b ?? 0), 0);
@@ -322,15 +329,16 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       `base=${round2(masterBase)} × cum_salary(2027..${N})=${round2(salaryFactor)} → ${round2(masterBase * salaryFactor)}`,
     ];
     for (let Y = 2027; Y <= N; Y++) {
-      const grown = cumulativeFactor(scenario_id, Y, N, salaryRate);
+      const currentYearFactor = cumulativeInputFactor(2027, N, salaryRate);
       for (const lvl of LEVELS) {
         const inc = intIncDec.inc.get(fteChangeKey(Y, lvl)) ?? 0;
         const dec = intIncDec.dec.get(fteChangeKey(Y, lvl)) ?? 0;
         if (inc === 0 && dec === 0) continue;
         const rate = intRate(lvl);
-        // Increase: vokser med lønnsvekst. Decrease: konstant mot FC2026.
-        const deltaInc = inc * rate * grown;
-        const deltaDec = -dec * rate;
+        const frozenYearFactor = cumulativeInputFactor(2027, Y, salaryRate);
+        // Increase: årskost i gjeldende år. Decrease: fryses på tiltaksårets kostnadsnivå.
+        const deltaInc = inc * rate * currentYearFactor;
+        const deltaDec = -dec * rate * frozenYearFactor;
         const delta = deltaInc + deltaDec;
         amount += delta;
         changeContributions.push({
@@ -338,19 +346,19 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           level: lvl,
           net: inc - dec,
           rate,
-          growthFactor: grown,
+          growthFactor: currentYearFactor,
           delta,
         });
-        if (inc !== 0) parts.push(`+ Y${Y} ${lvl} inc=${inc} × ${rate} × cum_salary(${Y}..${N})=${round2(grown)} → ${round2(deltaInc)}`);
-        if (dec !== 0) parts.push(`- Y${Y} ${lvl} dec=${dec} × ${rate} (konstant) → ${round2(deltaDec)}`);
+        if (inc !== 0) parts.push(`+ Y${Y} ${lvl} inc=${inc} × ${rate} × cum_salary(2027..${N})=${round2(currentYearFactor)} → ${round2(deltaInc)}`);
+        if (dec !== 0) parts.push(`- Y${Y} ${lvl} dec=${dec} × ${rate} × cum_salary(2027..${Y})=${round2(frozenYearFactor)} (fryst) → ${round2(deltaDec)}`);
       }
     }
     // Konverteringer øker intern FTE
     for (let Y = 2027; Y <= N; Y++) {
-      const grown = cumulativeFactor(scenario_id, Y, N, salaryRate);
+      const currentYearFactor = cumulativeInputFactor(2027, N, salaryRate);
       for (const conv of scenarioConversions.filter((c) => c.year === Y)) {
         const rate = intRate(conv.internal_level);
-        const delta = conv.count * rate * grown;
+        const delta = conv.count * rate * currentYearFactor;
         amount += delta;
         conversionContributions.push({
           changeYear: Y,
@@ -358,11 +366,11 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           to: conv.internal_level,
           count: conv.count,
           rate,
-          growthFactor: grown,
+          growthFactor: currentYearFactor,
           delta,
         });
         parts.push(
-          `+ Konv Y${Y} ${conv.external_level}→${conv.internal_level} ×${conv.count} × ${rate} × ${round2(grown)} → ${round2(delta)}`
+          `+ Konv Y${Y} ${conv.external_level}→${conv.internal_level} ×${conv.count} × ${rate} × cum_salary(2027..${N})=${round2(currentYearFactor)} → ${round2(delta)}`
         );
       }
     }
