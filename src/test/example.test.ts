@@ -109,7 +109,7 @@ describe("calculateForecast FTE accumulation", () => {
       (year) => (changedMaster?.amounts[year] ?? 0) - (baselineMaster?.amounts[year] ?? 0)
     );
 
-    expect(roundedSeries(deltas)).toEqual([-2756, -2866.24, -2980.89, -3100.13, -3224.13]);
+    expect(roundedSeries(deltas)).toEqual([-2650, -2650, -2650, -2650, -2650]);
   });
 
   it("accumulates external FTE changes once per year with price growth", () => {
@@ -123,16 +123,30 @@ describe("calculateForecast FTE accumulation", () => {
       })
     );
 
-    const baselineExternal = baseline.lines.find((line) => line.line_id === "external-line");
-    const changedExternal = changed.lines.find((line) => line.line_id === "external-line");
+    const baselineExternal = baseline.lines
+      .filter((line) => line.category === "External FTE")
+      .reduce((series, line) => {
+        YEARS.forEach((year) => {
+          series[year] = (series[year] ?? 0) + (line.amounts[year] ?? 0);
+        });
+        return series;
+      }, {} as Record<number, number>);
+    const changedExternal = changed.lines
+      .filter((line) => line.category === "External FTE")
+      .reduce((series, line) => {
+        YEARS.forEach((year) => {
+          series[year] = (series[year] ?? 0) + (line.amounts[year] ?? 0);
+        });
+        return series;
+      }, {} as Record<number, number>);
 
-    expect(baselineExternal).toBeTruthy();
-    expect(changedExternal).toBeTruthy();
+    expect(Object.keys(baselineExternal).length).toBeGreaterThan(0);
+    expect(Object.keys(changedExternal).length).toBeGreaterThan(0);
 
     const deltas = YEARS.map(
-      (year) => (changedExternal?.amounts[year] ?? 0) - (baselineExternal?.amounts[year] ?? 0)
+      (year) => (changedExternal[year] ?? 0) - (baselineExternal[year] ?? 0)
     );
 
-    expect(roundedSeries(deltas)).toEqual([-2756, -2866.24, -2980.89, -3100.13, -3224.13]);
+    expect(roundedSeries(deltas)).toEqual([-2650, -2650, -2650, -2650, -2650]);
   });
 });

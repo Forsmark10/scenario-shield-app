@@ -270,18 +270,22 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
       else extDec += v;
     }
   }
-  const catAdjExtFactor = (() => {
-    let f = 1;
+  const extPctAdjEffect = (() => {
+    let total = 0;
     for (let Y = 2027; Y <= N; Y++) {
       const r = inputs.category_adjustments.find(
         (a) => a.category === "External FTE" && a.year === Y,
       );
-      if (r?.adjustment_pct) f *= 1 + r.adjustment_pct;
+      const pct = Number(r?.adjustment_pct ?? 0);
+      if (!pct) continue;
+      const baseSum = inputs.cost_lines
+        .filter((c) => c.category === "External FTE" && c.cost_type === "Local")
+        .reduce((sum, c) => sum + (c.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0), 0);
+      const growthFactor = pct > 0 ? cumFactor(Y, N, priceRate) : 1;
+      total += baseSum * pct * growthFactor;
     }
-    return f;
+    return total;
   })();
-  extInc *= catAdjExtFactor;
-  extDec *= catAdjExtFactor;
 
   let nsInc = 0;
   let nsDec = 0;
@@ -311,20 +315,17 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   // %-justering for Internal FTE (External FTE allerede inkludert i extInc/extDec via catAdjExtFactor)
   let intCatAdjPct = 0;
   {
-    let f = 1;
+    const intBaseSum = inputs.cost_lines
+      .filter((c) => c.category === "Internal FTE")
+      .reduce((sum, c) => sum + (c.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0), 0);
     for (let Y = 2027; Y <= N; Y++) {
       const r = inputs.category_adjustments.find(
         (a) => a.category === "Internal FTE" && a.year === Y,
       );
-      if (r?.adjustment_pct) f *= 1 + r.adjustment_pct;
-    }
-    if (f !== 1) {
-      // Effekt = (f - 1) * (sum av Internal FTE etter lønnsvekst og endringer)
-      const intLinesSum = result.lines
-        .filter((l) => l.category === "Internal FTE")
-        .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
-      // Trekk ut komponenten som skyldes %-justeringen selv (siden den er multiplikativ)
-      intCatAdjPct = intLinesSum - intLinesSum / f;
+      const pct = Number(r?.adjustment_pct ?? 0);
+      if (!pct) continue;
+      const growthFactor = pct > 0 ? cumFactor(Y, N, salaryRate) : 1;
+      intCatAdjPct += intBaseSum * pct * growthFactor;
     }
   }
 
@@ -337,10 +338,10 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     nsInc + nsDec +
     extConvAmt +
     i2nNet +
-    fteCatAdjAmount + intCatAdjPct;
+    fteCatAdjAmount + intCatAdjPct + extPctAdjEffect;
 
   // Splitt kategori-justering FTE i positiv (økning) og negativ (besparelse)
-  const fteCatAdjTotal = fteCatAdjAmount + intCatAdjPct;
+  const fteCatAdjTotal = fteCatAdjAmount + intCatAdjPct + extPctAdjEffect;
   const fteCatAdjInc = fteCatAdjTotal > 0 ? fteCatAdjTotal : 0;
   const fteCatAdjDec = fteCatAdjTotal < 0 ? fteCatAdjTotal : 0;
 
@@ -419,20 +420,18 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     baseByCat[cl.category] = (baseByCat[cl.category] ?? 0) + base;
   }
 
-  // %-justeringseffekt per kategori = baseSum × cumPrice × (f - 1)
-  // Isolert effekt av selve %-justeringen, prisvekst er allerede i Prisvekst-søylen.
+  // %-justeringseffekt per kategori: negative justeringer er konstante mot FC 2026-basis,
+  // positive justeringer vokser med prisvekst fra tiltaksåret.
   for (const cat of Object.keys(baseByCat)) {
-    let f = 1;
     for (let Y = 2027; Y <= N; Y++) {
       const r = inputs.category_adjustments.find((a) => a.category === cat && a.year === Y);
-      if (r?.adjustment_pct) {
-        f *= 1 + r.adjustment_pct;
-        if (r.comment) addComment(cat, r.comment);
-      }
+      const pct = Number(r?.adjustment_pct ?? 0);
+      if (!pct) continue;
+      if (r?.comment) addComment(cat, r.comment);
+      const growthFactor = pct > 0 ? cumFactor(Y, N, priceRate) : 1;
+      const pctEffect = baseByCat[cat] * pct * growthFactor;
+      addComponent(cat, pctEffect);
     }
-    if (f === 1) continue;
-    const pctEffect = baseByCat[cat] * cumPrice * (f - 1);
-    addComponent(cat, pctEffect);
   }
 
   // tNOK-justeringer (faste beløp, vokser IKKE med prisvekst)
@@ -641,6 +640,18 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
 
   const sumBridges = bridges.reduce((a, b) => a + b.value, 0);
   const rest = end - (start + sumBridges);
+
+  if (typeof window !== "undefined") {
+    console.log("[Waterfall] Rest values", {
+      scenario: bundle.meta.name,
+      year: N,
+      view,
+      start,
+      end,
+      sumBridges,
+      rest,
+    });
+  }
 
   // Rest legges til som residual-driver rett før FC-N, slik at briden alltid stemmer per definisjon.
   bridges.push({

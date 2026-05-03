@@ -106,6 +106,39 @@ function cumulativeCatAdj(
   return { factor, desc: parts.length ? parts.join("×") : "1" };
 }
 
+function categoryAdjustmentEffect(
+  adjustments: CategoryAdjustment[],
+  scenarioId: string,
+  category: string,
+  baseAmount: number,
+  year: number,
+  growthRateFn: ((year: number) => number) | null,
+): { amount: number; desc: string } {
+  const rows = adjustments
+    .filter((a) => a.scenario_id === scenarioId && a.category === category && a.year <= year)
+    .sort((a, b) => a.year - b.year);
+
+  let amount = 0;
+  const parts: string[] = [];
+
+  for (const row of rows) {
+    const pct = Number(row.adjustment_pct ?? 0);
+    if (!pct) continue;
+    const growthFactor = pct > 0 && growthRateFn
+      ? cumulativeFactor(scenarioId, row.year, year, growthRateFn)
+      : 1;
+    const delta = baseAmount * pct * growthFactor;
+    amount += delta;
+    parts.push(
+      pct > 0
+        ? `${round2(baseAmount)} × ${pct} × growth(${row.year}..${year})=${round2(growthFactor)} = ${round2(delta)}`
+        : `${round2(baseAmount)} × ${pct} (konstant) = ${round2(delta)}`,
+    );
+  }
+
+  return { amount, desc: parts.length ? parts.join(" + ") : "0" };
+}
+
 function distributeMonthly(annual: number, pattern: number[]): number[] {
   const total = sum(pattern);
   if (total === 0) {
@@ -410,14 +443,16 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
         // linjer lenger ned (slik at de ikke fordeles per cost_line).
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
         const amt = base * priceFactor;
-        const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
+        const { amount: catAdjAmount, desc: catAdjDesc } = categoryAdjustmentEffect(
           category_adjustments,
           scenario_id,
           "External FTE",
-          N
+          base,
+          N,
+          priceRate,
         );
-        amount = amt * catFactor;
-        bd = `External FTE (linje): base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amount)}`;
+        amount = amt + catAdjAmount;
+        bd = `External FTE (linje): base=${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} = ${round2(amt)}; cat_adj=${catAdjDesc} → ${round2(catAdjAmount)}; sum=${round2(amount)}`;
       } else if (cl.category === "Depreciation") {
         // ===== DEPRECIATION (existing) =====
         if (cl.is_existing_depreciation_alfa) {
@@ -491,14 +526,17 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       } else {
         // ===== ØVRIGE LOKALE (Operations, IT Costs, Consultancy, Other operating income) =====
         const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
-        const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
+        const pricedBase = base * priceFactor;
+        const { amount: catAdjAmount, desc: catAdjDesc } = categoryAdjustmentEffect(
           category_adjustments,
           scenario_id,
           cl.category,
-          N
+          base,
+          N,
+          priceRate,
         );
-        amount = base * priceFactor * catFactor;
-        bd = `${cl.category}: ${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} × cum_cat_adj(2027..${N})=${catDesc}=${round2(catFactor)} = ${round2(amount)}`;
+        amount = pricedBase + catAdjAmount;
+        bd = `${cl.category}: ${round2(base)} × cum_price(2027..${N})=${round2(priceFactor)} = ${round2(pricedBase)}; cat_adj=${catAdjDesc} → ${round2(catAdjAmount)}; sum=${round2(amount)}`;
       }
 
       line.amounts[N] = amount;
@@ -554,13 +592,6 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   );
 
   for (const N of YEARS) {
-    const { factor: catFactor, desc: catDesc } = cumulativeCatAdj(
-      category_adjustments,
-      scenario_id,
-      "External FTE",
-      N,
-    );
-
     // 1) FTE-endringer
     {
       let amt = 0;
@@ -581,9 +612,9 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
           if (dec !== 0) parts.push(`Y${Y} ${lvl} dec=${dec} × annual=${annual} (konstant) = ${round2(deltaDec)}`);
         }
       }
-      extChangesLine.amounts[N] = amt * catFactor;
+      extChangesLine.amounts[N] = amt;
       extChangesLine.breakdown_source[N] = parts.length
-        ? `${parts.join("\n")}\n× cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amt * catFactor)}`
+        ? parts.join("\n")
         : "Ingen ekstern FTE-endring";
     }
 

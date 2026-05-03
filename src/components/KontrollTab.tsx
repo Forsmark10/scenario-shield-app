@@ -488,7 +488,8 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       const pct = Number(r.adjustment_pct) || 0;
       const amt = Number((r as any).adjustment_amount_tnok ?? 0);
       if (pct !== 0) {
-        // Direkte beregning: baseSum_cat × cumPrice(2027..Y) × pct (kun for Y >= r.year)
+        // Direkte beregning: negative %-justeringer er konstant mot FC 2026-basis,
+        // positive %-justeringer vokser med prisvekst fra tiltaksåret.
         const baseSum = base.cost_lines
           .filter((c) => c.category === r.category && c.cost_type === "Local")
           .reduce(
@@ -496,11 +497,17 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
             0,
           ) / 1000; // MNOK
         const yearly: Record<number, number> = {};
-        let cumPrice = 1;
         for (const Y of FC_YEARS) {
-          const p = base.global_assumptions.find((g) => g.year === Y)?.price_increase_pct ?? 0;
-          cumPrice *= 1 + p;
-          yearly[Y] = Y >= r.year ? baseSum * cumPrice * pct : 0;
+          if (Y < r.year) {
+            yearly[Y] = 0;
+            continue;
+          }
+          const growthFactor = pct > 0
+            ? base.global_assumptions
+                .filter((g) => g.year >= r.year && g.year <= Y)
+                .reduce((acc, g) => acc * (1 + Number(g.price_increase_pct ?? 0)), 1)
+            : 1;
+          yearly[Y] = baseSum * pct * growthFactor;
         }
         rows.push({
           key: `cat:${r.category}:${r.year}:pct`,
@@ -508,7 +515,9 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
           sortKey: r.year,
           name: `${(pct * 100).toFixed(1)} % ${r.category} ${r.year}`,
           type: "Kategori-justering %",
-          details: `På basis etter prisvekst, permanent fra ${r.year}`,
+          details: pct > 0
+            ? `Vokser med prisvekst fra ${r.year}, permanent mot FC 2026-basis`
+            : `Konstant besparelse mot FC 2026-basis, permanent fra ${r.year}`,
           yearly,
           comment: (r as any).comment,
         });
@@ -641,9 +650,9 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         <div className="rounded-md border overflow-hidden">
           <table className="w-full text-xs table-fixed">
             <colgroup>
-              <col style={{ width: "32%" }} />
-              <col style={{ width: "16%" }} />
               <col style={{ width: "22%" }} />
+              <col style={{ width: "16%" }} />
+              <col style={{ width: "32%" }} />
               {FC_YEARS.map((y) => (
                 <col key={y} style={{ width: "6%" }} />
               ))}
@@ -769,8 +778,8 @@ function GroupBlock({
               )}
             </span>
           </td>
-          <td className="px-3 py-1.5 text-muted-foreground truncate">{r.type}</td>
-          <td className="px-3 py-1.5 text-muted-foreground truncate">{r.details}</td>
+          <td className="px-3 py-1.5 text-muted-foreground whitespace-normal break-words">{r.type}</td>
+          <td className="px-3 py-1.5 text-muted-foreground whitespace-normal break-words">{r.details}</td>
           {FC_YEARS.map((y) => (
             <NumCell key={y} value={r.yearly[y]} />
           ))}
