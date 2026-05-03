@@ -137,7 +137,24 @@ function buildFteChangeIndex(changes: FteChangeRow[]): Map<string, number> {
   return index;
 }
 
+function buildFteIncDecIndex(
+  changes: FteChangeRow[]
+): { inc: Map<string, number>; dec: Map<string, number> } {
+  const inc = new Map<string, number>();
+  const dec = new Map<string, number>();
+  for (const c of changes) {
+    const k = fteChangeKey(c.year, c.level);
+    inc.set(k, (inc.get(k) ?? 0) + (c.increase ?? 0));
+    dec.set(k, (dec.get(k) ?? 0) + (c.decrease ?? 0));
+  }
+  return { inc, dec };
+}
+
 function getFteNetChange(index: Map<string, number>, year: number, level: Level): number {
+  return index.get(fteChangeKey(year, level)) ?? 0;
+}
+
+function getFteAmount(index: Map<string, number>, year: number, level: Level): number {
   return index.get(fteChangeKey(year, level)) ?? 0;
 }
 
