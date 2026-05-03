@@ -208,6 +208,8 @@ export default function Assumptions() {
     nearshoringChanges: "nearshoring_changes",
     catAdj: "category_adjustments",
     capexPlan: "capex_plan",
+    i2nConversions: "internal_to_nearshoring_conversions",
+    oneOffs: "one_off_effects",
   };
 
   // Bygg en AssumptionsSnapshot fra LOKAL state for et gitt scenario.
