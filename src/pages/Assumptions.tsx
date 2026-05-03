@@ -575,7 +575,9 @@ export default function Assumptions() {
             <SectionExternalFte data={data} scenario={s} patch={patch} />
             <SectionConversions data={data} scenario={s} patch={patch} />
             <SectionNearshoring data={data} scenario={s} patch={patch} />
+            <SectionInternalToNearshoring data={data} scenario={s} patch={patch} />
             <SectionCategoryAdj data={data} scenario={s} patch={patch} />
+            <SectionOneOff data={data} scenario={s} patch={patch} />
             <SectionCapex data={data} scenario={s} patch={patch} />
 
             <KontrollTab scenarioId={s.id} />
