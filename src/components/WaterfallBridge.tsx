@@ -937,19 +937,19 @@ function WaterfallChart({
   const yMax = maxV + span * 0.12;
   const yMin = minV - span * 0.04;
 
-  // Layout — generous spacing, flat clean bars matching bar-chart style
-  const W = 960;
-  const H = 220;
-  const PAD_L = 18;
-  const PAD_R = 18;
-  const PAD_T = 34;
-  const PAD_B = 40;
+  // Layout — narrower, flat clean bars matching bar-chart style
+  const W = 920;
+  const H = 230;
+  const PAD_L = 20;
+  const PAD_R = 20;
+  const PAD_T = 38;
+  const PAD_B = 44;
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
   const n = bars.length;
   const slot = innerW / n;
-  const driverBarW = Math.min(56, slot * 0.58);
-  const totalBarW = Math.min(60, slot * 0.62);
+  const driverBarW = Math.min(38, slot * 0.5);
+  const totalBarW = Math.min(44, slot * 0.56);
   const barWidthFor = (b: BarSpec) =>
     b.type === "start" || b.type === "end" ? totalBarW : driverBarW;
 
@@ -963,18 +963,20 @@ function WaterfallChart({
   const viewBadge = view === "PL" ? "P&L-modus" : "Spend-modus";
 
   return (
-    <div style={{ position: "relative" }}>
-      <div className="flex items-center justify-between mb-1.5 px-2">
-        <h3 className="text-[12px] font-semibold" style={{ color }}>
+    <div style={{ position: "relative", maxWidth: 940, margin: "0 auto" }}>
+      <div className="flex items-center justify-between mb-3 px-2">
+        <h3 className="font-bold" style={{ color, fontSize: 14 }}>
           {bundle.meta.name}
         </h3>
         <div
-          className="text-[11px] font-bold tabular-nums"
+          className="tabular-nums"
           style={{
             backgroundColor: totalChangeColor,
             color: "#ffffff",
-            padding: "3px 10px",
-            borderRadius: 4,
+            padding: "4px 12px",
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 700,
             letterSpacing: "0.01em",
           }}
           title={`FC 2026 → FC ${year}`}
