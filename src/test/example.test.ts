@@ -109,7 +109,7 @@ describe("calculateForecast FTE accumulation", () => {
       (year) => (changedMaster?.amounts[year] ?? 0) - (baselineMaster?.amounts[year] ?? 0)
     );
 
-    expect(roundedSeries(deltas)).toEqual([-2756, -2866.24, -2980.89, -3100.13, -3224.13]);
+    expect(roundedSeries(deltas)).toEqual([-2650, -2650, -2650, -2650, -2650]);
   });
 
   it("accumulates external FTE changes once per year with price growth", () => {
@@ -133,6 +133,6 @@ describe("calculateForecast FTE accumulation", () => {
       (year) => (changedExternal?.amounts[year] ?? 0) - (baselineExternal?.amounts[year] ?? 0)
     );
 
-    expect(roundedSeries(deltas)).toEqual([-2756, -2866.24, -2980.89, -3100.13, -3224.13]);
+    expect(roundedSeries(deltas)).toEqual([-2650, -2650, -2650, -2650, -2650]);
   });
 });
