@@ -594,29 +594,28 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       let amt = 0;
       const parts: string[] = [];
       for (let Y = 2027; Y <= N; Y++) {
-        const grown = cumulativeFactor(scenario_id, Y, N, extPriceRate);
         for (const conv of scenarioConversions.filter((c) => c.year === Y)) {
           const r = extRate(conv.external_level);
           if (Y === N) {
             const months = Math.max(0, r.working_months - conv.overlap_months);
-            const reduction = -conv.count * r.base_monthly_cost * months * grown;
+            const reduction = -conv.count * r.base_monthly_cost * months;
             amt += reduction;
             parts.push(
-              `Konv-år Y${Y} ${conv.external_level}: -${conv.count} × ${r.base_monthly_cost} × (${r.working_months}-${conv.overlap_months})=${months}m × cum=${round2(grown)} = ${round2(reduction)}`,
+              `Konv-år Y${Y} ${conv.external_level}: -${conv.count} × ${r.base_monthly_cost} × (${r.working_months}-${conv.overlap_months})=${months}m (konstant) = ${round2(reduction)}`,
             );
           } else {
             const annual = r.base_monthly_cost * r.working_months;
-            const reduction = -conv.count * annual * grown;
+            const reduction = -conv.count * annual;
             amt += reduction;
             parts.push(
-              `Etter Y${Y} ${conv.external_level}: -${conv.count} × annual=${annual} × cum=${round2(grown)} = ${round2(reduction)}`,
+              `Etter Y${Y} ${conv.external_level}: -${conv.count} × annual=${annual} (konstant mot FC2026) = ${round2(reduction)}`,
             );
           }
         }
       }
-      extConvLine.amounts[N] = amt * catFactor;
+      extConvLine.amounts[N] = amt;
       extConvLine.breakdown_source[N] = parts.length
-        ? `${parts.join("\n")}\n× cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amt * catFactor)}`
+        ? parts.join("\n")
         : "Ingen konvertering";
     }
   }
