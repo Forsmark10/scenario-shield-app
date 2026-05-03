@@ -11,6 +11,7 @@ import {
   annualInternalFteCost,
   annualNearshoringCost,
   cumulativeInputFactor,
+  externalWorkingMonths,
 } from "@/lib/forecast/fteCost";
 import type { ForecastInputs } from "@/lib/forecast/types";
 import { formatNumberNO } from "@/lib/format";
@@ -349,27 +350,21 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
     // ───────── KONVERTERINGER ─────────
     for (const r of base.conversions) {
       if (!Number(r.count)) continue;
-      const yearly = isolate((i) => {
-        i.conversions = [{ ...r }];
-        i.global_assumptions = base.global_assumptions.map((g) => ({
-          ...g,
-          salary_increase_pct: Number(g.salary_increase_pct) || 0,
-          price_increase_pct: Number(g.price_increase_pct) || 0,
-          eur_nok_rate: CENTRAL_BASE_FX,
-        }));
-        return i;
-      });
-      const growthOnly = isolate((i) => {
-        i.global_assumptions = base.global_assumptions.map((g) => ({
-          ...g,
-          salary_increase_pct: Number(g.salary_increase_pct) || 0,
-          price_increase_pct: Number(g.price_increase_pct) || 0,
-          eur_nok_rate: CENTRAL_BASE_FX,
-        }));
-        return i;
-      });
       const netYearly: Record<number, number> = {};
-      for (const Y of FC_YEARS) netYearly[Y] = (yearly[Y] ?? 0) - (growthOnly[Y] ?? 0);
+      const frozenExternalAnnual = annualExternalFteCost(base, r.external_level, r.year);
+      const externalMonths = externalWorkingMonths(base, r.external_level);
+      const overlapMonths = Math.max(0, Math.min(externalMonths, Number(r.overlap_months) || 0));
+      for (const Y of FC_YEARS) {
+        if (Y < r.year) {
+          netYearly[Y] = 0;
+          continue;
+        }
+        const internalCost = r.count * annualInternalFteCost(base, r.internal_level, Y);
+        const externalCost = Y === r.year
+          ? -r.count * (frozenExternalAnnual / externalMonths) * (externalMonths - overlapMonths)
+          : -r.count * frozenExternalAnnual;
+        netYearly[Y] = internalCost + externalCost;
+      }
       rows.push({
         key: `conv:${r.year}:${r.external_level}:${r.internal_level}`,
         group: "CONVERSION",
@@ -383,27 +378,20 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
     }
     for (const r of base.internal_to_nearshoring_conversions ?? []) {
       if (!Number(r.count)) continue;
-      const yearly = isolate((i) => {
-        i.internal_to_nearshoring_conversions = [{ ...r }];
-        i.global_assumptions = base.global_assumptions.map((g) => ({
-          ...g,
-          salary_increase_pct: Number(g.salary_increase_pct) || 0,
-          price_increase_pct: Number(g.price_increase_pct) || 0,
-          eur_nok_rate: CENTRAL_BASE_FX,
-        }));
-        return i;
-      });
-      const growthOnly = isolate((i) => {
-        i.global_assumptions = base.global_assumptions.map((g) => ({
-          ...g,
-          salary_increase_pct: Number(g.salary_increase_pct) || 0,
-          price_increase_pct: Number(g.price_increase_pct) || 0,
-          eur_nok_rate: CENTRAL_BASE_FX,
-        }));
-        return i;
-      });
       const netYearly: Record<number, number> = {};
-      for (const Y of FC_YEARS) netYearly[Y] = (yearly[Y] ?? 0) - (growthOnly[Y] ?? 0);
+      const frozenInternalAnnual = annualInternalFteCost(base, r.internal_level, r.year);
+      const overlapMonths = Math.max(0, Math.min(12, Number(r.overlap_months) || 3));
+      for (const Y of FC_YEARS) {
+        if (Y < r.year) {
+          netYearly[Y] = 0;
+          continue;
+        }
+        const internalSaving = Y === r.year
+          ? -r.count * frozenInternalAnnual * ((12 - overlapMonths) / 12)
+          : -r.count * frozenInternalAnnual;
+        const nearshoringCost = r.count * annualNearshoringCost(base, Y);
+        netYearly[Y] = internalSaving + nearshoringCost;
+      }
       rows.push({
         key: `i2n:${r.year}:${r.internal_level}:${(r as any).id ?? Math.random()}`,
         group: "CONVERSION",
