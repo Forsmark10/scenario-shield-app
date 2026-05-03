@@ -79,6 +79,8 @@ interface AllData {
   catAdj: any[];
   capexPlan: any[];
   depRules: any[];
+  i2nConversions: any[];
+  oneOffs: any[];
   categories: string[];
 }
 
@@ -94,7 +96,9 @@ type TableKey =
   | "nearshoringAdds"
   | "nearshoringChanges"
   | "catAdj"
-  | "capexPlan";
+  | "capexPlan"
+  | "i2nConversions"
+  | "oneOffs";
 
 type PatchAction =
   | { type: "upsert"; table: TableKey; row: any; matchBy?: (r: any) => boolean }
