@@ -219,9 +219,14 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const extChangesLine = result.lines.find((l) => l.line_id === "virtual:ext_fte_changes");
   const extConvLine = result.lines.find((l) => l.line_id === "virtual:ext_fte_conversions");
   const nsLine = result.lines.find((l) => l.line_id === "virtual:nearshoring");
+  const i2nIntRedLine = result.lines.find((l) => l.line_id === "virtual:i2ns_internal_reduction");
+  const i2nNsAddLine = result.lines.find((l) => l.line_id === "virtual:i2ns_nearshoring_addition");
   const extChangesAmt = extChangesLine?.amounts[N] ?? 0;
   const extConvAmt = extConvLine?.amounts[N] ?? 0;
   const nsAmt = nsLine?.amounts[N] ?? 0;
+  const i2nIntRedAmt = i2nIntRedLine?.amounts[N] ?? 0; // negative (besparelse)
+  const i2nNsAddAmt = i2nNsAddLine?.amounts[N] ?? 0;   // positive (kost)
+  const i2nNet = i2nIntRedAmt + i2nNsAddAmt;
 
   let intInc = 0;
   let intDec = 0;
@@ -331,6 +336,7 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     extInc + extDec +
     nsInc + nsDec +
     extConvAmt +
+    i2nNet +
     fteCatAdjAmount + intCatAdjPct;
 
   // Splitt kategori-justering FTE i positiv (økning) og negativ (besparelse)
@@ -338,8 +344,12 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const fteCatAdjInc = fteCatAdjTotal > 0 ? fteCatAdjTotal : 0;
   const fteCatAdjDec = fteCatAdjTotal < 0 ? fteCatAdjTotal : 0;
 
-  const incTotFte = intIncTot + extInc + nsInc + fteCatAdjInc;
-  const decTotFte = intDecTot + extDec + nsDec + extConvAmt + fteCatAdjDec;
+  // Klassifiser intern→nearshoring konvertering basert på NETTO effekt
+  const i2nInc = i2nNet > 0 ? i2nNet : 0;
+  const i2nDec = i2nNet < 0 ? i2nNet : 0;
+
+  const incTotFte = intIncTot + extInc + nsInc + fteCatAdjInc + i2nInc;
+  const decTotFte = intDecTot + extDec + nsDec + extConvAmt + fteCatAdjDec + i2nDec;
 
   const fteDetails: BridgeBreakdown["details"] = [
     { label: "ØKNINGER", value: incTotFte, isHeader: true },
@@ -347,6 +357,9 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     { label: "Eksterne FTE", value: extInc, indent: true },
     { label: "Nearshoring", value: nsInc, indent: true },
   ];
+  if (i2nInc !== 0) {
+    fteDetails.push({ label: "Konvertering intern→nearshoring", value: i2nInc, indent: true });
+  }
   if (fteCatAdjInc !== 0) {
     fteDetails.push({ label: "Kategori-justering FTE", value: fteCatAdjInc, indent: true });
   }
@@ -357,6 +370,9 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     { label: "Nearshoring", value: nsDec, indent: true },
     { label: "Konvertering (ekstern red.)", value: extConvAmt, indent: true },
   );
+  if (i2nDec !== 0) {
+    fteDetails.push({ label: "Konvertering intern→nearshoring", value: i2nDec, indent: true });
+  }
   if (fteCatAdjDec !== 0) {
     fteDetails.push({ label: "Kategori-justering FTE", value: fteCatAdjDec, indent: true });
   }
@@ -470,10 +486,35 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     }
   }
 
+  // ─────── Engangseffekter (one-off) – kun aktivt i sitt eget år ───────
+  // Engangseffekter ligger som virtual:one_off:<cat>-linjer fra engine; de har
+  // kun beløp i året de gjelder. Klassifiser per komponent (ikke per kategori-sum).
+  const oneOffIncByCat: Record<string, number> = {};
+  const oneOffDecByCat: Record<string, number> = {};
+  const oneOffDescByCat: Record<string, string[]> = {};
+  for (const l of result.lines) {
+    if (!l.line_id.startsWith("virtual:one_off:")) continue;
+    if (!includeForecastLine(l)) continue;
+    const v = l.amounts[N] ?? 0;
+    if (v === 0) continue;
+    if (v > 0) oneOffIncByCat[l.category] = (oneOffIncByCat[l.category] ?? 0) + v;
+    else oneOffDecByCat[l.category] = (oneOffDecByCat[l.category] ?? 0) + v;
+    // Hent beskrivelser fra inputs.one_off_effects for år N
+    for (const r of inputs.one_off_effects ?? []) {
+      if (r.category !== l.category || r.year !== N) continue;
+      const desc = r.description ?? r.comment ?? null;
+      if (!desc) continue;
+      const arr = (oneOffDescByCat[l.category] ??= []);
+      if (!arr.includes(desc)) arr.push(desc);
+    }
+  }
+  const oneOffIncTot = Object.values(oneOffIncByCat).reduce((a, b) => a + b, 0);
+  const oneOffDecTot = Object.values(oneOffDecByCat).reduce((a, b) => a + b, 0);
+
   const incTot =
-    Object.values(incByCat).reduce((a, b) => a + b, 0) + centralRedPctInc + centralRedAmtInc;
+    Object.values(incByCat).reduce((a, b) => a + b, 0) + centralRedPctInc + centralRedAmtInc + oneOffIncTot;
   const decTot =
-    Object.values(decByCat).reduce((a, b) => a + b, 0) + centralRedPctDec + centralRedAmtDec;
+    Object.values(decByCat).reduce((a, b) => a + b, 0) + centralRedPctDec + centralRedAmtDec + oneOffDecTot;
 
   const incDetails: BridgeBreakdown["details"] = [];
   Object.entries(incByCat).forEach(([cat, v]) => {
@@ -490,6 +531,12 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     incDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtInc });
     centralRedAmtComments.forEach((c) => incDetails.push({ label: c, value: 0, isComment: true }));
   }
+  Object.entries(oneOffIncByCat).forEach(([cat, v]) => {
+    incDetails.push({ label: `${cat} (engangseffekt)`, value: v });
+    (oneOffDescByCat[cat] ?? []).forEach((d) =>
+      incDetails.push({ label: `Engangseffekt: ${d}`, value: 0, isComment: true }),
+    );
+  });
   if (incDetails.length === 0) incDetails.push({ label: "Ingen positive justeringer", value: 0 });
   else incDetails.push({ label: "SUM", value: incTot, isHeader: true });
 
@@ -508,6 +555,12 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtDec });
     centralRedAmtComments.forEach((c) => decDetails.push({ label: c, value: 0, isComment: true }));
   }
+  Object.entries(oneOffDecByCat).forEach(([cat, v]) => {
+    decDetails.push({ label: `${cat} (engangseffekt)`, value: v });
+    (oneOffDescByCat[cat] ?? []).forEach((d) =>
+      decDetails.push({ label: `Engangseffekt: ${d}`, value: 0, isComment: true }),
+    );
+  });
   if (decDetails.length === 0) decDetails.push({ label: "Ingen besparelser", value: 0 });
   else decDetails.push({ label: "SUM", value: decTot, isHeader: true });
 
