@@ -399,6 +399,42 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       });
     }
 
+    // ---- Internal → Nearshoring konvertering ----
+    for (const r of base.internal_to_nearshoring_conversions ?? []) {
+      if (!Number(r.count)) continue;
+      const yearly = isolate((i) => {
+        i.internal_to_nearshoring_conversions = [{ ...r }];
+        return i;
+      });
+      rows.push({
+        key: `i2n:${r.year}:${r.internal_level}:${(r as any).id ?? Math.random()}`,
+        name: `${r.count} ${r.internal_level} Intern→Nearshoring ${r.year}`,
+        type: "Intern→Nearshoring",
+        details: `${r.overlap_months ?? 3} mnd overlapp`,
+        yearly,
+        acc2031: yearly[2031],
+        comment: (r as any).comment,
+      });
+    }
+
+    // ---- Engangseffekter ----
+    for (const r of base.one_off_effects ?? []) {
+      if (!Number(r.amount_tnok)) continue;
+      const yearly = isolate((i) => {
+        i.one_off_effects = [{ ...r }];
+        return i;
+      });
+      rows.push({
+        key: `oneoff:${r.year}:${r.category}:${(r as any).id ?? Math.random()}`,
+        name: `${r.description || "Engangseffekt"} (${r.category}) ${r.year}`,
+        type: "Engangseffekt",
+        details: `${formatNumberNO(Number(r.amount_tnok) / 1000, 1)} MNOK kun ${r.year}`,
+        yearly,
+        acc2031: yearly[2031],
+        comment: (r as any).comment,
+      });
+    }
+
     // Sum-rad
     const sumYearly: Record<number, number> = {};
     for (const Y of FC_YEARS) sumYearly[Y] = rows.reduce((s, r) => s + (r.yearly[Y] ?? 0), 0);
@@ -408,7 +444,7 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       sumYearly,
       totalDiff,
     };
-  }, [bundle]);
+  }, [bundle, view]);
 
   if (loading) {
     return (
