@@ -416,7 +416,7 @@ function NumTd({
 }) {
   const m = toM(v);
   const baseCls = cn(
-    "text-right tabular-nums px-2 py-1.5 font-mono border-b",
+    "text-right tabular-nums px-2.5 py-2 font-mono text-[13px] border-b transition-colors",
     bold && "font-bold",
     locked && LOCKED_BG,
     separator && "border-l-4 border-l-border",
@@ -427,11 +427,11 @@ function NumTd({
   }
   const negative = m < 0;
   const formatted = formatNumberNO(m, 1);
-  let cls = "";
+  let style: React.CSSProperties | undefined;
   if (delta) {
-    cls = negative ? "text-[hsl(var(--positive))]" : "text-[hsl(var(--negative))]";
+    style = { color: negative ? "rgba(22,163,74,0.85)" : "rgba(220,38,38,0.85)" };
   } else if (negative) {
-    cls = "text-destructive";
+    style = { color: "rgba(220,38,38,0.85)" };
   }
-  return <td className={cn(baseCls, cls)}>{formatted}</td>;
+  return <td className={cn(baseCls)} style={style}>{formatted}</td>;
 }
