@@ -427,7 +427,7 @@ function NumTd({
   }
   const negative = m < 0;
   const formatted = formatNumberNO(m, 1);
-  let style: React.CSSProperties | undefined;
+  let style: CSSProperties | undefined;
   if (delta) {
     style = { color: negative ? "rgba(22,163,74,0.85)" : "rgba(220,38,38,0.85)" };
   } else if (negative) {
