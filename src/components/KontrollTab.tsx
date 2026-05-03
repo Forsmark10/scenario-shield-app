@@ -367,10 +367,10 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
           netYearly[Y] = 0;
           continue;
         }
-        const internalCost = r.count * annualInternalFteCost(base, r.internal_level, Y);
+        const internalCost = r.count * annualInternalFteCost(base, r.internal_level, Y) / 1000;
         const externalCost = Y === r.year
-          ? -r.count * (frozenExternalAnnual / externalMonths) * (externalMonths - overlapMonths)
-          : -r.count * frozenExternalAnnual;
+          ? -r.count * (frozenExternalAnnual / externalMonths) * (externalMonths - overlapMonths) / 1000
+          : -r.count * frozenExternalAnnual / 1000;
         netYearly[Y] = internalCost + externalCost;
       }
       rows.push({
@@ -395,9 +395,9 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
           continue;
         }
         const internalSaving = Y === r.year
-          ? -r.count * frozenInternalAnnual * ((12 - overlapMonths) / 12)
-          : -r.count * frozenInternalAnnual;
-        const nearshoringCost = r.count * annualNearshoringCost(base, Y);
+          ? -r.count * frozenInternalAnnual * ((12 - overlapMonths) / 12) / 1000
+          : -r.count * frozenInternalAnnual / 1000;
+        const nearshoringCost = r.count * annualNearshoringCost(base, Y) / 1000;
         netYearly[Y] = internalSaving + nearshoringCost;
       }
       rows.push({
@@ -427,10 +427,10 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         }
         if (net > 0) {
           // Økning: vokser med prisvekst hvert år
-          netYearly[Y] = absNet * annualNearshoringCost(base, Y);
+          netYearly[Y] = absNet * annualNearshoringCost(base, Y) / 1000;
         } else {
           // Besparelse: frosset på kostnadsnivået i startåret, KONSTANT
-          netYearly[Y] = -(absNet * annualNearshoringCost(base, r.year));
+          netYearly[Y] = -(absNet * annualNearshoringCost(base, r.year) / 1000);
         }
       }
       rows.push({
