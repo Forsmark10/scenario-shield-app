@@ -216,16 +216,19 @@ export default function ScenarioComparison() {
               <thead className="sticky top-0 bg-card z-10">
                 {/* Topp-rad: scenario-navn med farget topplinje, separasjon mellom blokker */}
                 <tr>
-                  <th className="sticky left-0 bg-card text-left font-medium px-3 py-2.5 z-20 min-w-[260px] border-b">
+                  <th className="sticky left-0 bg-card text-left font-medium px-3 py-2.5 z-20 min-w-[200px] border-b">
                     Kategori / Project
                   </th>
                   {displayedScenarios.map((b, i) => {
                     const colorIdx = colorIndexFor(b.meta.id);
                     const sColor = SCENARIO_COLOR_VAR[colorIdx];
+                    const isBaseInDelta = isDeltaMode && b.meta.id === baseScenario.meta.id;
+                    const isDeltaScenario = isDeltaMode && b.meta.id !== baseScenario.meta.id;
+                    const yearsForScenario = isDeltaScenario ? YEARS.filter((y) => y !== 2026) : YEARS;
                     return (
                       <th
                         key={b.meta.id}
-                        colSpan={YEARS.length}
+                        colSpan={yearsForScenario.length}
                         className={cn(
                           "text-center px-2 py-3 border-b",
                           i > 0 && "border-l-4 border-l-border",
@@ -251,14 +254,16 @@ export default function ScenarioComparison() {
                 {/* År-rad */}
                 <tr className="bg-muted/40">
                   <th className="sticky left-0 bg-muted/40 px-3 py-2 z-20 border-b"></th>
-                  {displayedScenarios.map((b, si) =>
-                    YEARS.map((y, yi) => {
+                  {displayedScenarios.map((b, si) => {
+                    const isDeltaScenario = isDeltaMode && b.meta.id !== baseScenario.meta.id;
+                    const yearsForScenario = isDeltaScenario ? YEARS.filter((y) => y !== 2026) : YEARS;
+                    return yearsForScenario.map((y, yi) => {
                       const isLocked = y === 2026;
                       return (
                         <th
                           key={`${b.meta.id}-${y}`}
                           className={cn(
-                            "text-right font-medium text-muted-foreground px-2.5 py-2 whitespace-nowrap border-b text-[11.5px] uppercase tracking-wider",
+                            "text-right font-medium text-muted-foreground px-2 py-2 whitespace-nowrap border-b text-[11px] uppercase tracking-wider",
                             si > 0 && yi === 0 && "border-l-4 border-l-border",
                             isLocked && LOCKED_BG,
                           )}
@@ -273,8 +278,8 @@ export default function ScenarioComparison() {
                           )}
                         </th>
                       );
-                    }),
-                  )}
+                    });
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -305,21 +310,23 @@ export default function ScenarioComparison() {
                             {g.category}
                           </span>
                         </td>
-                        {displayedScenarios.map((b, si) =>
-                          YEARS.map((y, yi) => {
+                        {displayedScenarios.map((b, si) => {
+                          const isDeltaScenario = isDeltaMode && b.meta.id !== baseScenario.meta.id;
+                          const yearsForScenario = isDeltaScenario ? YEARS.filter((y) => y !== 2026) : YEARS;
+                          return yearsForScenario.map((y, yi) => {
                             const v = cellValue(b, g.category, null, y);
                             const isLocked = y === 2026;
                             return (
                               <NumTd
                                 key={`${b.meta.id}-${g.category}-${y}`}
                                 value={v}
-                                delta={isDeltaMode && b.meta.id !== baseScenario.meta.id}
+                                delta={isDeltaScenario}
                                 locked={isLocked}
                                 separator={si > 0 && yi === 0}
                               />
                             );
-                          }),
-                        )}
+                          });
+                        })}
                       </tr>
                       {open &&
                         g.projects.map((proj, pIdx) => {
@@ -340,21 +347,23 @@ export default function ScenarioComparison() {
                               >
                                 {proj}
                               </td>
-                              {displayedScenarios.map((b, si) =>
-                                YEARS.map((y, yi) => {
+                              {displayedScenarios.map((b, si) => {
+                                const isDeltaScenario = isDeltaMode && b.meta.id !== baseScenario.meta.id;
+                                const yearsForScenario = isDeltaScenario ? YEARS.filter((y) => y !== 2026) : YEARS;
+                                return yearsForScenario.map((y, yi) => {
                                   const v = cellValue(b, g.category, proj, y);
                                   const isLocked = y === 2026;
                                   return (
                                     <NumTd
                                       key={`${b.meta.id}-${proj}-${y}`}
                                       value={v}
-                                      delta={isDeltaMode && b.meta.id !== baseScenario.meta.id}
+                                      delta={isDeltaScenario}
                                       locked={isLocked}
                                       separator={si > 0 && yi === 0}
                                     />
                                   );
-                                }),
-                              )}
+                                });
+                              })}
                             </tr>
                           );
                         })}
@@ -365,23 +374,25 @@ export default function ScenarioComparison() {
               <tfoot>
                 <tr className="font-semibold">
                   <td className="sticky left-0 bg-card px-3 py-2 z-10 border-t-2 border-foreground/20">Grand Total</td>
-                  {displayedScenarios.map((b, si) =>
-                    YEARS.map((y, yi) => {
+                  {displayedScenarios.map((b, si) => {
+                    const isDeltaScenario = isDeltaMode && b.meta.id !== baseScenario.meta.id;
+                    const yearsForScenario = isDeltaScenario ? YEARS.filter((y) => y !== 2026) : YEARS;
+                    return yearsForScenario.map((y, yi) => {
                       const v = totalRow(b, y);
                       const isLocked = y === 2026;
                       return (
                         <NumTd
                           key={`total-${b.meta.id}-${y}`}
                           value={v}
-                          delta={isDeltaMode && b.meta.id !== baseScenario.meta.id}
+                          delta={isDeltaScenario}
                           bold
                           locked={isLocked}
                           separator={si > 0 && yi === 0}
                           topBorder
                         />
                       );
-                    }),
-                  )}
+                    });
+                  })}
                 </tr>
               </tfoot>
             </table>
