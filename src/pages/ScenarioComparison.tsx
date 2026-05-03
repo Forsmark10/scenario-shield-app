@@ -334,7 +334,7 @@ export default function ScenarioComparison() {
                             >
                               <td
                                 className={cn(
-                                  "sticky left-0 px-3 py-1.5 pl-9 text-muted-foreground z-10 border-b",
+                                  "sticky left-0 px-3 py-2 pl-9 text-muted-foreground z-10 border-b",
                                   pZebra ? "bg-muted/20" : "bg-card",
                                 )}
                               >
