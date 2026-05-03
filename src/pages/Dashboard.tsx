@@ -1141,48 +1141,24 @@ function SavingsSection({
             <div className="text-xs font-medium text-muted-foreground mb-2">Besparelser per år (MNOK)</div>
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={lineData} margin={{ top: 16, right: 20, bottom: 4, left: 0 }}>
-                  <defs>
-                    {others.map((sc, i) => {
-                      const idx = scenarios.findIndex((s) => s.meta.id === sc.meta.id);
-                      const c = SCENARIO_COLOR[idx >= 0 ? idx : i + 1];
-                      return (
-                        <linearGradient key={sc.meta.id} id={`grad-${sc.meta.id}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={c} stopOpacity={0.18} />
-                          <stop offset="100%" stopColor={c} stopOpacity={0} />
-                        </linearGradient>
-                      );
-                    })}
-                  </defs>
-                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} opacity={0.5} />
-                  <XAxis dataKey="year" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <LineChart data={lineData} margin={{ top: 16, right: 20, bottom: 4, left: 0 }}>
+                  <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 4" vertical={false} />
+                  <XAxis dataKey="year" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
                   <YAxis
-                    tick={{ fontSize: 11 }}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
                     axisLine={false}
                     tickLine={false}
                     domain={lineYDomain}
                     tickFormatter={(v) => formatNumberNO(v, 0)}
                   />
-                  <Tooltip formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={10} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }}
+                    formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} iconType="circle" iconSize={10} />
                   {lineYDomain && typeof lineYDomain[0] === "number" && typeof lineYDomain[1] === "number" && lineYDomain[0] < 0 && lineYDomain[1] > 0 && (
-                    <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.4} strokeWidth={1} />
+                    <ReferenceLine y={0} stroke="#cbd5e1" strokeWidth={1} />
                   )}
-                  {others.map((sc, i) => {
-                    const idx = scenarios.findIndex((s) => s.meta.id === sc.meta.id);
-                    const c = SCENARIO_COLOR[idx >= 0 ? idx : i + 1];
-                    return (
-                      <Area
-                        key={`area-${sc.meta.id}`}
-                        type="monotone"
-                        dataKey={sc.meta.name}
-                        stroke="none"
-                        fill={`url(#grad-${sc.meta.id})`}
-                        isAnimationActive={false}
-                        legendType="none"
-                      />
-                    );
-                  })}
                   {others.map((sc, i) => {
                     const idx = scenarios.findIndex((s) => s.meta.id === sc.meta.id);
                     const c = SCENARIO_COLOR[idx >= 0 ? idx : i + 1];
@@ -1192,13 +1168,13 @@ function SavingsSection({
                         type="monotone"
                         dataKey={sc.meta.name}
                         stroke={c}
-                        strokeWidth={2.75}
-                        dot={{ r: 4, fill: "#ffffff", stroke: c, strokeWidth: 2 }}
-                        activeDot={{ r: 6, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
+                        activeDot={{ r: 5.5, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
                       />
                     );
                   })}
-                </ComposedChart>
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
