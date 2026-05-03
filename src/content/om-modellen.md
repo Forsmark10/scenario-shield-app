@@ -10,7 +10,7 @@ Kort fortalt: Du starter med dagens kostnader (FC 2026) og ser hvordan de endrer
 
 Appen gir deg tre versjoner av fremtiden:
 
-- **Steady State** – Hva skjer hvis vi fortsetter som i dag? Ingen nye tiltak, bare normal lønns- og prisvekst.
+- **Steady State** – Hva skjer hvis vi fortsetter som i dag?
 - **Moderate Saving** – Hva om vi gjennomfører moderate tiltak? Noen FTE-reduksjoner, reforhandling av avtaler, og smartere bruk av ressurser.
 - **Aggressive Saving** – Hva om vi tar alle grep? Betydelige kutt i bemanning, store reforhandlinger og minimale investeringer.
 
