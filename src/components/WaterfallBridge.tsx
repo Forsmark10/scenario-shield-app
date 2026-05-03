@@ -9,6 +9,11 @@ import {
 } from "@/components/ui/select";
 import type { ScenarioBundle } from "@/hooks/useAllScenarios";
 import type { Level } from "@/lib/forecast/types";
+import {
+  annualExternalFteCost,
+  annualInternalFteCost,
+  annualNearshoringCost,
+} from "@/lib/forecast/fteCost";
 import { formatNumberNO } from "@/lib/format";
 
 type ViewMode = "PL" | "Spend";
@@ -230,44 +235,30 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
 
   let intInc = 0;
   let intDec = 0;
-  const intRate = (lvl: Level) =>
-    inputs.internal_fte_base_rates.find((r) => r.level === lvl)?.base_annual_cost ?? 0;
   for (let Y = 2027; Y <= N; Y++) {
-    const grown = cumFactor(Y, N, salaryRate);
     for (const lvl of LEVELS) {
       const rows = inputs.internal_fte_changes.filter((c) => c.year === Y && c.level === lvl);
-      const net = rows.reduce((a, r) => a + (r.increase ?? 0) - (r.decrease ?? 0), 0);
-      if (net === 0) continue;
-      const v = net * intRate(lvl) * grown;
-      if (v >= 0) intInc += v;
-      else intDec += v;
+      const inc = rows.reduce((a, r) => a + Number(r.increase ?? 0), 0);
+      const dec = rows.reduce((a, r) => a + Number(r.decrease ?? 0), 0);
+      if (inc !== 0) intInc += inc * annualInternalFteCost(inputs, lvl, N);
+      if (dec !== 0) intDec += -dec * annualInternalFteCost(inputs, lvl, Y);
     }
     for (const conv of inputs.conversions.filter((c) => c.year === Y)) {
-      const v = conv.count * intRate(conv.internal_level) * grown;
-      intInc += v;
+      intInc += conv.count * annualInternalFteCost(inputs, conv.internal_level, N);
     }
   }
-  const driverPctSum = inputs.cost_lines
-    .filter((c) => c.category === "Internal FTE" && !c.is_fte_master && c.fte_driver_pct != null)
-    .reduce((a, c) => a + (c.fte_driver_pct ?? 0), 0);
-  const intIncTot = intInc * (1 + driverPctSum);
-  const intDecTot = intDec * (1 + driverPctSum);
+  const intIncTot = intInc;
+  const intDecTot = intDec;
 
   let extInc = 0;
   let extDec = 0;
-  const extRate = (lvl: Level) => {
-    const r = inputs.external_fte_base_rates.find((x) => x.level === lvl);
-    return r ? r.base_monthly_cost * r.working_months : 0;
-  };
   for (let Y = 2027; Y <= N; Y++) {
-    const grown = cumFactor(Y, N, priceRate);
     for (const lvl of LEVELS) {
       const rows = inputs.external_fte_changes.filter((c) => c.year === Y && c.level === lvl);
-      const net = rows.reduce((a, r) => a + (r.increase ?? 0) - (r.decrease ?? 0), 0);
-      if (net === 0) continue;
-      const v = net * extRate(lvl) * grown;
-      if (v >= 0) extInc += v;
-      else extDec += v;
+      const inc = rows.reduce((a, r) => a + Number(r.increase ?? 0), 0);
+      const dec = rows.reduce((a, r) => a + Number(r.decrease ?? 0), 0);
+      if (inc !== 0) extInc += inc * annualExternalFteCost(inputs, lvl, N);
+      if (dec !== 0) extDec += -dec * annualExternalFteCost(inputs, lvl, Y);
     }
   }
   const extPctAdjEffect = (() => {
@@ -289,20 +280,13 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
 
   let nsInc = 0;
   let nsDec = 0;
-  {
-    const g = inputs.global_assumptions.find((x) => x.year === N);
-    const fxn = g?.eur_nok_rate ?? CENTRAL_BASE_FX;
-    const annualNokK = (inputs.nearshoring_base.base_annual_cost_eur * cumPrice * fxn) / 1000;
-    let cumInc = 0;
-    let cumDec = 0;
-    for (let Y = 2027; Y <= N; Y++) {
-      for (const r of inputs.nearshoring_changes.filter((n) => n.year === Y)) {
-        cumInc += Number(r.increase || 0);
-        cumDec += Number(r.decrease || 0);
-      }
+  for (let Y = 2027; Y <= N; Y++) {
+    for (const r of inputs.nearshoring_changes.filter((n) => n.year === Y)) {
+      const inc = Number(r.increase || 0);
+      const dec = Number(r.decrease || 0);
+      if (inc !== 0) nsInc += inc * annualNearshoringCost(inputs, N);
+      if (dec !== 0) nsDec += -dec * annualNearshoringCost(inputs, Y);
     }
-    nsInc = cumInc * annualNokK;
-    nsDec = -cumDec * annualNokK;
   }
 
   // FTE-endring inkluderer også kategori-justeringer (tNOK + %) for Internal FTE og External FTE
