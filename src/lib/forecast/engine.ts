@@ -291,22 +291,25 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     for (let Y = 2027; Y <= N; Y++) {
       const grown = cumulativeFactor(scenario_id, Y, N, salaryRate);
       for (const lvl of LEVELS) {
-        const net = getFteNetChange(intChangeIndex, Y, lvl);
-        if (net === 0) continue;
+        const inc = intIncDec.inc.get(fteChangeKey(Y, lvl)) ?? 0;
+        const dec = intIncDec.dec.get(fteChangeKey(Y, lvl)) ?? 0;
+        if (inc === 0 && dec === 0) continue;
         const rate = intRate(lvl);
-        const delta = net * rate * grown;
+        // Increase: vokser med lønnsvekst. Decrease: konstant mot FC2026.
+        const deltaInc = inc * rate * grown;
+        const deltaDec = -dec * rate;
+        const delta = deltaInc + deltaDec;
         amount += delta;
         changeContributions.push({
           changeYear: Y,
           level: lvl,
-          net,
+          net: inc - dec,
           rate,
           growthFactor: grown,
           delta,
         });
-        parts.push(
-          `+ Y${Y} ${lvl} net=${net} × rate=${rate} × cum_salary(${Y}..${N})=${round2(grown)} → ${round2(delta)}`
-        );
+        if (inc !== 0) parts.push(`+ Y${Y} ${lvl} inc=${inc} × ${rate} × cum_salary(${Y}..${N})=${round2(grown)} → ${round2(deltaInc)}`);
+        if (dec !== 0) parts.push(`- Y${Y} ${lvl} dec=${dec} × ${rate} (konstant) → ${round2(deltaDec)}`);
       }
     }
     // Konverteringer øker intern FTE
