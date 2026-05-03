@@ -173,6 +173,8 @@ export interface ForecastInputs {
   conversions: Conversion[];
   nearshoring_additions: NearshoringAddition[];
   nearshoring_changes: NearshoringChange[];
+  internal_to_nearshoring_conversions?: InternalToNearshoringConversion[];
+  one_off_effects?: OneOffEffect[];
   category_adjustments: CategoryAdjustment[];
   capex_plan: CapexPlan[];
   depreciation_rules: DepreciationRule[];
