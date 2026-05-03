@@ -939,17 +939,17 @@ function WaterfallChart({
 
   // Layout — compact, totals slightly wider than driver bars
   const W = 960;
-  const H = 190;
-  const PAD_L = 10;
-  const PAD_R = 10;
-  const PAD_T = 22;
-  const PAD_B = 34;
+  const H = 210;
+  const PAD_L = 14;
+  const PAD_R = 14;
+  const PAD_T = 30;
+  const PAD_B = 38;
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
   const n = bars.length;
   const slot = innerW / n;
-  const driverBarW = Math.min(56, slot * 0.55);
-  const totalBarW = Math.min(78, slot * 0.78);
+  const driverBarW = Math.min(64, slot * 0.7);
+  const totalBarW = Math.min(58, slot * 0.55);
   const barWidthFor = (b: BarSpec) =>
     b.type === "start" || b.type === "end" ? totalBarW : driverBarW;
 
