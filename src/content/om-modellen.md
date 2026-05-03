@@ -31,6 +31,14 @@ En komplett guide til hva appen gjør, hvordan kostnadsmodellen er bygget opp, o
 - **Stolpediagram**: viser absolutt kostnad per år. En ny FTE i 2027 ligger i 2027-søylen; i 2028-søylen vises bare differansen (lønnsveksten) i forhold til 2027.
 - **Waterfall**: viser **total endring fra FC 2026-baseline** til valgt sluttår. En ny FTE i 2027 viser hele årskosten (inkl. kumulativ lønnsvekst) i hvert år, fordi den ikke fantes i baseline.
 - **Kontroll-tabben**: samme perspektiv som waterfall – isolert effekt mot baseline.
+- ### Modellteknisk differanse (basisjustering)
+
+Waterfallen har en liten innebygd differanse på ca. 4 MNOK mellom summen av alle eksplisitte drivere og den faktiske endringen fra FC 2026 til FC 2031. Denne differansen er **konstant** på tvers av alle scenarioer og alle år, og skyldes forskjellen mellom:
+
+- **FC 2026 (faktiske tall):** Regnskapstallene inneholder faktiske kostnader for arbeidsgiveravgift, feriepenger, pensjon og andre personalrelaterte poster basert på reelle lønninger og individuelle satser.
+- **Modellens beregnede satser:** Fra FC 2027 beregnes personalkostnader med standardiserte prosentsatser (AGA 14,1 %, feriepenger 12 %, AGA på feriepenger 1,69 %, pensjon 5 %) på standardiserte basisrater (Low/Medium/High).
+
+Denne forenklede modellen treffer ikke nøyaktig de faktiske FC 2026-tallene, og differansen oppstår i overgangen fra faktisk til modellberegnet. Differansen er ikke en kostnadsendring – den er en modellteknisk artefakt som ikke påvirker nøyaktigheten av de individuelle driverne. Den er skjult i waterfallen for å unngå forvirring, men logges i konsollen for feilsøking.
 
 ---
 
