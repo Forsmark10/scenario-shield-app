@@ -559,13 +559,13 @@ function ScenarioSection({
               <div className="col-span-2 text-center">Baseline</div>
               <div className="col-span-5 text-center">Forecast</div>
             </div>
-            {/* Dashed dividers — between bars 1|2 and 3|4 */}
+            {/* Dashed dividers — centered between AC2025|BU2026 and FC2026|FC2027 */}
             <div
               className="absolute inset-0 grid pointer-events-none z-[5]"
               style={{
                 gridTemplateColumns: "repeat(8, 1fr)",
-                paddingLeft: 5,
-                paddingRight: 17,
+                paddingLeft: 0,
+                paddingRight: 12,
                 paddingTop: 36,
                 paddingBottom: 26,
               }}
