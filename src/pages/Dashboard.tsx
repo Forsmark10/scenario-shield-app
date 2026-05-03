@@ -794,20 +794,6 @@ function ScenarioComparisonChart({
               {scenarios.map((b, i) => {
                 const c = SCENARIO_COLOR[i % SCENARIO_COLOR.length];
                 return (
-                  <Area
-                    key={`area-${b.meta.id}`}
-                    type="monotone"
-                    dataKey={b.meta.name}
-                    stroke="none"
-                    fill={`url(#scen-grad-${b.meta.id})`}
-                    isAnimationActive={false}
-                    legendType="none"
-                  />
-                );
-              })}
-              {scenarios.map((b, i) => {
-                const c = SCENARIO_COLOR[i % SCENARIO_COLOR.length];
-                return (
                   <Line
                     key={b.meta.id}
                     type="monotone"
