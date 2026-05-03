@@ -1079,8 +1079,20 @@ function SavingsSection({
             <div className="text-xs font-medium text-muted-foreground mb-2">Besparelser per år (MNOK)</div>
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={lineData} margin={{ top: 12, right: 16, bottom: 4, left: 0 }}>
-                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} />
+                <ComposedChart data={lineData} margin={{ top: 16, right: 20, bottom: 4, left: 0 }}>
+                  <defs>
+                    {others.map((sc, i) => {
+                      const idx = scenarios.findIndex((s) => s.meta.id === sc.meta.id);
+                      const c = SCENARIO_COLOR[idx >= 0 ? idx : i + 1];
+                      return (
+                        <linearGradient key={sc.meta.id} id={`grad-${sc.meta.id}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={c} stopOpacity={0.18} />
+                          <stop offset="100%" stopColor={c} stopOpacity={0} />
+                        </linearGradient>
+                      );
+                    })}
+                  </defs>
+                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} opacity={0.5} />
                   <XAxis dataKey="year" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis
                     tick={{ fontSize: 11 }}
@@ -1091,21 +1103,40 @@ function SavingsSection({
                   />
                   <Tooltip formatter={(v: number) => `${formatNumberNO(v, 1)} MNOK`} />
                   <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" iconSize={10} />
+                  {lineYDomain && lineYDomain[0] < 0 && lineYDomain[1] > 0 && (
+                    <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.4} strokeWidth={1} />
+                  )}
                   {others.map((sc, i) => {
                     const idx = scenarios.findIndex((s) => s.meta.id === sc.meta.id);
+                    const c = SCENARIO_COLOR[idx >= 0 ? idx : i + 1];
+                    return (
+                      <Area
+                        key={`area-${sc.meta.id}`}
+                        type="monotone"
+                        dataKey={sc.meta.name}
+                        stroke="none"
+                        fill={`url(#grad-${sc.meta.id})`}
+                        isAnimationActive={false}
+                        legendType="none"
+                      />
+                    );
+                  })}
+                  {others.map((sc, i) => {
+                    const idx = scenarios.findIndex((s) => s.meta.id === sc.meta.id);
+                    const c = SCENARIO_COLOR[idx >= 0 ? idx : i + 1];
                     return (
                       <Line
                         key={sc.meta.id}
                         type="monotone"
                         dataKey={sc.meta.name}
-                        stroke={SCENARIO_COLOR[idx >= 0 ? idx : i + 1]}
-                        strokeWidth={2.5}
-                        dot={{ r: 3 }}
-                        activeDot={{ r: 5 }}
+                        stroke={c}
+                        strokeWidth={2.75}
+                        dot={{ r: 4, fill: "#ffffff", stroke: c, strokeWidth: 2 }}
+                        activeDot={{ r: 6, fill: "#ffffff", stroke: c, strokeWidth: 2.5 }}
                       />
                     );
                   })}
-                </LineChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>
