@@ -169,6 +169,8 @@ export default function Assumptions() {
         catAdj: caRes.data ?? [],
         capexPlan: capRes.data ?? [],
         depRules: drRes.data ?? [],
+        i2nConversions: i2nRes.data ?? [],
+        oneOffs: ooRes.data ?? [],
         categories: cats,
       };
       setData(next);
