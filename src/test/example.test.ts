@@ -149,4 +149,29 @@ describe("calculateForecast FTE accumulation", () => {
 
     expect(roundedSeries(deltas)).toEqual([-2650, -2650, -2650, -2650, -2650]);
   });
+
+  it("keeps internal FTE decreases constant from the change year onward", () => {
+    const baseline = calculateForecast(buildInputs());
+    const changed = calculateForecast(
+      buildInputs({
+        internal_fte_changes: [
+          { scenario_id: "scenario-a", year: 2029, level: "Medium", increase: 0, decrease: 1 },
+        ],
+      })
+    );
+
+    const baselineTotal = YEARS.reduce((acc, year) => {
+      acc[year] = baseline.lines.reduce((sum, line) => sum + (line.amounts[year] ?? 0), 0);
+      return acc;
+    }, {} as Record<number, number>);
+
+    const changedTotal = YEARS.reduce((acc, year) => {
+      acc[year] = changed.lines.reduce((sum, line) => sum + (line.amounts[year] ?? 0), 0);
+      return acc;
+    }, {} as Record<number, number>);
+
+    const deltas = YEARS.map((year) => (changedTotal[year] - baselineTotal[year]) / 1000);
+
+    expect(roundedSeries(deltas)).toEqual([0, 0, -1, -1, -1]);
+  });
 });
