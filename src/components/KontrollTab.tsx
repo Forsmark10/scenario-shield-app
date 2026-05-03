@@ -84,14 +84,15 @@ function diff(a: Record<number, number>, b: Record<number, number>): Record<numb
 export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
   const { loading, scenarios, error } = useAllScenarios();
   const bundle = scenarios.find((s) => s.meta.id === scenarioId);
+  const [view, setView] = useState<ViewMode>("PL");
 
   // Beregn baseline (alle drivere = 0) og total-diff samt per-driver isolert diff.
   const calc = useMemo(() => {
     if (!bundle) return null;
     const base = bundle.inputs;
     const empty = emptyDriverInputs(base);
-    const baseTotals = totalsByYear(empty);
-    const fullTotals = totalsByYear(base);
+    const baseTotals = totalsByYear(empty, view);
+    const fullTotals = totalsByYear(base, view);
     const totalDiff = diff(fullTotals, baseTotals);
 
     const rows: Row[] = [];
