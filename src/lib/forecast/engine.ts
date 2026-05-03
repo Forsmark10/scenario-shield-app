@@ -743,6 +743,128 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     }
   }
 
+  // ---------- VIRTUAL: Internal → Nearshoring conversions ----------
+  // I konverteringsåret: full intern (allerede i master_amount videreført?) + 3 mnd overlapp.
+  // Modellen: vi REDUSERER intern (besparelse) og LEGGER TIL nearshoring-kost. I konverteringsåret
+  // beholdes 3 mnd intern-overlapp (delvis intern). Etter konverteringsåret: intern fjernes 100 %.
+  // Implementeres som én virtuell linje per kategori-effekt (Internal FTE besparelse, External FTE add)
+  const i2n = (inputs.internal_to_nearshoring_conversions ?? []).filter(
+    (r) => r.scenario_id === scenario_id,
+  );
+  if (i2n.length > 0) {
+    const intRedLine: ForecastLine = {
+      line_id: "virtual:i2ns_internal_reduction",
+      source: "virtual",
+      category: "Internal FTE",
+      project: "Konvertering til nearshoring",
+      account: null,
+      account_name: "Konvertering intern → nearshoring (intern besparelse)",
+      cost_type: "Local",
+      is_capex: false,
+      is_depreciation: false,
+      base_2026: 0,
+      amounts: {},
+      monthly_2027: [],
+      breakdown_source: {},
+    };
+    const nsAddLine: ForecastLine = {
+      line_id: "virtual:i2ns_nearshoring_addition",
+      source: "virtual",
+      category: "External FTE",
+      project: "Nearshoring (fra intern-konvertering)",
+      account: null,
+      account_name: "Nearshoring fra intern-konvertering",
+      cost_type: "Local",
+      is_capex: false,
+      is_depreciation: false,
+      base_2026: 0,
+      amounts: {},
+      monthly_2027: [],
+      breakdown_source: {},
+    };
+    for (const N of YEARS) {
+      const g = getGlobal(global_assumptions, scenario_id, N);
+      const salaryRate = (Y: number) =>
+        getGlobal(global_assumptions, scenario_id, Y).salary_increase_pct;
+      const priceRate = (Y: number) =>
+        getGlobal(global_assumptions, scenario_id, Y).price_increase_pct;
+      let intRed = 0;
+      let nsAdd = 0;
+      const intParts: string[] = [];
+      const nsParts: string[] = [];
+      for (let Y = 2027; Y <= N; Y++) {
+        for (const r of i2n.filter((c) => c.year === Y)) {
+          const rate = intRate(r.internal_level);
+          const grownSalary = cumulativeFactor(scenario_id, Y, N, salaryRate);
+          const annualInt = r.count * rate * grownSalary;
+          const overlapMonths = Math.max(0, Math.min(12, r.overlap_months ?? 3));
+          if (Y === N) {
+            // Konverteringsåret: behold (overlapMonths/12) av intern-kost.
+            const monthsRemoved = 12 - overlapMonths;
+            const reduction = -(annualInt * monthsRemoved) / 12;
+            intRed += reduction;
+            intParts.push(`Konv-år Y${Y} ${r.internal_level} ×${r.count}: -${monthsRemoved}/12 av annual=${round2(annualInt)} = ${round2(reduction)}`);
+          } else {
+            intRed += -annualInt;
+            intParts.push(`Etter Y${Y} ${r.internal_level} ×${r.count}: -annual=${round2(annualInt)}`);
+          }
+          // Nearshoring-kost: full årseffekt fra Y, ingen overlapp på nearshoring-siden
+          // (overlapp gjelder kun intern). Pris vokser med global price_rate.
+          const priceFactor = cumulativeFactor(scenario_id, Y, N, priceRate);
+          const annualNokK = (nearshoring_base.base_annual_cost_eur * priceFactor * g.eur_nok_rate) / 1000;
+          const nsCost = r.count * annualNokK;
+          nsAdd += nsCost;
+          nsParts.push(`Y${Y} ×${r.count}: +${round2(annualNokK)} kNOK/ressurs = ${round2(nsCost)}`);
+        }
+      }
+      intRedLine.amounts[N] = intRed;
+      intRedLine.breakdown_source[N] = intParts.length ? intParts.join("\n") : "Ingen konvertering intern→nearshoring";
+      nsAddLine.amounts[N] = nsAdd;
+      nsAddLine.breakdown_source[N] = nsParts.length ? nsParts.join("\n") : "—";
+    }
+    intRedLine.monthly_2027 = Array(12).fill((intRedLine.amounts[2027] ?? 0) / 12);
+    nsAddLine.monthly_2027 = Array(12).fill((nsAddLine.amounts[2027] ?? 0) / 12);
+    lines.push(intRedLine);
+    lines.push(nsAddLine);
+  }
+
+  // ---------- VIRTUAL: One-off effects (engangseffekter) ----------
+  // Gjelder KUN det valgte året, vokser ikke, additivt på kategorien.
+  const oneOffs = (inputs.one_off_effects ?? []).filter((r) => r.scenario_id === scenario_id);
+  const oneOffByCat = new Map<string, typeof oneOffs>();
+  for (const r of oneOffs) {
+    const arr = oneOffByCat.get(r.category) ?? [];
+    arr.push(r);
+    oneOffByCat.set(r.category, arr);
+  }
+  for (const [cat, rows] of oneOffByCat) {
+    const ooLine: ForecastLine = {
+      line_id: `virtual:one_off:${cat}`,
+      source: "virtual",
+      category: cat,
+      project: "Engangseffekt",
+      account: null,
+      account_name: `Engangseffekter ${cat}`,
+      cost_type: "Local",
+      is_capex: false,
+      is_depreciation: false,
+      base_2026: 0,
+      amounts: {},
+      monthly_2027: [],
+      breakdown_source: {},
+    };
+    for (const N of YEARS) {
+      const matching = rows.filter((r) => r.year === N);
+      const amt = matching.reduce((s, r) => s + Number(r.amount_tnok || 0), 0);
+      ooLine.amounts[N] = amt;
+      ooLine.breakdown_source[N] = matching.length
+        ? matching.map((r) => `${r.description ?? "—"}: ${r.amount_tnok} tNOK (kun ${N})`).join("\n")
+        : "—";
+    }
+    ooLine.monthly_2027 = Array(12).fill((ooLine.amounts[2027] ?? 0) / 12);
+    lines.push(ooLine);
+  }
+
   // ---------- TOTALS ----------
   const totals: ForecastTotals = {
     by_year: {},
