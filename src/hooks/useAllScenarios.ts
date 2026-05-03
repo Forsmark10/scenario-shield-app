@@ -70,6 +70,8 @@ export function useAllScenarios(reloadKey = 0): UseAllScenariosState {
           supabase.from("internal_fte_base_rates").select("*"),
           supabase.from("external_fte_base_rates").select("*"),
           supabase.from("nearshoring_base").select("*").limit(1).maybeSingle(),
+          supabase.from("internal_to_nearshoring_conversions").select("*"),
+          supabase.from("one_off_effects").select("*"),
         ]);
 
         const errs = [
