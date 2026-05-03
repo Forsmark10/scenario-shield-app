@@ -546,11 +546,7 @@ function ScenarioSection({
             {bundle.meta.name}
           </h2>
           <p className="text-[11px] text-muted-foreground">
-            Totalkostnad 2031: <span className="font-medium text-foreground">{formatNumberNO(total2031M, 1)} MNOK</span>{" "}
-            · CAGR 2026–2031:{" "}
-            <span className={cn("font-medium", cagr < 0 ? "text-[hsl(var(--positive))]" : "text-foreground")}>
-              {formatPercentNO(cagr * 100, 1)} %
-            </span>
+            Totalkostnad 2031: <span className="font-medium text-foreground">{formatNumberNO(total2031M, 1)} MNOK</span>
           </p>
         </div>
 
