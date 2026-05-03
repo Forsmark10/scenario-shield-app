@@ -6,6 +6,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAllScenarios } from "@/hooks/useAllScenarios";
 import { calculateForecast } from "@/lib/forecast/engine";
+import {
+  annualExternalFteCost,
+  annualInternalFteCost,
+  annualNearshoringCost,
+  cumulativeInputFactor,
+} from "@/lib/forecast/fteCost";
 import type { ForecastInputs } from "@/lib/forecast/types";
 import { formatNumberNO } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -128,24 +134,7 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
     const totalDiff = diff(fullTotals, baseTotals);
 
     const rows: Row[] = [];
-    const internalDriverPctSum = base.cost_lines
-      .filter((c) => c.category === "Internal FTE" && !c.is_fte_master && c.fte_driver_pct != null)
-      .reduce((sum, c) => sum + Number(c.fte_driver_pct ?? 0), 0);
-    const internalRate = (level: ForecastInputs["internal_fte_base_rates"][number]["level"]) =>
-      base.internal_fte_base_rates.find((r) => r.level === level)?.base_annual_cost ?? 0;
-    const externalRate = (level: ForecastInputs["external_fte_base_rates"][number]["level"]) => {
-      const rate = base.external_fte_base_rates.find((r) => r.level === level);
-      return rate ? rate.base_monthly_cost * rate.working_months : 0;
-    };
-    const cumulativeGrowth = (
-      startYear: number,
-      endYear: number,
-      rateSelector: (year: number) => number,
-    ) => {
-      let factor = 1;
-      for (let year = startYear; year <= endYear; year++) factor *= 1 + rateSelector(year);
-      return factor;
-    };
+    const cumulativeGrowth = cumulativeInputFactor;
 
     const isolate = (mutate: (i: ForecastInputs) => ForecastInputs): Record<number, number> => {
       const iso = mutate({
@@ -307,16 +296,11 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
           netYearly[Y] = 0;
           continue;
         }
-        const rate = internalRate(r.level);
         const inc = Number(r.increase) || 0;
         const dec = Number(r.decrease) || 0;
-        const growthFactor = cumulativeGrowth(
-          r.year,
-          Y,
-          (year) => base.global_assumptions.find((g) => g.year === year)?.salary_increase_pct ?? 0,
-        );
-        const deltaInc = inc * rate * growthFactor * (1 + internalDriverPctSum);
-        const deltaDec = -dec * rate;
+        const deltaInc = inc * annualInternalFteCost(base, r.level, Y);
+        const frozenDecrease = annualInternalFteCost(base, r.level, r.year);
+        const deltaDec = -dec * frozenDecrease;
         netYearly[Y] = deltaInc + deltaDec;
       }
       rows.push({
@@ -341,16 +325,11 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
           netYearly[Y] = 0;
           continue;
         }
-        const rate = externalRate(r.level);
         const inc = Number(r.increase) || 0;
         const dec = Number(r.decrease) || 0;
-        const growthFactor = cumulativeGrowth(
-          r.year,
-          Y,
-          (year) => base.global_assumptions.find((g) => g.year === year)?.price_increase_pct ?? 0,
-        );
-        const deltaInc = inc * rate * growthFactor;
-        const deltaDec = -dec * rate;
+        const deltaInc = inc * annualExternalFteCost(base, r.level, Y);
+        const frozenDecrease = annualExternalFteCost(base, r.level, r.year);
+        const deltaDec = -dec * frozenDecrease;
         netYearly[Y] = deltaInc + deltaDec;
       }
       rows.push({
@@ -441,31 +420,19 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
     for (const r of base.nearshoring_changes) {
       const net = (Number(r.increase) || 0) - (Number(r.decrease) || 0);
       if (net === 0) continue;
-      const yearly = isolate((i) => {
-        i.nearshoring_changes = base.nearshoring_changes.map((x) =>
-          x.year === r.year
-            ? { ...x, increase: Number(r.increase) || 0, decrease: Number(r.decrease) || 0 }
-            : { ...x, increase: 0, decrease: 0 },
-        );
-        i.global_assumptions = base.global_assumptions.map((g) => ({
-          ...g,
-          salary_increase_pct: 0,
-          price_increase_pct: Number(g.price_increase_pct) || 0,
-          eur_nok_rate: CENTRAL_BASE_FX,
-        }));
-        return i;
-      });
-      const priceOnly = isolate((i) => {
-        i.global_assumptions = base.global_assumptions.map((g) => ({
-          ...g,
-          salary_increase_pct: 0,
-          price_increase_pct: Number(g.price_increase_pct) || 0,
-          eur_nok_rate: CENTRAL_BASE_FX,
-        }));
-        return i;
-      });
       const netYearly: Record<number, number> = {};
-      for (const Y of FC_YEARS) netYearly[Y] = (yearly[Y] ?? 0) - (priceOnly[Y] ?? 0);
+      for (const Y of FC_YEARS) {
+        if (Y < r.year) {
+          netYearly[Y] = 0;
+          continue;
+        }
+        const inc = Number(r.increase) || 0;
+        const dec = Number(r.decrease) || 0;
+        const deltaInc = inc * annualNearshoringCost(base, Y);
+        const frozenDecrease = annualNearshoringCost(base, r.year);
+        const deltaDec = -dec * frozenDecrease;
+        netYearly[Y] = deltaInc + deltaDec;
+      }
       rows.push({
         key: `ns:${r.year}`,
         group: "NEARSHORING",
