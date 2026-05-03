@@ -52,6 +52,8 @@ export function useAllScenarios(reloadKey = 0): UseAllScenariosState {
           intRes,
           extRes,
           nsBaseRes,
+          i2nRes,
+          ooRes,
         ] = await Promise.all([
           supabase.from("scenarios").select("id, name, sort_order").eq("is_active", true).order("sort_order"),
           supabase.from("cost_lines").select("*"),
@@ -68,6 +70,8 @@ export function useAllScenarios(reloadKey = 0): UseAllScenariosState {
           supabase.from("internal_fte_base_rates").select("*"),
           supabase.from("external_fte_base_rates").select("*"),
           supabase.from("nearshoring_base").select("*").limit(1).maybeSingle(),
+          supabase.from("internal_to_nearshoring_conversions").select("*"),
+          supabase.from("one_off_effects").select("*"),
         ]);
 
         const errs = [
@@ -105,6 +109,8 @@ export function useAllScenarios(reloadKey = 0): UseAllScenariosState {
             nearshoring_changes: (ncRes.data ?? []).filter((r: any) => r.scenario_id === s.id) as ForecastInputs["nearshoring_changes"],
             category_adjustments: (adjRes.data ?? []).filter((r: any) => r.scenario_id === s.id),
             capex_plan: (capRes.data ?? []).filter((r: any) => r.scenario_id === s.id) as ForecastInputs["capex_plan"],
+            internal_to_nearshoring_conversions: (i2nRes.data ?? []).filter((r: any) => r.scenario_id === s.id) as any,
+            one_off_effects: (ooRes.data ?? []).filter((r: any) => r.scenario_id === s.id) as any,
             depreciation_rules: (drRes.data ?? []) as ForecastInputs["depreciation_rules"],
             internal_fte_base_rates: (intRes.data ?? []) as ForecastInputs["internal_fte_base_rates"],
             external_fte_base_rates: (extRes.data ?? []) as ForecastInputs["external_fte_base_rates"],

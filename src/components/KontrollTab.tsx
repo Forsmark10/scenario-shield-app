@@ -1,13 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CheckCircle2, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAllScenarios } from "@/hooks/useAllScenarios";
 import { calculateForecast } from "@/lib/forecast/engine";
 import type { ForecastInputs } from "@/lib/forecast/types";
 import { formatNumberNO } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+type ViewMode = "PL" | "Spend";
 
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031] as const;
 
@@ -25,14 +28,12 @@ type Row = {
 function emptyDriverInputs(base: ForecastInputs): ForecastInputs {
   return {
     ...base,
-    // Globale: 0 lønns-/prisvekst, default kurs
     global_assumptions: base.global_assumptions.map((g) => ({
       ...g,
       salary_increase_pct: 0,
       price_increase_pct: 0,
       eur_nok_rate: 11.3,
     })),
-    // Sentrale: alle drivere på 0, default kurs
     central_assumptions: base.central_assumptions.map((c) => ({
       ...c,
       central_price_increase_pct: 0,
@@ -52,14 +53,24 @@ function emptyDriverInputs(base: ForecastInputs): ForecastInputs {
       adjustment_amount_tnok: 0,
     })),
     capex_plan: [],
+    internal_to_nearshoring_conversions: [],
+    one_off_effects: [],
   };
 }
 
-/** Beregn årlige totaler (P&L, MNOK) for et input-sett. */
-function totalsByYear(inputs: ForecastInputs): Record<number, number> {
+/** Beregn årlige totaler for et input-sett, P&L eller Spend. */
+function totalsByYear(inputs: ForecastInputs, view: ViewMode): Record<number, number> {
   const r = calculateForecast(inputs);
   const out: Record<number, number> = {};
-  for (const Y of FC_YEARS) out[Y] = (r.totals.by_year[Y] ?? 0) / 1000;
+  for (const Y of FC_YEARS) out[Y] = 0;
+  for (const line of r.lines) {
+    if (view === "PL" && line.is_capex) continue;
+    if (view === "Spend" && line.is_depreciation) continue;
+    if (view === "Spend" && line.category === "Other operating income") continue;
+    for (const Y of FC_YEARS) {
+      out[Y] += (line.amounts[Y] ?? 0) / 1000;
+    }
+  }
   return out;
 }
 
@@ -73,14 +84,15 @@ function diff(a: Record<number, number>, b: Record<number, number>): Record<numb
 export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
   const { loading, scenarios, error } = useAllScenarios();
   const bundle = scenarios.find((s) => s.meta.id === scenarioId);
+  const [view, setView] = useState<ViewMode>("PL");
 
   // Beregn baseline (alle drivere = 0) og total-diff samt per-driver isolert diff.
   const calc = useMemo(() => {
     if (!bundle) return null;
     const base = bundle.inputs;
     const empty = emptyDriverInputs(base);
-    const baseTotals = totalsByYear(empty);
-    const fullTotals = totalsByYear(base);
+    const baseTotals = totalsByYear(empty, view);
+    const fullTotals = totalsByYear(base, view);
     const totalDiff = diff(fullTotals, baseTotals);
 
     const rows: Row[] = [];
@@ -97,8 +109,10 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         nearshoring_changes: empty.nearshoring_changes.map((r) => ({ ...r })),
         category_adjustments: empty.category_adjustments.map((r) => ({ ...r })),
         capex_plan: [],
+        internal_to_nearshoring_conversions: [],
+        one_off_effects: [],
       });
-      return diff(totalsByYear(iso), baseTotals);
+      return diff(totalsByYear(iso, view), baseTotals);
     };
 
     // ---- Globale drivere (per år, men slå sammen til én rad per type) ----
@@ -385,6 +399,42 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       });
     }
 
+    // ---- Internal → Nearshoring konvertering ----
+    for (const r of base.internal_to_nearshoring_conversions ?? []) {
+      if (!Number(r.count)) continue;
+      const yearly = isolate((i) => {
+        i.internal_to_nearshoring_conversions = [{ ...r }];
+        return i;
+      });
+      rows.push({
+        key: `i2n:${r.year}:${r.internal_level}:${(r as any).id ?? Math.random()}`,
+        name: `${r.count} ${r.internal_level} Intern→Nearshoring ${r.year}`,
+        type: "Intern→Nearshoring",
+        details: `${r.overlap_months ?? 3} mnd overlapp`,
+        yearly,
+        acc2031: yearly[2031],
+        comment: (r as any).comment,
+      });
+    }
+
+    // ---- Engangseffekter ----
+    for (const r of base.one_off_effects ?? []) {
+      if (!Number(r.amount_tnok)) continue;
+      const yearly = isolate((i) => {
+        i.one_off_effects = [{ ...r }];
+        return i;
+      });
+      rows.push({
+        key: `oneoff:${r.year}:${r.category}:${(r as any).id ?? Math.random()}`,
+        name: `${r.description || "Engangseffekt"} (${r.category}) ${r.year}`,
+        type: "Engangseffekt",
+        details: `${formatNumberNO(Number(r.amount_tnok) / 1000, 1)} MNOK kun ${r.year}`,
+        yearly,
+        acc2031: yearly[2031],
+        comment: (r as any).comment,
+      });
+    }
+
     // Sum-rad
     const sumYearly: Record<number, number> = {};
     for (const Y of FC_YEARS) sumYearly[Y] = rows.reduce((s, r) => s + (r.yearly[Y] ?? 0), 0);
@@ -394,7 +444,7 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       sumYearly,
       totalDiff,
     };
-  }, [bundle]);
+  }, [bundle, view]);
 
   if (loading) {
     return (
@@ -431,10 +481,16 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
               Kontroll – isolert effekt per forutsetning
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Hver rad viser hva forutsetningen alene bidrar med på P&L-totalen,
+              Hver rad viser hva forutsetningen alene bidrar med på {view === "PL" ? "P&L-totalen" : "Spend (kontant utgift)"},
               alt annet likt. Sum nederst skal tilnærmet matche modellens totale endring 2026 → 2031.
             </p>
           </div>
+          <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
+            <TabsList>
+              <TabsTrigger value="PL">P&amp;L</TabsTrigger>
+              <TabsTrigger value="Spend">Spend</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         <div className="overflow-x-auto rounded-md border">
@@ -524,7 +580,7 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Alle tall i MNOK (P&L-perspektiv). Positivt = økt kostnad, negativt = besparelse.
+          Alle tall i MNOK ({view === "PL" ? "P&L-perspektiv: Capex som avskrivninger over levetid" : "Spend-perspektiv: Capex som direkte utgift i investeringsåret"}). Positivt = økt kostnad, negativt = besparelse.
         </p>
       </CardContent>
     </Card>

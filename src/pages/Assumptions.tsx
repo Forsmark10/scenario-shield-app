@@ -79,6 +79,8 @@ interface AllData {
   catAdj: any[];
   capexPlan: any[];
   depRules: any[];
+  i2nConversions: any[];
+  oneOffs: any[];
   categories: string[];
 }
 
@@ -94,7 +96,9 @@ type TableKey =
   | "nearshoringAdds"
   | "nearshoringChanges"
   | "catAdj"
-  | "capexPlan";
+  | "capexPlan"
+  | "i2nConversions"
+  | "oneOffs";
 
 type PatchAction =
   | { type: "upsert"; table: TableKey; row: any; matchBy?: (r: any) => boolean }
@@ -128,7 +132,7 @@ export default function Assumptions() {
     (async () => {
       setLoading(true);
       const [
-        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, ncRes, caRes, capRes, drRes, clRes,
+        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, ncRes, caRes, capRes, drRes, clRes, i2nRes, ooRes,
       ] = await Promise.all([
         supabase.from("scenarios").select("*").eq("is_active", true).order("sort_order"),
         supabase.from("global_assumptions").select("*"),
@@ -145,6 +149,8 @@ export default function Assumptions() {
         supabase.from("capex_plan").select("*"),
         supabase.from("depreciation_rules").select("*"),
         supabase.from("cost_lines").select("category"),
+        supabase.from("internal_to_nearshoring_conversions").select("*"),
+        supabase.from("one_off_effects").select("*"),
       ]);
       if (cancelled) return;
       const cats = Array.from(new Set((clRes.data ?? []).map((r: any) => r.category))).sort() as string[];
@@ -163,6 +169,8 @@ export default function Assumptions() {
         catAdj: caRes.data ?? [],
         capexPlan: capRes.data ?? [],
         depRules: drRes.data ?? [],
+        i2nConversions: i2nRes.data ?? [],
+        oneOffs: ooRes.data ?? [],
         categories: cats,
       };
       setData(next);
@@ -200,6 +208,8 @@ export default function Assumptions() {
     nearshoringChanges: "nearshoring_changes",
     catAdj: "category_adjustments",
     capexPlan: "capex_plan",
+    i2nConversions: "internal_to_nearshoring_conversions",
+    oneOffs: "one_off_effects",
   };
 
   // Bygg en AssumptionsSnapshot fra LOKAL state for et gitt scenario.
@@ -452,6 +462,10 @@ export default function Assumptions() {
                         ["capex_plan (detaljerte)", () =>
                           supabase.from("capex_plan").delete()
                             .eq("scenario_id", sid).not("description", "is", null)],
+                        ["internal_to_nearshoring_conversions", () =>
+                          supabase.from("internal_to_nearshoring_conversions").delete().eq("scenario_id", sid)],
+                        ["one_off_effects", () =>
+                          supabase.from("one_off_effects").delete().eq("scenario_id", sid)],
                       ];
                       for (const [label, fn] of deletes) {
                         const { error } = await fn();
@@ -517,6 +531,8 @@ export default function Assumptions() {
                             ),
                           conversions: (prev.conversions as any[]).filter((r) => r.scenario_id !== sid),
                           nearshoringAdds: (prev.nearshoringAdds as any[]).filter((r) => r.scenario_id !== sid),
+                          i2nConversions: (prev.i2nConversions as any[]).filter((r) => r.scenario_id !== sid),
+                          oneOffs: (prev.oneOffs as any[]).filter((r) => r.scenario_id !== sid),
                         };
                       });
                       console.log("[Reset] Lokal state nullstilt – starter refresh()");
@@ -559,7 +575,9 @@ export default function Assumptions() {
             <SectionExternalFte data={data} scenario={s} patch={patch} />
             <SectionConversions data={data} scenario={s} patch={patch} />
             <SectionNearshoring data={data} scenario={s} patch={patch} />
+            <SectionInternalToNearshoring data={data} scenario={s} patch={patch} />
             <SectionCategoryAdj data={data} scenario={s} patch={patch} />
+            <SectionOneOff data={data} scenario={s} patch={patch} />
             <SectionCapex data={data} scenario={s} patch={patch} />
 
             <KontrollTab scenarioId={s.id} />
@@ -2312,6 +2330,229 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
             </table>
           )}
         </div>
+      </div>
+    </Section>
+  );
+}
+
+// ---------------------- 6b. Internal → Nearshoring konvertering ----------------------
+function SectionInternalToNearshoring({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
+  const rows = [...data.i2nConversions.filter((c) => c.scenario_id === scenario.id)].sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return aTime - bTime;
+  });
+
+  const addRow = async () => {
+    const { data: inserted, error } = await supabase
+      .from("internal_to_nearshoring_conversions")
+      .insert({ scenario_id: scenario.id, year: 2027, internal_level: "Low", count: 0, overlap_months: 3 })
+      .select()
+      .single();
+    if (error) throw error;
+    patch({ type: "upsert", table: "i2nConversions", row: inserted });
+  };
+
+  const updateField = async (id: string, field: string, value: any) => {
+    patch({ type: "update", table: "i2nConversions", id, changes: { [field]: value } });
+    const { error } = await supabase.from("internal_to_nearshoring_conversions").update({ [field]: value } as any).eq("id", id);
+    if (error) throw error;
+  };
+
+  const updateComment = async (id: string, comment: string | null) => {
+    const ts = new Date().toISOString();
+    patch({ type: "update", table: "i2nConversions", id, changes: { comment, comment_updated_at: ts } });
+    const { error } = await supabase
+      .from("internal_to_nearshoring_conversions")
+      .update({ comment, comment_updated_at: ts } as any)
+      .eq("id", id);
+    if (error) throw error;
+  };
+
+  const remove = async (id: string) => {
+    patch({ type: "delete", table: "i2nConversions", id });
+    const { error } = await supabase.from("internal_to_nearshoring_conversions").delete().eq("id", id);
+    if (error) throw error;
+  };
+
+  return (
+    <Section
+      title="Intern → Nearshoring konvertering"
+      description="Overlapp er 3 måneder (fast). Intern besparelse + nearshoring-kostnad legges til automatisk."
+      tooltip="Konvertering av interne ressurser til nearshoring. Overlapp er 3 måneder (fast)."
+    >
+      <div className="space-y-3">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left font-medium px-2 py-2 w-[80px]">År</th>
+              <th className="text-left font-medium px-2 py-2 w-[120px]">Intern-nivå</th>
+              <th className="text-right font-medium px-2 py-2 w-[100px]">Antall</th>
+              <th className="text-left font-medium px-2 py-2">→ Nearshoring</th>
+              <th className="w-[40px]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={5} className="text-center text-muted-foreground px-2 py-4">Ingen konverteringer ennå.</td></tr>
+            )}
+            {rows.map((r) => (
+              <tr key={r.id} className="border-b">
+                <td className="px-1 py-1">
+                  <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="px-1 py-1">
+                  <Select value={r.internal_level} onValueChange={(v) => updateField(r.id, "internal_level", v)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>{LEVELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}</SelectContent>
+                  </Select>
+                </td>
+                <td className="px-1 py-1">
+                  <CellWithComment
+                    comment={r.comment}
+                    updatedAt={r.comment_updated_at}
+                    updatedBy={r.comment_updated_by}
+                    onSaveComment={(next) => updateComment(r.id, next)}
+                    label={`Intern→NS ${r.year} · Antall`}
+                  >
+                    <NumCell value={Number(r.count)} step="1" min={0} errorHint="Antall må være 0 eller positivt." onCommit={(v) => updateField(r.id, "count", Math.max(0, Math.round(v)))} />
+                  </CellWithComment>
+                </td>
+                <td className="px-2 py-1 text-muted-foreground">Nearshoring</td>
+                <td className="px-1 py-1 text-center">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(r.id)}>
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <Button variant="outline" size="sm" onClick={addRow}><Plus className="h-3.5 w-3.5 mr-1" /> Legg til konvertering</Button>
+      </div>
+    </Section>
+  );
+}
+
+// ---------------------- 7b. One-off effects (engangseffekter) ----------------------
+function SectionOneOff({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
+  const ONE_OFF_CATEGORIES = [
+    "Capex", "Consultancy", "Depreciation", "External FTE", "IT Costs",
+    "Internal FTE", "Operations & Personnel-related", "Other operating income",
+  ];
+  const rows = [...data.oneOffs.filter((r) => r.scenario_id === scenario.id)].sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return aTime - bTime;
+  });
+
+  const addRow = async () => {
+    const { data: inserted, error } = await supabase
+      .from("one_off_effects")
+      .insert({ scenario_id: scenario.id, year: 2027, category: "Consultancy", amount_tnok: 0, description: "" })
+      .select()
+      .single();
+    if (error) throw error;
+    patch({ type: "upsert", table: "oneOffs", row: inserted });
+  };
+
+  const updateField = async (id: string, field: string, value: any) => {
+    patch({ type: "update", table: "oneOffs", id, changes: { [field]: value } });
+    const { error } = await supabase.from("one_off_effects").update({ [field]: value } as any).eq("id", id);
+    if (error) throw error;
+  };
+
+  const updateComment = async (id: string, comment: string | null) => {
+    const ts = new Date().toISOString();
+    patch({ type: "update", table: "oneOffs", id, changes: { comment, comment_updated_at: ts } });
+    const { error } = await supabase
+      .from("one_off_effects")
+      .update({ comment, comment_updated_at: ts } as any)
+      .eq("id", id);
+    if (error) throw error;
+  };
+
+  const remove = async (id: string) => {
+    patch({ type: "delete", table: "oneOffs", id });
+    const { error } = await supabase.from("one_off_effects").delete().eq("id", id);
+    if (error) throw error;
+  };
+
+  return (
+    <Section
+      title="Engangseffekter"
+      description="Gjelder kun det valgte året. Vokser ikke med prisvekst og er ikke kumulative."
+      tooltip="Engangseffekter gjelder kun det valgte året og er ikke kumulative. De vokser ikke med prisvekst."
+    >
+      <div className="space-y-3">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left font-medium px-2 py-2">Beskrivelse</th>
+              <th className="text-left font-medium px-2 py-2 w-[200px]">Kategori</th>
+              <th className="text-left font-medium px-2 py-2 w-[80px]">År</th>
+              <th className="text-right font-medium px-2 py-2 w-[140px]">Beløp (tNOK)</th>
+              <th className="w-[40px]"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={5} className="text-center text-muted-foreground px-2 py-4">Ingen engangseffekter ennå.</td></tr>
+            )}
+            {rows.map((r) => (
+              <tr key={r.id} className="border-b">
+                <td className="px-1 py-1">
+                  <Input
+                    defaultValue={r.description ?? ""}
+                    onBlur={(e) => {
+                      if (e.target.value !== r.description) updateField(r.id, "description", e.target.value);
+                    }}
+                    className="h-8 text-xs"
+                    placeholder="Beskrivelse..."
+                  />
+                </td>
+                <td className="px-1 py-1">
+                  <Select value={r.category} onValueChange={(v) => updateField(r.id, "category", v)}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ONE_OFF_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="px-1 py-1">
+                  <Select value={String(r.year)} onValueChange={(v) => updateField(r.id, "year", Number(v))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="px-1 py-1">
+                  <CellWithComment
+                    comment={r.comment}
+                    updatedAt={r.comment_updated_at}
+                    updatedBy={r.comment_updated_by}
+                    onSaveComment={(next) => updateComment(r.id, next)}
+                    label={`Engangseffekt ${r.year}`}
+                  >
+                    <NumCell value={Number(r.amount_tnok)} step="100" onCommit={(v) => updateField(r.id, "amount_tnok", v)} />
+                  </CellWithComment>
+                </td>
+                <td className="px-1 py-1 text-center">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(r.id)}>
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <Button variant="outline" size="sm" onClick={addRow}><Plus className="h-3.5 w-3.5 mr-1" /> Legg til engangseffekt</Button>
       </div>
     </Section>
   );
