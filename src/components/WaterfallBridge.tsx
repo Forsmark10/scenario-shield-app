@@ -486,10 +486,35 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     }
   }
 
+  // ─────── Engangseffekter (one-off) – kun aktivt i sitt eget år ───────
+  // Engangseffekter ligger som virtual:one_off:<cat>-linjer fra engine; de har
+  // kun beløp i året de gjelder. Klassifiser per komponent (ikke per kategori-sum).
+  const oneOffIncByCat: Record<string, number> = {};
+  const oneOffDecByCat: Record<string, number> = {};
+  const oneOffDescByCat: Record<string, string[]> = {};
+  for (const l of result.lines) {
+    if (!l.line_id.startsWith("virtual:one_off:")) continue;
+    if (!includeForecastLine(l)) continue;
+    const v = l.amounts[N] ?? 0;
+    if (v === 0) continue;
+    if (v > 0) oneOffIncByCat[l.category] = (oneOffIncByCat[l.category] ?? 0) + v;
+    else oneOffDecByCat[l.category] = (oneOffDecByCat[l.category] ?? 0) + v;
+    // Hent beskrivelser fra inputs.one_off_effects for år N
+    for (const r of inputs.one_off_effects ?? []) {
+      if (r.category !== l.category || r.year !== N) continue;
+      const desc = r.description ?? r.comment ?? null;
+      if (!desc) continue;
+      const arr = (oneOffDescByCat[l.category] ??= []);
+      if (!arr.includes(desc)) arr.push(desc);
+    }
+  }
+  const oneOffIncTot = Object.values(oneOffIncByCat).reduce((a, b) => a + b, 0);
+  const oneOffDecTot = Object.values(oneOffDecByCat).reduce((a, b) => a + b, 0);
+
   const incTot =
-    Object.values(incByCat).reduce((a, b) => a + b, 0) + centralRedPctInc + centralRedAmtInc;
+    Object.values(incByCat).reduce((a, b) => a + b, 0) + centralRedPctInc + centralRedAmtInc + oneOffIncTot;
   const decTot =
-    Object.values(decByCat).reduce((a, b) => a + b, 0) + centralRedPctDec + centralRedAmtDec;
+    Object.values(decByCat).reduce((a, b) => a + b, 0) + centralRedPctDec + centralRedAmtDec + oneOffDecTot;
 
   const incDetails: BridgeBreakdown["details"] = [];
   Object.entries(incByCat).forEach(([cat, v]) => {
