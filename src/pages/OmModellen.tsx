@@ -16,7 +16,9 @@ export default function OmModellen() {
           prose-strong:text-foreground prose-strong:font-semibold
           prose-hr:my-8 prose-hr:border-border
           prose-table:text-sm prose-th:text-left prose-th:font-semibold
-          prose-code:text-xs prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded"
+          prose-code:text-xs prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none
+          prose-pre:bg-slate-50 prose-pre:text-foreground prose-pre:border prose-pre:border-border prose-pre:rounded-md prose-pre:p-4 prose-pre:text-xs
+          [&_pre_code]:bg-transparent [&_pre_code]:text-foreground [&_pre_code]:p-0"
       >
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </article>
