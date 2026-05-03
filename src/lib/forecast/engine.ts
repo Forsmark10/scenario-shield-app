@@ -106,6 +106,39 @@ function cumulativeCatAdj(
   return { factor, desc: parts.length ? parts.join("×") : "1" };
 }
 
+function categoryAdjustmentEffect(
+  adjustments: CategoryAdjustment[],
+  scenarioId: string,
+  category: string,
+  baseAmount: number,
+  year: number,
+  growthRateFn: ((year: number) => number) | null,
+): { amount: number; desc: string } {
+  const rows = adjustments
+    .filter((a) => a.scenario_id === scenarioId && a.category === category && a.year <= year)
+    .sort((a, b) => a.year - b.year);
+
+  let amount = 0;
+  const parts: string[] = [];
+
+  for (const row of rows) {
+    const pct = Number(row.adjustment_pct ?? 0);
+    if (!pct) continue;
+    const growthFactor = pct > 0 && growthRateFn
+      ? cumulativeFactor(scenarioId, row.year, year, growthRateFn)
+      : 1;
+    const delta = baseAmount * pct * growthFactor;
+    amount += delta;
+    parts.push(
+      pct > 0
+        ? `${round2(baseAmount)} × ${pct} × growth(${row.year}..${year})=${round2(growthFactor)} = ${round2(delta)}`
+        : `${round2(baseAmount)} × ${pct} (konstant) = ${round2(delta)}`,
+    );
+  }
+
+  return { amount, desc: parts.length ? parts.join(" + ") : "0" };
+}
+
 function distributeMonthly(annual: number, pattern: number[]): number[] {
   const total = sum(pattern);
   if (total === 0) {
