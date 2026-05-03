@@ -999,32 +999,7 @@ function WaterfallChart({
             />
           )}
 
-          {/* connector dashed lines — thin and discreet */}
-          {bars.map((b, i) => {
-            if (i === bars.length - 1) return null;
-            const nextBar = bars[i + 1];
-            let yVal: number;
-            if (b.type === "start") yVal = b.raw;
-            else if (nextBar.type === "end") yVal = nextBar.raw;
-            else yVal = b.raw >= 0 ? b.top : b.bottom;
-            const wA = barWidthFor(b);
-            const wB = barWidthFor(nextBar);
-            const x1 = xCenter(i) + wA / 2;
-            const x2 = xCenter(i + 1) - wB / 2;
-            const y = yScale(yVal);
-            return (
-              <line
-                key={`conn-${i}`}
-                x1={x1}
-                x2={x2}
-                y1={y}
-                y2={y}
-                stroke="#94a3b8"
-                strokeWidth={1}
-                strokeDasharray="4 3"
-              />
-            );
-          })}
+          {/* connector lines removed for cleaner look */}
 
           {/* bars — flat, rounded corners, matches stolpediagrammene */}
           {bars.map((b, i) => {
@@ -1044,8 +1019,8 @@ function WaterfallChart({
               : b.raw < 0
                 ? COLOR_TEXT_DEC
                 : COLOR_TEXT_INC;
-            const labelY = yTop - 10;
-            const xLabelY = H - PAD_B + 16;
+            const labelY = yTop - 8;
+            const xLabelY = H - PAD_B + 18;
             const isActive = activeBar?.name === b.name && activeBar?.type === b.type;
             return (
               <g
@@ -1058,7 +1033,6 @@ function WaterfallChart({
                 onMouseLeave={() => setActiveBar(null)}
                 style={{ cursor: "pointer" }}
               >
-                {/* hit area covers full slot for easier hover */}
                 <rect
                   x={xCenter(i) - slot / 2}
                   y={PAD_T}
@@ -1072,8 +1046,8 @@ function WaterfallChart({
                   textAnchor="middle"
                   style={{
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: isTotal ? 12 : 11,
-                    fontWeight: 700,
+                    fontSize: isTotal ? 13 : 11,
+                    fontWeight: isTotal ? 700 : 600,
                     fill: labelColor,
                   }}
                 >
@@ -1084,7 +1058,7 @@ function WaterfallChart({
                   y={yTop}
                   width={w}
                   height={h}
-                  rx={2.5}
+                  rx={4}
                   fill={b.color}
                   opacity={isActive ? 1 : 0.96}
                 />
@@ -1094,9 +1068,9 @@ function WaterfallChart({
                   textAnchor="middle"
                   style={{
                     fontFamily: "Inter, system-ui, sans-serif",
-                    fontSize: 10.5,
+                    fontSize: 10,
                     fill: "hsl(var(--muted-foreground))",
-                    fontWeight: isTotal ? 600 : 400,
+                    fontWeight: 400,
                   }}
                 >
                   {b.name}
