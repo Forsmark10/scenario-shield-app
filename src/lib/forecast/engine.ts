@@ -250,8 +250,9 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   const scenarioExtChanges = external_fte_changes.filter(
     (c) => c.scenario_id === scenario_id
   );
-  const intChangeIndex = buildFteChangeIndex(scenarioIntChanges);
-  const extChangeIndex = buildFteChangeIndex(scenarioExtChanges);
+  const intIncDec = buildFteIncDecIndex(scenarioIntChanges);
+  const extIncDec = buildFteIncDecIndex(scenarioExtChanges);
+
 
   const lines: ForecastLine[] = [];
 
