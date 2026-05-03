@@ -360,7 +360,9 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         sortKey: (net > 0 ? 2 : 3) * 1000 + r.year,
         name: `${net > 0 ? "+" : ""}${net} ${r.level} Ekstern FTE ${r.year}`,
         type: "Ekstern FTE-endring",
-        details: `Inkl. kumulativ prisvekst på endringen`,
+        details: net > 0
+          ? "Inkl. kumulativ prisvekst fra FC 2026-basis"
+          : "Konstant besparelse mot FC 2026-basis",
         yearly: netYearly,
         comment: (r as any).comment ?? (r as any).comment_increase ?? (r as any).comment_decrease,
       });
