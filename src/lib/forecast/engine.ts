@@ -648,27 +648,28 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     const g = getGlobal(global_assumptions, scenario_id, N);
     const priceRate = (Y: number) =>
       getGlobal(global_assumptions, scenario_id, Y).price_increase_pct;
-    // Cumulative net headcount through year N
-    let cumulativeHeadcount = 0;
+    let amt = 0;
     const headcountParts: string[] = [];
+    const baseAnnualNokK = (nearshoring_base.base_annual_cost_eur * g.eur_nok_rate) / 1000;
     for (let Y = 2027; Y <= N; Y++) {
       const yearChanges = scenarioNearshoringChanges.filter((n) => n.year === Y);
       const inc = yearChanges.reduce((s, n) => s + (Number(n.increase) || 0), 0);
       const dec = yearChanges.reduce((s, n) => s + (Number(n.decrease) || 0), 0);
-      const net = inc - dec;
-      if (net !== 0) {
-        cumulativeHeadcount += net;
-        headcountParts.push(`Y${Y} net=${net}`);
+      if (inc > 0) {
+        const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
+        const annualNokK = (nearshoring_base.base_annual_cost_eur * grown * g.eur_nok_rate) / 1000;
+        amt += inc * annualNokK;
+        headcountParts.push(`Y${Y} inc=${inc} x ${round2(annualNokK)} kNOK (vokser)`);
+      }
+      if (dec > 0) {
+        amt += -dec * baseAnnualNokK;
+        headcountParts.push(`Y${Y} dec=${dec} x ${round2(baseAnnualNokK)} kNOK (konstant)`);
       }
     }
-    const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
-    const annualEur = nearshoring_base.base_annual_cost_eur * priceFactor;
-    const annualNokK = (annualEur * g.eur_nok_rate) / 1000;
-    const amt = cumulativeHeadcount * annualNokK;
     nsLine.amounts[N] = amt;
-    nsLine.breakdown_source[N] = cumulativeHeadcount === 0
+    nsLine.breakdown_source[N] = headcountParts.length === 0
       ? "Ingen aktive nearshoring-ressurser"
-      : `${headcountParts.join(", ")} → cum=${cumulativeHeadcount} × ${round2(annualEur)} EUR × ${g.eur_nok_rate} NOK/EUR / 1000 = ${round2(amt)} kNOK (cum_price(2027..${N})=${round2(priceFactor)})`;
+      : headcountParts.join(", ") + ` = ${round2(amt)} kNOK`;
   }
   nsLine.monthly_2027 = Array(12).fill((nsLine.amounts[2027] ?? 0) / 12);
   lines.push(nsLine);
