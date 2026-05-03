@@ -316,10 +316,12 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       rows.push({
         key: `intfte:${r.year}:${r.level}`,
         group: "FTE",
-        sortKey: (net > 0 ? 0 : 1) * 1000 + r.year, // interne økn først (0xxx), så red (1xxx); eksterne får 2xxx/3xxx
+        sortKey: (net > 0 ? 0 : 1) * 1000 + r.year,
         name: `${net > 0 ? "+" : ""}${net} ${r.level} Intern FTE ${r.year}`,
         type: "Intern FTE-endring",
-        details: `Inkl. kumulativ lønnsvekst på endringen`,
+        details: net > 0
+          ? "Inkl. kumulativ lønnsvekst fra FC 2026-basis"
+          : "Konstant besparelse mot FC 2026-basis",
         yearly: netYearly,
         comment: (r as any).comment ?? (r as any).comment_increase ?? (r as any).comment_decrease,
       });
