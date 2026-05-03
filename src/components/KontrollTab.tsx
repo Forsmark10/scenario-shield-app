@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { CheckCircle2, MessageSquare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -122,7 +122,38 @@ function diff(a: Record<number, number>, b: Record<number, number>): Record<numb
 }
 
 export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
-  const { loading, scenarios, error } = useAllScenarios();
+  const [isOpen, setIsOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Only load data when opened; bump reloadKey each time to get fresh data
+  const handleToggle = useCallback(() => {
+    setIsOpen((prev) => {
+      if (!prev) setReloadKey((k) => k + 1);
+      return !prev;
+    });
+  }, []);
+
+  return (
+    <div className="border rounded-lg mt-6">
+      <button
+        onClick={handleToggle}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-lg">⊙</span>
+          <div>
+            <span className="font-semibold text-sm">Kontroll – isolert effekt per forutsetning</span>
+          </div>
+        </div>
+        <span className="text-muted-foreground text-xs">{isOpen ? "▲ Lukk" : "▼ Åpne"}</span>
+      </button>
+      {isOpen && <KontrollTabInner scenarioId={scenarioId} reloadKey={reloadKey} />}
+    </div>
+  );
+}
+
+function KontrollTabInner({ scenarioId, reloadKey }: { scenarioId: string | null; reloadKey: number }) {
+  const { loading, scenarios, error } = useAllScenarios(reloadKey);
   const bundle = scenarios.find((s) => s.meta.id === scenarioId);
   const [view, setView] = useState<ViewMode>("PL");
 
