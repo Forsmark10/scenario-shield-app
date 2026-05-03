@@ -605,19 +605,15 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       let amt = 0;
       const parts: string[] = [];
       for (let Y = 2027; Y <= N; Y++) {
-        const grown = cumulativeFactor(scenario_id, Y, N, extPriceRate);
         for (const lvl of LEVELS) {
           const inc = extIncDec.inc.get(fteChangeKey(Y, lvl)) ?? 0;
           const dec = extIncDec.dec.get(fteChangeKey(Y, lvl)) ?? 0;
           if (inc === 0 && dec === 0) continue;
-          const r = extRate(lvl);
-          const annual = r.base_monthly_cost * r.working_months;
-          // Increase vokser med prisvekst, decrease konstant.
-          const deltaInc = inc * annual * grown;
-          const deltaDec = -dec * annual;
+          const deltaInc = inc * annualExternalFteCost(inputs, lvl, N);
+          const deltaDec = -dec * annualExternalFteCost(inputs, lvl, Y);
           amt += deltaInc + deltaDec;
-          if (inc !== 0) parts.push(`Y${Y} ${lvl} inc=${inc} × annual=${annual} × cum_price(${Y}..${N})=${round2(grown)} = ${round2(deltaInc)}`);
-          if (dec !== 0) parts.push(`Y${Y} ${lvl} dec=${dec} × annual=${annual} (konstant) = ${round2(deltaDec)}`);
+          if (inc !== 0) parts.push(`Y${Y} ${lvl} inc=${inc} × annual@${N}=${round2(annualExternalFteCost(inputs, lvl, N))} = ${round2(deltaInc)}`);
+          if (dec !== 0) parts.push(`Y${Y} ${lvl} dec=${dec} × annual@${Y}=${round2(annualExternalFteCost(inputs, lvl, Y))} (fryst) = ${round2(deltaDec)}`);
         }
       }
       extChangesLine.amounts[N] = amt;
@@ -634,20 +630,20 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       const parts: string[] = [];
       for (let Y = 2027; Y <= N; Y++) {
         for (const conv of scenarioConversions.filter((c) => c.year === Y)) {
-          const r = extRate(conv.external_level);
+          const frozenAnnual = annualExternalFteCost(inputs, conv.external_level, Y);
+          const workingMonths = externalWorkingMonths(inputs, conv.external_level);
           if (Y === N) {
-            const months = Math.max(0, r.working_months - conv.overlap_months);
-            const reduction = -conv.count * r.base_monthly_cost * months;
+            const months = Math.max(0, workingMonths - conv.overlap_months);
+            const reduction = -conv.count * (frozenAnnual / workingMonths) * months;
             amt += reduction;
             parts.push(
-              `Konv-år Y${Y} ${conv.external_level}: -${conv.count} × ${r.base_monthly_cost} × (${r.working_months}-${conv.overlap_months})=${months}m (konstant) = ${round2(reduction)}`,
+              `Konv-år Y${Y} ${conv.external_level}: -${conv.count} × annual@${Y}=${round2(frozenAnnual)} × ${months}/${workingMonths} (fryst) = ${round2(reduction)}`,
             );
           } else {
-            const annual = r.base_monthly_cost * r.working_months;
-            const reduction = -conv.count * annual;
+            const reduction = -conv.count * frozenAnnual;
             amt += reduction;
             parts.push(
-              `Etter Y${Y} ${conv.external_level}: -${conv.count} × annual=${annual} (konstant mot FC2026) = ${round2(reduction)}`,
+              `Etter Y${Y} ${conv.external_level}: -${conv.count} × annual@${Y}=${round2(frozenAnnual)} (fryst) = ${round2(reduction)}`,
             );
           }
         }
@@ -684,25 +680,21 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     breakdown_source: {},
   };
   for (const N of YEARS) {
-    const g = getGlobal(global_assumptions, scenario_id, N);
-    const priceRate = (Y: number) =>
-      getGlobal(global_assumptions, scenario_id, Y).price_increase_pct;
     let amt = 0;
     const headcountParts: string[] = [];
-    const baseAnnualNokK = (nearshoring_base.base_annual_cost_eur * g.eur_nok_rate) / 1000;
     for (let Y = 2027; Y <= N; Y++) {
       const yearChanges = scenarioNearshoringChanges.filter((n) => n.year === Y);
       const inc = yearChanges.reduce((s, n) => s + (Number(n.increase) || 0), 0);
       const dec = yearChanges.reduce((s, n) => s + (Number(n.decrease) || 0), 0);
       if (inc > 0) {
-        const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
-        const annualNokK = (nearshoring_base.base_annual_cost_eur * grown * g.eur_nok_rate) / 1000;
+        const annualNokK = annualNearshoringCost(inputs, N);
         amt += inc * annualNokK;
         headcountParts.push(`Y${Y} inc=${inc} x ${round2(annualNokK)} kNOK (vokser)`);
       }
       if (dec > 0) {
-        amt += -dec * baseAnnualNokK;
-        headcountParts.push(`Y${Y} dec=${dec} x ${round2(baseAnnualNokK)} kNOK (konstant)`);
+        const frozenAnnualNokK = annualNearshoringCost(inputs, Y);
+        amt += -dec * frozenAnnualNokK;
+        headcountParts.push(`Y${Y} dec=${dec} x ${round2(frozenAnnualNokK)} kNOK (fryst)`);
       }
     }
     nsLine.amounts[N] = amt;
@@ -845,35 +837,24 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       breakdown_source: {},
     };
     for (const N of YEARS) {
-      const g = getGlobal(global_assumptions, scenario_id, N);
-      const salaryRate = (Y: number) =>
-        getGlobal(global_assumptions, scenario_id, Y).salary_increase_pct;
-      const priceRate = (Y: number) =>
-        getGlobal(global_assumptions, scenario_id, Y).price_increase_pct;
       let intRed = 0;
       let nsAdd = 0;
       const intParts: string[] = [];
       const nsParts: string[] = [];
       for (let Y = 2027; Y <= N; Y++) {
         for (const r of i2n.filter((c) => c.year === Y)) {
-          const rate = intRate(r.internal_level);
-          // Intern besparelse er KONSTANT mot FC2026 (ingen lønnsvekst)
-          const annualIntFlat = r.count * rate;
+          const annualIntFrozen = r.count * annualInternalFteCost(inputs, r.internal_level, Y);
           const overlapMonths = Math.max(0, Math.min(12, r.overlap_months ?? 3));
           if (Y === N) {
-            // Konverteringsåret: behold (overlapMonths/12) av intern-kost.
             const monthsRemoved = 12 - overlapMonths;
-            const reduction = -(annualIntFlat * monthsRemoved) / 12;
+            const reduction = -(annualIntFrozen * monthsRemoved) / 12;
             intRed += reduction;
-            intParts.push(`Konv-år Y${Y} ${r.internal_level} x${r.count}: -${monthsRemoved}/12 av annual=${round2(annualIntFlat)} (konstant) = ${round2(reduction)}`);
+            intParts.push(`Konv-år Y${Y} ${r.internal_level} x${r.count}: -${monthsRemoved}/12 av annual@${Y}=${round2(annualIntFrozen)} (fryst) = ${round2(reduction)}`);
           } else {
-            intRed += -annualIntFlat;
-            intParts.push(`Etter Y${Y} ${r.internal_level} x${r.count}: -annual=${round2(annualIntFlat)} (konstant)`);
+            intRed += -annualIntFrozen;
+            intParts.push(`Etter Y${Y} ${r.internal_level} x${r.count}: -annual@${Y}=${round2(annualIntFrozen)} (fryst)`);
           }
-          // Nearshoring-kost: full årseffekt fra Y, ingen overlapp på nearshoring-siden
-          // (overlapp gjelder kun intern). Pris vokser med global price_rate.
-          const priceFactor = cumulativeFactor(scenario_id, Y, N, priceRate);
-          const annualNokK = (nearshoring_base.base_annual_cost_eur * priceFactor * g.eur_nok_rate) / 1000;
+          const annualNokK = annualNearshoringCost(inputs, N);
           const nsCost = r.count * annualNokK;
           nsAdd += nsCost;
           nsParts.push(`Y${Y} ×${r.count}: +${round2(annualNokK)} kNOK/ressurs = ${round2(nsCost)}`);
