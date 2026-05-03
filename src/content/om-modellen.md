@@ -1,235 +1,201 @@
 # Om LTP-modellen
 
-En komplett guide til hva appen gjør, hvordan kostnadsmodellen er bygget opp, og hvordan du tolker tallene.
+Denne appen hjelper deg med å planlegge kostnader for de neste fem årene. Den viser hvordan kostnadene utvikler seg under tre ulike scenarioer, og gjør det enkelt å forstå *hva* som driver endringene.
 
 ---
 
-## Beregningsprinsipper – økninger vs. besparelser
+## Hva er dette?
 
-**Grunnprinsipp:** FC 2026 er baseline og er **frosset** – den vokser ikke. Alle endringer i waterfall og Kontroll-tabben måles mot denne frosne baseline.
+Kort fortalt: Du starter med dagens kostnader (FC 2026) og ser hvordan de endrer seg frem til 2031 – avhengig av hvilke valg som tas.
 
-- **Økninger** (nye FTE-er, nearshoring-økninger) **vokser** med kumulativ lønnsvekst/prisvekst fra året de inntreffer.
-- **Besparelser** (FTE-reduksjoner, nearshoring-reduksjoner) er **permanente og konstante** – de vokser ikke, fordi baseline ikke vokser.
-- **Konverteringer** (Ekstern→Intern, Intern→Nearshoring) har en **konstant** besparelse på den fjernede ressursen og en **voksende** kostnad på den nye. Netto besparelse krymper derfor over tid.
-- **Kategori-justeringer i tNOK** og **engangseffekter**: konstant beløp, vokser ikke. %-justeringer regnes på basis etter prisvekst.
+Appen gir deg tre versjoner av fremtiden:
 
-### Eksempler
+- **Steady State** – Hva skjer hvis vi fortsetter som i dag? Ingen nye tiltak, bare normal lønns- og prisvekst.
+- **Moderate Saving** – Hva om vi gjennomfører moderate tiltak? Noen FTE-reduksjoner, reforhandling av avtaler, og smartere bruk av ressurser.
+- **Aggressive Saving** – Hva om vi tar alle grep? Betydelige kutt i bemanning, store reforhandlinger og minimale investeringer.
 
-**+1 Medium Intern FTE 2027** (rate 1 000 tNOK, lønnsvekst 4 %):
-2027: 1 040 · 2028: 1 082 · 2029: 1 125 · 2030: 1 170 · 2031: 1 217 tNOK.
-
-**−2 Medium Intern FTE 2027** (rate 1 000 tNOK):
-2027–2031: konstant (2 000) tNOK/år.
-
-**3 konv. Medium Ekstern→Medium Intern 2027** (ekstern 270 × 11 = 2 970, intern 1 000, lønnsvekst 4 %):
-- Ekstern besparelse −8 910 tNOK/år (konstant).
-- Intern økning vokser fra ~3 120 (2027) til ~3 650 (2031).
-- Netto besparelse krymper fra ca. (3 360) i 2027 mot ca. (5 260) i 2031.
-
-### Forskjell mellom stolpediagram og waterfall
-
-- **Stolpediagram**: viser absolutt kostnad per år. En ny FTE i 2027 ligger i 2027-søylen; i 2028-søylen vises bare differansen (lønnsveksten) i forhold til 2027.
-- **Waterfall**: viser **total endring fra FC 2026-baseline** til valgt sluttår. En ny FTE i 2027 viser hele årskosten (inkl. kumulativ lønnsvekst) i hvert år, fordi den ikke fantes i baseline.
-- **Kontroll-tabben**: samme perspektiv som waterfall – isolert effekt mot baseline.
-- ### Modellteknisk differanse (basisjustering)
-
-Waterfallen har en liten innebygd differanse på ca. 4 MNOK mellom summen av alle eksplisitte drivere og den faktiske endringen fra FC 2026 til FC 2031. Denne differansen er **konstant** på tvers av alle scenarioer og alle år, og skyldes forskjellen mellom:
-
-- **FC 2026 (faktiske tall):** Regnskapstallene inneholder faktiske kostnader for arbeidsgiveravgift, feriepenger, pensjon og andre personalrelaterte poster basert på reelle lønninger og individuelle satser.
-- **Modellens beregnede satser:** Fra FC 2027 beregnes personalkostnader med standardiserte prosentsatser (AGA 14,1 %, feriepenger 12 %, AGA på feriepenger 1,69 %, pensjon 5 %) på standardiserte basisrater (Low/Medium/High).
-
-Denne forenklede modellen treffer ikke nøyaktig de faktiske FC 2026-tallene, og differansen oppstår i overgangen fra faktisk til modellberegnet. Differansen er ikke en kostnadsendring – den er en modellteknisk artefakt som ikke påvirker nøyaktigheten av de individuelle driverne. Den er skjult i waterfallen for å unngå forvirring, men logges i konsollen for feilsøking.
+Alle tre scenarioene starter fra samme utgangspunkt (FC 2026), men har ulike forutsetninger for hva som skjer videre.
 
 ---
 
+## Hvordan navigere i appen
 
-## a) Formål
+### Dashboard
+Hovedsiden. Her ser du alt på ett sted:
 
-Appen er et verktøy for **langsiktig kostnadsplanlegging (LTP)** for et kostnadssenter. Den tar utgangspunkt i prognosen for FC 2026 og beregner hvordan kostnadene utvikler seg fra **FC 2026 til FC 2031** under tre ulike scenarioer. Målet er å gjøre det enkelt å forstå *hvilke drivere* som forklarer kostnadsendringer fra år til år, og å sammenligne effekten av ulike tiltak side ved side.
+- **Stolpediagrammet** viser den totale kostnaden per år for hvert scenario. Du ser med én gang om kostnadene går opp eller ned.
+- **Waterfallen** (kostnadsbriden) bryter ned *hvorfor* kostnadene endrer seg. Hver søyle representerer én driver – f.eks. lønnsvekst, FTE-endringer eller avskrivninger.
+- **YoY-vekst** viser den årlige vekstprosenten som en linje, slik at du ser trenden.
+- **Besparelser per år** viser hvor mye Moderate og Aggressive Saving sparer sammenlignet med Steady State.
+- **Executive Summary** gir en AI-generert oppsummering av hvert scenario i 3–4 setninger.
+
+**Tips:** Hold musepekeren over en søyle i waterfallen for å se detaljer og kommentarer.
+
+### Scenarioer
+Sammenligner de tre scenarioene side om side i en tabell. Du kan veksle mellom:
+- **Absolute** – viser faktiske kostnader per kategori og år
+- **Delta vs Steady** – viser forskjellen mellom hvert scenario og Steady State
+
+### Assumptions
+Her legger du inn forutsetningene som driver modellen. Alt du endrer her påvirker Dashboard og Scenarioer automatisk. Mer om dette under «Hva kan du justere?» nedenfor.
+
+### Om modellen
+Denne siden – forklarer hvordan alt henger sammen.
 
 ---
 
-## b) De tre scenarioene
+## Hva kan du justere?
 
-Alle tre scenarioene bruker samme baseline (cost_lines fra FC 2026), men har hvert sitt sett med forutsetninger.
+Alle forutsetninger ligger på **Assumptions**-siden. Her er en oversikt over hva du kan endre:
 
-### Steady State
-Videreføring av dagens drift uten aktive tiltak. Viser hvordan kostnadene utvikler seg under «business as usual» med lønnsvekst, prisvekst og naturlig utfasing av eksisterende avskrivninger. Bør holdes ren – kun normal vekst, ingen tiltak. Brukes som sammenligningsgrunnlag for besparelser i de andre scenarioene.
+### Lønnsvekst og prisvekst
+- **Lønnsvekst %** – Hvor mye lønningene øker hvert år. Påvirker alle interne ansatte.
+- **Prisvekst %** – Hvor mye prisene øker hvert år. Påvirker eksterne kostnader som konsulenter, IT, drift osv.
 
-### Moderate Saving
-Moderat innsparing med målrettede tiltak: utvalgte FTE-reduksjoner, ekstern→intern konverteringer, reforhandling av avtaler og utfasing av enkelte capex-investeringer.
+Begge er kumulative – 4 % i 2027 og 4 % i 2028 betyr at 2028-nivået er 8,16 % over 2026 (ikke bare 8 %).
 
-### Aggressive Saving
-Ambisiøs kostnadsreduksjon med betydelige kutt i arbeidsstyrken, store reforhandlinger på sentrale og lokale avtaler, og minimum av nye investeringer.
+### Sentrale kostnader
+Noen kostnader faktureres fra morselskapet i EUR. For disse kan du justere:
+- **Sentral prisvekst %** – EUR-prisøkning per år
+- **Sentral reduksjon %** – Permanent rabatt gjennom reforhandling
+- **Sentral reduksjon tNOK** – Fast beløp i NOK som trekkes fra
+- **EUR/NOK-kurs** – Valutakursen per år
 
----
+### Bemanning (FTE-endringer)
+Du kan legge til eller fjerne ansatte på tre nivåer (Low, Medium, High) for:
+- **Interne ansatte** – Fast ansatte med årslønn + sosiale avgifter
+- **Eksterne konsulenter** – Månedskostnad × 11 arbeidsmåneder per år
+- **Nearshoring** – Ressurser i utlandet, fakturert i EUR
 
-## c) Kostnadsmodellens oppbygning
-
-Hver kostnadslinje har sin egen logikk. Driverne nedenfor finnes alle på **Assumptions**-siden og styres separat per scenario.
-
-### Globale drivere
-- **Lønnsvekst %** – årlig lønnsvekst som brukes på alle interne FTE.
-- **Prisvekst %** – årlig prisvekst som brukes på lokale eksterne kostnader (External FTE, Consultancy, IT Costs, Operations, etc.).
-
-Vekstratene er **kumulative år for år**: 2027-veksten bygger 2027-nivået, 2028-veksten bygger på 2027 osv.
-
-### Sentrale drivere
-Sentrale kostnader (allokeringer fra morselskap, f.eks. Phoenix IT-services) faktureres i EUR og har egen, EUR-basert beregning:
-
-| Driver | Effekt |
-|---|---|
-| **Sentral prisvekst %** | Underliggende EUR-prisøkning, kumulativ år for år. |
-| **Sentral reduksjon %** | Permanent multiplikativ reforhandling. Negativt tall = rabatt. |
-| **Sentral reduksjon tNOK** | Permanent additiv reduksjon i NOK. Vises som egen virtuell linje. |
-| **EUR/NOK-kurs** | Settes per år. Default 11,3 (matcher EUR-basis i FC 2026). |
-
-Beregning per år N:
-```
-EUR-basis        = FC2026 / 11,3
-EUR med vekst    = EUR-basis × ∏(1 + sentral_prisvekst_Y) for Y=2027..N
-NOK før reduksjon = EUR med vekst × EUR/NOK-kurs(N)
-NOK etter %-red. = NOK før reduksjon × ∏(1 + reduksjon%_Y)
-Sentral kost(N)  = NOK etter %-red. + Σ reduksjon_tNOK_Y for Y ≤ N
-```
-
-### Internal FTE
-- **Basisrater per nivå** (tNOK/år, 2026-nivå): Low 650, Medium 1 000, High 1 300.
-- **Endringer per nivå/år/type**: Increase (positiv) og Decrease (negativ).
-- Hver FTE-endring vokser med lønnsvekst fra året den skjer.
-- Eksisterende interne FTE-linjer drives av en *master*-linje + driver-prosenter (AGA, feriepenger, pensjon).
-
-### External FTE
-- **Månedsrater per nivå** (tNOK/mnd): Low 240, Medium 270, High 300.
-- **11 arbeidsmåneder** per år (ingen juli, norsk praksis).
-- **Endringer per nivå/år/type** (Increase/Decrease) legges som samlet virtuell linje.
-- Eksisterende External FTE-linjer drives av prisvekst + kategori-justering.
-
-### Ekstern → Intern konvertering
-Ved konvertering av N eksterne på et nivå til N interne på et annet nivå:
-- **3 måneders overlapp** i konverteringsåret: full intern årskost + 3 mnd ekstern overlapp.
-- **Etter overlappet**: kun intern-kost. Eksterne er borte.
-- Netto kostnadseffekt vises som besparelse fordi 1 intern typisk koster mindre enn 1 ekstern over tid.
-
-### Nearshoring
-- **Basis**: 75 000 EUR/år, 12 arbeidsmåneder.
-- **EUR/NOK-kurs per år** styres separat fra sentrale drivere.
-- **Akkumulerende endringer** per år (Increase/Decrease) – nearshoring-ressurser modelleres som en uavhengig FTE-lignende ressurs.
+### Konverteringer
+- **Ekstern → Intern** – Erstatte en ekstern konsulent med en fast ansatt. Tre måneders overlapp der begge kostnader løper.
+- **Intern → Nearshoring** – Erstatte en intern ansatt med nearshoring. Også tre måneders overlapp.
 
 ### Kategori-justeringer
-Per kategori og år kan du legge inn:
-- **Justering %** – multiplikativt på prisvekst, **permanent** fra året den settes (reforhandling).
-- **Justering tNOK** – additivt beløp, **permanent** fra året den settes.
+For hver kostnadskategori (IT Costs, Consultancy, Operations osv.) kan du legge inn:
+- **Prosentjustering** – F.eks. −5 % permanent prisreduksjon gjennom reforhandling
+- **Beløpsjustering (tNOK)** – F.eks. +3 000 tNOK for et nytt prosjekt
 
-Eksempel: −10 % på Consultancy i 2027 gjelder også 2028–2031. Flere justeringer over år multipliseres sammen.
+Begge er permanente fra året de settes.
 
-### Capex-plan
-Investeringer per år og type:
+### Engangseffekter
+Engangskostnader eller -besparelser som kun gjelder ett spesifikt år. F.eks. en ekstrakostnad for et migreringsprosjekt i 2028. Vokser ikke med prisvekst.
 
-| Type | Avskrivningstid |
+### Capex (investeringer)
+Planlagte investeringer per år i Hardware, Software eller Prosjekt. Avskrivningstiden er:
+- Hardware: 3 år
+- Software: 5 år
+- Prosjekt: 5 år
+
+---
+
+## Hvordan lese waterfallen
+
+Waterfallen er den viktigste grafen i modellen. Den viser endringen fra FC 2026 til valgt sluttår, brutt ned på drivere:
+
+| Søyle | Hva den viser |
 |---|---|
-| Hardware | 3 år |
-| Software | 5 år |
-| Prosjekt | 5 år |
+| **FC 2026** | Utgangspunktet – dagens kostnader |
+| **Lønnsvekst** | Effekten av årlig lønnsøkning på eksisterende ansatte |
+| **Prisvekst** | Effekten av årlig prisøkning på eksterne kostnader |
+| **FTE-endring** | Netto effekt av å ansette eller fjerne folk (interne, eksterne, nearshoring, konverteringer) |
+| **Øvrige økninger** | Andre kostnadsøkninger (nye avtaler, prosjekter osv.) |
+| **Øvrige besparelser** | Andre kostnadsreduksjoner (reforhandlinger, sentrale reduksjoner osv.) |
+| **Valutaeffekt** | Effekten av endring i EUR/NOK-kurs |
+| **Avskrivning / Capex** | Endring i avskrivninger (P&L) eller investeringer (Spend) |
+| **FC 2031** | Sluttsummen – hva kostnadene ender på |
 
-Avskrivninger starter året **etter** investeringen og fordeles lineært. Capex-utbetalingen treffer **Spend-view** i selve investeringsåret; avskrivningene treffer **P&L-view** i påfølgende år.
-
----
-
-## d) Dashboard
-
-### Stolpediagram
-Tre serier:
-- **Historisk** (AC 2025) – mørk søyle.
-- **Baseline** (FC 2026) – nøytral søyle, samme på tvers av scenarioer.
-- **Forecast** (FC 2027–2031) – farget per scenario (Steady / Moderate / Aggressive).
-
-Stacked-modus deler hver søyle på kategorier; Total-modus viser kun summen.
-
-### Kostnadsbridge (waterfall)
-Forklarer endringen fra **FC 2026 → FC 2031** søyle for søyle. Hver søyle viser bidraget fra én driver:
-
-1. **FC 2026** (start)
-2. **Lønnsvekst** – kumulativ effekt på interne FTE
-3. **Prisvekst** – kumulativ effekt på lokale eksterne kostnader
-4. **Sentral prisvekst + FX** – EUR-prisvekst og valutaeffekt
-5. **FTE-endringer (intern)** – netto økning/reduksjon i intern arbeidsstyrke
-6. **FTE-endringer (ekstern)** – netto økning/reduksjon i ekstern arbeidsstyrke
-7. **Konverteringer + nearshoring** – netto effekt av strukturendringer
-8. **Kategori-justeringer** – reforhandlinger og faste justeringer
-9. **Sentral reduksjon** – % og tNOK på sentrale kostnader
-10. **Avskrivninger / Capex** – avhengig av P&L- eller Spend-modus
-11. **FC 2031** (sluttsum)
-
-Hold musepekeren over en søyle for å se underliggende drivere og kommentarer.
+**Rød søyle** = kostnadsøkning. **Grønn søyle** = kostnadsreduksjon.
 
 ---
 
-## e) Visningsmodus
+## P&L vs. Spend – hva er forskjellen?
 
-### P&L-view (default)
-**Opex + Depreciation.** Kostnaden som går i resultatregnskapet. Standard for rapportering. Capex-investeringer dukker ikke opp her direkte; de blir til avskrivninger i påfølgende år.
+Appen har to visningsmodus som du kan veksle mellom:
 
-### Spend-view
-**Opex + Capex.** Faktisk pengeutgang det året. Nyttig for kontantstrømsperspektiv. Avskrivninger er ikke med (ellers ville du telt dobbelt).
+- **P&L (resultatregnskap)** – Viser kostnader slik de treffer resultatet. Investeringer vises som avskrivninger fordelt over levetiden (f.eks. en server til 300 tNOK avskrives med 100 tNOK/år i 3 år).
+- **Spend (kontantstrøm)** – Viser faktisk pengebruk. Investeringen på 300 tNOK vises i sin helhet det året du kjøper den.
 
-Bridge-en tilpasser «Avskrivninger / Capex»-søylen automatisk basert på valgt modus.
-
----
-
-## f) Snapshots og historikk
-
-Snapshots brukes til å fryse tilstanden for **alle tre scenarioer samtidig** – inkludert alle assumptions, kommentarer og beregnede resultater.
-
-- **Lagre**: Tar et bilde av nåværende state for alle tre scenarioer som én samlet enhet.
-- **Vis**: Åpner en lesemodus av de lagrede beregnede resultatene.
-- **Sammenlign**: Stiller to snapshots opp mot hverandre, kategori for kategori.
-- **Gjenopprett**: Skriver alle assumptions-inputs tilbake slik at modellen igjen produserer nøyaktig de lagrede tallene. Bekreftelsesdialog vises før overskriving.
-- **Slett**: Fjerner alle tre scenarioer i gruppen samtidig.
-
-I tillegg lagres **auto-versjoner** ved hver endring i Assumptions (beholdes 30 dager) som kan gjenopprettes via Historikk-panelet.
+Begge er riktige – de viser bare ulike perspektiver. P&L er standard for rapportering, Spend er nyttig for budsjettering.
 
 ---
 
-## g) AI-funksjoner
+## Kontroll-tabben
 
-### AI-oppsummering per scenario
-Genererer en kort, CFO-stil executive summary (3–4 setninger på norsk) som beskriver de underliggende driverne og forutsetningene for det aktuelle scenarioet, ikke bare totaltallene. Bruker faktiske drivere, FTE-tall og kommentarer fra Assumptions.
+Nederst på Assumptions-siden finner du **Kontroll**-tabben. Den viser den isolerte effekten av *hver enkelt forutsetning* du har lagt inn – altså hva akkurat den ene endringen bidrar med.
 
-### AI-assistert forutsetning (Goal Seek)
-Skriv et mål i naturlig språk, så foreslår AI-en konkrete endringer for å nå målet:
-- *«Total kostnad FC 2031 skal være lik FC 2026»*
-- *«15 % kostnadskutt innen 2031»*
-- *«Reduser Consultancy med 20 % gjennom hele perioden»*
+Dette er nyttig for å:
+- Verifisere at en endring gir den effekten du forventer
+- Forstå hvilke tiltak som har størst effekt
+- Sjekke at modellen oppfører seg logisk
 
-Forslagene vises som en tabell der du selv huker av hvilke endringer som skal anvendes. Ingenting endres uten din bekreftelse.
+**Merk:** Naturlig utfasing av historiske avskrivninger vises ikke her – kun nye forutsetninger du har lagt inn. Utfasingseffekten vises i waterfallens Avskrivning-søyle.
 
 ---
 
-## Kontroll-tab på Assumptions
+## Snapshots og historikk
 
-Under Assumptions finner du en egen **Kontroll**-tab som viser den **isolerte effekten** av hver enkelt forutsetning, slik at du kan verifisere at hver endring gir forventet utslag. Tabellen lister forutsetning, type, detaljer, årlig effekt 2027–2031 og akkumulert effekt 2031, og avsluttes med en sum-rad som tilnærmet matcher differansen mellom FC 2026 og FC 2031 i modellen.
+Du kan lagre snapshots av hele modellens tilstand – inkludert alle forutsetninger, kommentarer og beregnede resultater for alle tre scenarioer.
+
+- **Lagre snapshot** – Fryser nåværende tilstand med et navn og dato
+- **Vis** – Åpner de lagrede resultatene i lesemodus
+- **Sammenlign** – Sammenligner et snapshot mot nåværende tall for å se hva som er endret
+- **Gjenopprett** – Tilbakestiller alle forutsetninger til snapshotets tilstand
+- **Slett** – Fjerner snapshotet
+
+I tillegg lagres auto-versjoner automatisk ved endringer som kan gjenopprettes via Historikk.
 
 ---
 
-## Fortegn-konvensjon
+## Viktige prinsipper i modellen
 
-Konsekvent på tvers av hele appen:
-- **Økninger** = positive tall (Increase = 2, prisvekst = 0,05).
-- **Reduksjoner** = negative tall (Decrease = 2 → vises som −2 i effekt, Sentral reduksjon = −0,05).
+### Økninger vokser, besparelser er konstante
+
+Når du legger til en ny ansatt, øker kostnaden hvert år med lønnsveksten – fordi personen får lønnsøkning. Men når du fjerner en ansatt, er besparelsen konstant – fordi du sammenligner mot utgangspunktet (FC 2026) som ikke endrer seg.
+
+**Eksempel:** Du fjerner 1 Medium intern FTE i 2029 (årslønn 1 000 tNOK + sosiale avgifter). Besparelsen er den samme i 2029, 2030 og 2031 – den vokser ikke.
+
+**Eksempel:** Du ansetter 1 Medium intern FTE i 2027. Kostnaden i 2027 er 1 040 tNOK (1 000 × 1,04). I 2028 er den 1 082 tNOK (1 000 × 1,04²). Den vokser fordi personen får lønnsøkning.
+
+### Konverteringer har krympende besparelse
+
+Når du konverterer en ekstern konsulent til en intern ansatt, sparer du konsulent­kostnaden (konstant) men den interne kostnaden øker med lønnsvekst hvert år. Netto besparelse krymper derfor over tid.
+
+### Stolpediagram vs. waterfall
+
+- **Stolpediagrammet** viser den totale kostnaden per år. Hvis du legger til en person i 2027, ser du hele kostnaden i 2027-søylen. I 2028 ser du bare den lille økningen (lønnsveksten).
+- **Waterfallen** viser total endring fra FC 2026. Den nye personen viser hele sin årskostnad i alle år – fordi den ikke fantes i utgangspunktet.
 
 ---
 
-## Teknisk oppsummering
+## AI-funksjoner
 
-| Element | Spesifikasjon |
+### AI-oppsummering
+Trykk «Generer på nytt» i Executive Summary for å få en kort, datadrevet oppsummering av scenarioet. Den trekker inn faktiske tall, FTE-endringer og kommentarer du har lagt inn.
+
+### AI-assistert forutsetning
+Skriv et mål i vanlig språk under Assumptions, f.eks.:
+- *«Total kostnad i 2031 skal være lik FC 2026»*
+- *«Kutt 15 % av kostnadene innen 2031»*
+
+AI-en foreslår konkrete endringer som kan oppnå målet. Du velger selv hvilke forslag du vil bruke – ingenting endres uten din bekreftelse.
+
+---
+
+## Teknisk detalj: Modellteknisk differanse
+
+Waterfallen har en liten innebygd differanse på ca. 4 MNOK som er skjult. Den skyldes at FC 2026 bruker faktiske regnskapstall, mens modellen fra FC 2027 beregner med standardiserte prosentsatser for sosiale avgifter (arbeidsgiveravgift 14,1 %, feriepenger 12 %, AGA på feriepenger 1,69 %, pensjon 5 %). Denne forenklingen treffer ikke nøyaktig, og differansen er en teknisk artefakt – ikke en reell kostnadsendring.
+
+---
+
+## Teknisk oversikt
+
+| Element | Detalj |
 |---|---|
-| Antall scenarioer | 3 (Steady, Moderate, Aggressive) |
-| Tidshorisont | AC 2025 (historisk), BU/FC 2026 (baseline), FC 2027–2031 (forecast) |
-| Antall kostnadslinjer | ca. 136 (standard import) |
-| Kategorier | 8 (Capex, Consultancy, Depreciation, External FTE, Internal FTE, IT Costs, Operations & Personnel-related, Other operating income) |
-| Internal FTE | Low 650 / Medium 1 000 / High 1 300 tNOK/år (2026-nivå) |
-| External FTE | Low 240 / Medium 270 / High 300 tNOK/mnd × 11 mnd |
-| Nearshoring | 75 000 EUR/år × 12 mnd |
-| Avskrivninger | Hardware 3 år, Software/Prosjekt 5 år |
-| Driver-baserte FTE | AGA 14,1 %, Feriepenger 12 %, AGA på feriepenger 1,69 %, Pensjon 5 % |
+| Scenarioer | 3 (Steady State, Moderate Saving, Aggressive Saving) |
+| Tidshorisont | AC 2025 → BU 2026 → FC 2026 (baseline) → FC 2027–2031 |
+| Interne FTE-rater | Low 650 / Medium 1 000 / High 1 300 tNOK/år |
+| Eksterne FTE-rater | Low 240 / Medium 270 / High 300 tNOK/mnd × 11 mnd |
+| Nearshoring | 75 000 EUR/år |
+| Sosiale avgifter | AGA 14,1 %, Feriepenger 12 %, AGA på feriepenger 1,69 %, Pensjon 5 % |
+| Avskrivningstider | Hardware 3 år, Software 5 år, Prosjekt 5 år |
