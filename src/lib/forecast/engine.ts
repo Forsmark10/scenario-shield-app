@@ -568,15 +568,17 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       for (let Y = 2027; Y <= N; Y++) {
         const grown = cumulativeFactor(scenario_id, Y, N, extPriceRate);
         for (const lvl of LEVELS) {
-          const net = getFteNetChange(extChangeIndex, Y, lvl);
-          if (net === 0) continue;
+          const inc = extIncDec.inc.get(fteChangeKey(Y, lvl)) ?? 0;
+          const dec = extIncDec.dec.get(fteChangeKey(Y, lvl)) ?? 0;
+          if (inc === 0 && dec === 0) continue;
           const r = extRate(lvl);
           const annual = r.base_monthly_cost * r.working_months;
-          const delta = net * annual * grown;
-          amt += delta;
-          parts.push(
-            `Y${Y} ${lvl} net=${net} × annual=${annual} × cum_price(${Y}..${N})=${round2(grown)} = ${round2(delta)}`,
-          );
+          // Increase vokser med prisvekst, decrease konstant.
+          const deltaInc = inc * annual * grown;
+          const deltaDec = -dec * annual;
+          amt += deltaInc + deltaDec;
+          if (inc !== 0) parts.push(`Y${Y} ${lvl} inc=${inc} × annual=${annual} × cum_price(${Y}..${N})=${round2(grown)} = ${round2(deltaInc)}`);
+          if (dec !== 0) parts.push(`Y${Y} ${lvl} dec=${dec} × annual=${annual} (konstant) = ${round2(deltaDec)}`);
         }
       }
       extChangesLine.amounts[N] = amt * catFactor;
