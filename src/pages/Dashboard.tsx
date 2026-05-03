@@ -545,9 +545,6 @@ function ScenarioSection({
           <h2 className="text-[13px] font-semibold tracking-tight" style={{ color }}>
             {bundle.meta.name}
           </h2>
-          <p className="text-[11px] text-muted-foreground">
-            Totalkostnad 2031: <span className="font-medium text-foreground">{formatNumberNO(total2031M, 1)} MNOK</span>
-          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-3">
