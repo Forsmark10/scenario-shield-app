@@ -212,15 +212,16 @@ export default function ScenarioComparison() {
       <Card>
         <CardContent className="pt-4">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-separate border-spacing-0">
+            <table className="w-full text-[13px] border-separate border-spacing-0">
               <thead className="sticky top-0 bg-card z-10">
                 {/* Topp-rad: scenario-navn med farget topplinje, separasjon mellom blokker */}
                 <tr>
-                  <th className="sticky left-0 bg-card text-left font-medium px-3 py-2 z-20 min-w-[260px] border-b">
+                  <th className="sticky left-0 bg-card text-left font-medium px-3 py-2.5 z-20 min-w-[260px] border-b">
                     Kategori / Project
                   </th>
                   {displayedScenarios.map((b, i) => {
                     const colorIdx = colorIndexFor(b.meta.id);
+                    const sColor = SCENARIO_COLOR_VAR[colorIdx];
                     return (
                       <th
                         key={b.meta.id}
@@ -230,12 +231,13 @@ export default function ScenarioComparison() {
                           i > 0 && "border-l-4 border-l-border",
                         )}
                         style={{
-                          borderTop: `3px solid ${SCENARIO_COLOR_VAR[colorIdx] ?? "transparent"}`,
+                          borderTop: `3px solid ${sColor ?? "transparent"}`,
+                          backgroundColor: sColor ? `color-mix(in srgb, ${sColor} 10%, transparent)` : undefined,
                         }}
                       >
                         <span
                           className="text-base font-bold tracking-tight"
-                          style={{ color: SCENARIO_COLOR_VAR[colorIdx] ?? undefined }}
+                          style={{ color: sColor ?? undefined }}
                         >
                           {b.meta.name}
                         </span>
@@ -248,7 +250,7 @@ export default function ScenarioComparison() {
                 </tr>
                 {/* År-rad */}
                 <tr className="bg-muted/40">
-                  <th className="sticky left-0 bg-muted/40 px-3 py-1.5 z-20 border-b"></th>
+                  <th className="sticky left-0 bg-muted/40 px-3 py-2 z-20 border-b"></th>
                   {displayedScenarios.map((b, si) =>
                     YEARS.map((y, yi) => {
                       const isLocked = y === 2026;
@@ -256,7 +258,7 @@ export default function ScenarioComparison() {
                         <th
                           key={`${b.meta.id}-${y}`}
                           className={cn(
-                            "text-right font-medium text-muted-foreground px-2 py-1.5 whitespace-nowrap border-b",
+                            "text-right font-medium text-muted-foreground px-2.5 py-2 whitespace-nowrap border-b text-[11.5px] uppercase tracking-wider",
                             si > 0 && yi === 0 && "border-l-4 border-l-border",
                             isLocked && LOCKED_BG,
                           )}
