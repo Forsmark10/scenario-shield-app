@@ -398,7 +398,7 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         sortKey: r.year,
         name: `${r.count} konv. ${r.external_level}→${r.internal_level} ${r.year}`,
         type: "Ekstern→Intern",
-        details: `${r.overlap_months} mnd overlapp`,
+        details: `${r.overlap_months} mnd overlapp. Besparelse konstant, intern kost vokser med lønnsvekst`,
         yearly: netYearly,
         comment: (r as any).comment,
       });
