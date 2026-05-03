@@ -636,36 +636,73 @@ function ScenarioSection({
           </div>
 
           {/* YoY */}
-          <div className="h-[210px]">
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">YoY-vekst %</div>
+          <div className="h-[210px] relative">
+            <div className="flex items-center justify-between mb-0.5">
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">YoY-vekst %</div>
+              <div
+                className="text-[13px] font-bold tabular-nums"
+                style={{
+                  color,
+                  backgroundColor: `${color}1a`,
+                  padding: "2px 10px",
+                  borderRadius: 6,
+                }}
+              >
+                CAGR 2026–2031: {formatPercentNO(cagr * 100, 1)} %
+              </div>
+            </div>
             <ResponsiveContainer width="100%" height="92%">
-              <LineChart data={yoyData} margin={{ top: 18, right: 24, bottom: 4, left: 16 }}>
-                <XAxis dataKey="year" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} padding={{ left: 12, right: 12 }} />
+              <ComposedChart data={yoyData} margin={{ top: 18, right: 24, bottom: 4, left: 16 }}>
+                <defs>
+                  <linearGradient id={`yoy-grad-${bundle.meta.id}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity={0.06} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="#e2e8f0" strokeDasharray="2 4" vertical={false} />
+                <XAxis dataKey="year" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} padding={{ left: 12, right: 12 }} />
                 <YAxis hide />
                 <Tooltip
                   formatter={(v: number | null) => (v == null ? "" : `${formatPercentNO(v, 1)} %`)}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="none"
+                  fill={`url(#yoy-grad-${bundle.meta.id})`}
+                  isAnimationActive={false}
                 />
                 <Line
                   type="monotone"
                   dataKey="value"
                   stroke={color}
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   connectNulls={false}
                   dot={(props: any) => {
                     const { cx, cy, payload, index } = props;
                     if (payload?.value == null) return <g key={`empty-${index}`} />;
-                    return <circle key={`dot-${index}`} cx={cx} cy={cy} r={3} fill={color} />;
+                    return (
+                      <circle
+                        key={`dot-${index}`}
+                        cx={cx}
+                        cy={cy}
+                        r={3.5}
+                        fill="#ffffff"
+                        stroke={color}
+                        strokeWidth={2.5}
+                      />
+                    );
                   }}
-                  activeDot={{ r: 5 }}
+                  activeDot={{ r: 5, fill: "#ffffff", stroke: color, strokeWidth: 2.5 }}
                 >
                   <LabelList
                     dataKey="value"
                     position="top"
                     formatter={(v: number | null) => (v == null ? "" : formatPercentNO(v, 1))}
-                    style={{ fontSize: 10, fill: "hsl(var(--foreground))" }}
+                    style={{ fontSize: 10, fill: "#64748b" }}
                   />
                 </Line>
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
