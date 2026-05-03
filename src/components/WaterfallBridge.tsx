@@ -531,6 +531,12 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     incDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtInc });
     centralRedAmtComments.forEach((c) => incDetails.push({ label: c, value: 0, isComment: true }));
   }
+  Object.entries(oneOffIncByCat).forEach(([cat, v]) => {
+    incDetails.push({ label: `${cat} (engangseffekt)`, value: v });
+    (oneOffDescByCat[cat] ?? []).forEach((d) =>
+      incDetails.push({ label: `Engangseffekt: ${d}`, value: 0, isComment: true }),
+    );
+  });
   if (incDetails.length === 0) incDetails.push({ label: "Ingen positive justeringer", value: 0 });
   else incDetails.push({ label: "SUM", value: incTot, isHeader: true });
 
@@ -549,6 +555,12 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     decDetails.push({ label: "Sentral reduksjon tNOK", value: centralRedAmtDec });
     centralRedAmtComments.forEach((c) => decDetails.push({ label: c, value: 0, isComment: true }));
   }
+  Object.entries(oneOffDecByCat).forEach(([cat, v]) => {
+    decDetails.push({ label: `${cat} (engangseffekt)`, value: v });
+    (oneOffDescByCat[cat] ?? []).forEach((d) =>
+      decDetails.push({ label: `Engangseffekt: ${d}`, value: 0, isComment: true }),
+    );
+  });
   if (decDetails.length === 0) decDetails.push({ label: "Ingen besparelser", value: 0 });
   else decDetails.push({ label: "SUM", value: decTot, isHeader: true });
 
