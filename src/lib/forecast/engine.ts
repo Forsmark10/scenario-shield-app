@@ -137,7 +137,24 @@ function buildFteChangeIndex(changes: FteChangeRow[]): Map<string, number> {
   return index;
 }
 
+function buildFteIncDecIndex(
+  changes: FteChangeRow[]
+): { inc: Map<string, number>; dec: Map<string, number> } {
+  const inc = new Map<string, number>();
+  const dec = new Map<string, number>();
+  for (const c of changes) {
+    const k = fteChangeKey(c.year, c.level);
+    inc.set(k, (inc.get(k) ?? 0) + (c.increase ?? 0));
+    dec.set(k, (dec.get(k) ?? 0) + (c.decrease ?? 0));
+  }
+  return { inc, dec };
+}
+
 function getFteNetChange(index: Map<string, number>, year: number, level: Level): number {
+  return index.get(fteChangeKey(year, level)) ?? 0;
+}
+
+function getFteAmount(index: Map<string, number>, year: number, level: Level): number {
   return index.get(fteChangeKey(year, level)) ?? 0;
 }
 
@@ -233,8 +250,9 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   const scenarioExtChanges = external_fte_changes.filter(
     (c) => c.scenario_id === scenario_id
   );
-  const intChangeIndex = buildFteChangeIndex(scenarioIntChanges);
-  const extChangeIndex = buildFteChangeIndex(scenarioExtChanges);
+  const intIncDec = buildFteIncDecIndex(scenarioIntChanges);
+  const extIncDec = buildFteIncDecIndex(scenarioExtChanges);
+
 
   const lines: ForecastLine[] = [];
 
@@ -273,22 +291,25 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     for (let Y = 2027; Y <= N; Y++) {
       const grown = cumulativeFactor(scenario_id, Y, N, salaryRate);
       for (const lvl of LEVELS) {
-        const net = getFteNetChange(intChangeIndex, Y, lvl);
-        if (net === 0) continue;
+        const inc = intIncDec.inc.get(fteChangeKey(Y, lvl)) ?? 0;
+        const dec = intIncDec.dec.get(fteChangeKey(Y, lvl)) ?? 0;
+        if (inc === 0 && dec === 0) continue;
         const rate = intRate(lvl);
-        const delta = net * rate * grown;
+        // Increase: vokser med lønnsvekst. Decrease: konstant mot FC2026.
+        const deltaInc = inc * rate * grown;
+        const deltaDec = -dec * rate;
+        const delta = deltaInc + deltaDec;
         amount += delta;
         changeContributions.push({
           changeYear: Y,
           level: lvl,
-          net,
+          net: inc - dec,
           rate,
           growthFactor: grown,
           delta,
         });
-        parts.push(
-          `+ Y${Y} ${lvl} net=${net} × rate=${rate} × cum_salary(${Y}..${N})=${round2(grown)} → ${round2(delta)}`
-        );
+        if (inc !== 0) parts.push(`+ Y${Y} ${lvl} inc=${inc} × ${rate} × cum_salary(${Y}..${N})=${round2(grown)} → ${round2(deltaInc)}`);
+        if (dec !== 0) parts.push(`- Y${Y} ${lvl} dec=${dec} × ${rate} (konstant) → ${round2(deltaDec)}`);
       }
     }
     // Konverteringer øker intern FTE
@@ -547,15 +568,17 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       for (let Y = 2027; Y <= N; Y++) {
         const grown = cumulativeFactor(scenario_id, Y, N, extPriceRate);
         for (const lvl of LEVELS) {
-          const net = getFteNetChange(extChangeIndex, Y, lvl);
-          if (net === 0) continue;
+          const inc = extIncDec.inc.get(fteChangeKey(Y, lvl)) ?? 0;
+          const dec = extIncDec.dec.get(fteChangeKey(Y, lvl)) ?? 0;
+          if (inc === 0 && dec === 0) continue;
           const r = extRate(lvl);
           const annual = r.base_monthly_cost * r.working_months;
-          const delta = net * annual * grown;
-          amt += delta;
-          parts.push(
-            `Y${Y} ${lvl} net=${net} × annual=${annual} × cum_price(${Y}..${N})=${round2(grown)} = ${round2(delta)}`,
-          );
+          // Increase vokser med prisvekst, decrease konstant.
+          const deltaInc = inc * annual * grown;
+          const deltaDec = -dec * annual;
+          amt += deltaInc + deltaDec;
+          if (inc !== 0) parts.push(`Y${Y} ${lvl} inc=${inc} × annual=${annual} × cum_price(${Y}..${N})=${round2(grown)} = ${round2(deltaInc)}`);
+          if (dec !== 0) parts.push(`Y${Y} ${lvl} dec=${dec} × annual=${annual} (konstant) = ${round2(deltaDec)}`);
         }
       }
       extChangesLine.amounts[N] = amt * catFactor;
@@ -571,29 +594,28 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       let amt = 0;
       const parts: string[] = [];
       for (let Y = 2027; Y <= N; Y++) {
-        const grown = cumulativeFactor(scenario_id, Y, N, extPriceRate);
         for (const conv of scenarioConversions.filter((c) => c.year === Y)) {
           const r = extRate(conv.external_level);
           if (Y === N) {
             const months = Math.max(0, r.working_months - conv.overlap_months);
-            const reduction = -conv.count * r.base_monthly_cost * months * grown;
+            const reduction = -conv.count * r.base_monthly_cost * months;
             amt += reduction;
             parts.push(
-              `Konv-år Y${Y} ${conv.external_level}: -${conv.count} × ${r.base_monthly_cost} × (${r.working_months}-${conv.overlap_months})=${months}m × cum=${round2(grown)} = ${round2(reduction)}`,
+              `Konv-år Y${Y} ${conv.external_level}: -${conv.count} × ${r.base_monthly_cost} × (${r.working_months}-${conv.overlap_months})=${months}m (konstant) = ${round2(reduction)}`,
             );
           } else {
             const annual = r.base_monthly_cost * r.working_months;
-            const reduction = -conv.count * annual * grown;
+            const reduction = -conv.count * annual;
             amt += reduction;
             parts.push(
-              `Etter Y${Y} ${conv.external_level}: -${conv.count} × annual=${annual} × cum=${round2(grown)} = ${round2(reduction)}`,
+              `Etter Y${Y} ${conv.external_level}: -${conv.count} × annual=${annual} (konstant mot FC2026) = ${round2(reduction)}`,
             );
           }
         }
       }
-      extConvLine.amounts[N] = amt * catFactor;
+      extConvLine.amounts[N] = amt;
       extConvLine.breakdown_source[N] = parts.length
-        ? `${parts.join("\n")}\n× cum_cat_adj=${catDesc}=${round2(catFactor)} = ${round2(amt * catFactor)}`
+        ? parts.join("\n")
         : "Ingen konvertering";
     }
   }
@@ -626,27 +648,28 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     const g = getGlobal(global_assumptions, scenario_id, N);
     const priceRate = (Y: number) =>
       getGlobal(global_assumptions, scenario_id, Y).price_increase_pct;
-    // Cumulative net headcount through year N
-    let cumulativeHeadcount = 0;
+    let amt = 0;
     const headcountParts: string[] = [];
+    const baseAnnualNokK = (nearshoring_base.base_annual_cost_eur * g.eur_nok_rate) / 1000;
     for (let Y = 2027; Y <= N; Y++) {
       const yearChanges = scenarioNearshoringChanges.filter((n) => n.year === Y);
       const inc = yearChanges.reduce((s, n) => s + (Number(n.increase) || 0), 0);
       const dec = yearChanges.reduce((s, n) => s + (Number(n.decrease) || 0), 0);
-      const net = inc - dec;
-      if (net !== 0) {
-        cumulativeHeadcount += net;
-        headcountParts.push(`Y${Y} net=${net}`);
+      if (inc > 0) {
+        const grown = cumulativeFactor(scenario_id, Y, N, priceRate);
+        const annualNokK = (nearshoring_base.base_annual_cost_eur * grown * g.eur_nok_rate) / 1000;
+        amt += inc * annualNokK;
+        headcountParts.push(`Y${Y} inc=${inc} x ${round2(annualNokK)} kNOK (vokser)`);
+      }
+      if (dec > 0) {
+        amt += -dec * baseAnnualNokK;
+        headcountParts.push(`Y${Y} dec=${dec} x ${round2(baseAnnualNokK)} kNOK (konstant)`);
       }
     }
-    const priceFactor = cumulativeFactor(scenario_id, 2027, N, priceRate);
-    const annualEur = nearshoring_base.base_annual_cost_eur * priceFactor;
-    const annualNokK = (annualEur * g.eur_nok_rate) / 1000;
-    const amt = cumulativeHeadcount * annualNokK;
     nsLine.amounts[N] = amt;
-    nsLine.breakdown_source[N] = cumulativeHeadcount === 0
+    nsLine.breakdown_source[N] = headcountParts.length === 0
       ? "Ingen aktive nearshoring-ressurser"
-      : `${headcountParts.join(", ")} → cum=${cumulativeHeadcount} × ${round2(annualEur)} EUR × ${g.eur_nok_rate} NOK/EUR / 1000 = ${round2(amt)} kNOK (cum_price(2027..${N})=${round2(priceFactor)})`;
+      : headcountParts.join(", ") + ` = ${round2(amt)} kNOK`;
   }
   nsLine.monthly_2027 = Array(12).fill((nsLine.amounts[2027] ?? 0) / 12);
   lines.push(nsLine);
@@ -795,18 +818,18 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       for (let Y = 2027; Y <= N; Y++) {
         for (const r of i2n.filter((c) => c.year === Y)) {
           const rate = intRate(r.internal_level);
-          const grownSalary = cumulativeFactor(scenario_id, Y, N, salaryRate);
-          const annualInt = r.count * rate * grownSalary;
+          // Intern besparelse er KONSTANT mot FC2026 (ingen lønnsvekst)
+          const annualIntFlat = r.count * rate;
           const overlapMonths = Math.max(0, Math.min(12, r.overlap_months ?? 3));
           if (Y === N) {
             // Konverteringsåret: behold (overlapMonths/12) av intern-kost.
             const monthsRemoved = 12 - overlapMonths;
-            const reduction = -(annualInt * monthsRemoved) / 12;
+            const reduction = -(annualIntFlat * monthsRemoved) / 12;
             intRed += reduction;
-            intParts.push(`Konv-år Y${Y} ${r.internal_level} ×${r.count}: -${monthsRemoved}/12 av annual=${round2(annualInt)} = ${round2(reduction)}`);
+            intParts.push(`Konv-år Y${Y} ${r.internal_level} x${r.count}: -${monthsRemoved}/12 av annual=${round2(annualIntFlat)} (konstant) = ${round2(reduction)}`);
           } else {
-            intRed += -annualInt;
-            intParts.push(`Etter Y${Y} ${r.internal_level} ×${r.count}: -annual=${round2(annualInt)}`);
+            intRed += -annualIntFlat;
+            intParts.push(`Etter Y${Y} ${r.internal_level} x${r.count}: -annual=${round2(annualIntFlat)} (konstant)`);
           }
           // Nearshoring-kost: full årseffekt fra Y, ingen overlapp på nearshoring-siden
           // (overlapp gjelder kun intern). Pris vokser med global price_rate.

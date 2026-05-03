@@ -316,10 +316,12 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
       rows.push({
         key: `intfte:${r.year}:${r.level}`,
         group: "FTE",
-        sortKey: (net > 0 ? 0 : 1) * 1000 + r.year, // interne økn først (0xxx), så red (1xxx); eksterne får 2xxx/3xxx
+        sortKey: (net > 0 ? 0 : 1) * 1000 + r.year,
         name: `${net > 0 ? "+" : ""}${net} ${r.level} Intern FTE ${r.year}`,
         type: "Intern FTE-endring",
-        details: `Inkl. kumulativ lønnsvekst på endringen`,
+        details: net > 0
+          ? "Inkl. kumulativ lønnsvekst fra FC 2026-basis"
+          : "Konstant besparelse mot FC 2026-basis",
         yearly: netYearly,
         comment: (r as any).comment ?? (r as any).comment_increase ?? (r as any).comment_decrease,
       });
@@ -358,7 +360,9 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         sortKey: (net > 0 ? 2 : 3) * 1000 + r.year,
         name: `${net > 0 ? "+" : ""}${net} ${r.level} Ekstern FTE ${r.year}`,
         type: "Ekstern FTE-endring",
-        details: `Inkl. kumulativ prisvekst på endringen`,
+        details: net > 0
+          ? "Inkl. kumulativ prisvekst fra FC 2026-basis"
+          : "Konstant besparelse mot FC 2026-basis",
         yearly: netYearly,
         comment: (r as any).comment ?? (r as any).comment_increase ?? (r as any).comment_decrease,
       });
@@ -394,7 +398,7 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         sortKey: r.year,
         name: `${r.count} konv. ${r.external_level}→${r.internal_level} ${r.year}`,
         type: "Ekstern→Intern",
-        details: `${r.overlap_months} mnd overlapp`,
+        details: `${r.overlap_months} mnd overlapp. Besparelse konstant, intern kost vokser med lønnsvekst`,
         yearly: netYearly,
         comment: (r as any).comment,
       });
@@ -428,7 +432,7 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         sortKey: 10000 + r.year,
         name: `${r.count} ${r.internal_level} Intern→Nearshoring ${r.year}`,
         type: "Intern→Nearshoring",
-        details: `${r.overlap_months ?? 3} mnd overlapp`,
+        details: `${r.overlap_months ?? 3} mnd overlapp. Intern besparelse konstant, nearshoring vokser med prisvekst`,
         yearly: netYearly,
         comment: (r as any).comment,
       });
@@ -469,7 +473,9 @@ export function KontrollTab({ scenarioId }: { scenarioId: string | null }) {
         sortKey: r.year,
         name: `${net > 0 ? "+" : ""}${net} Nearshoring ${r.year}`,
         type: "Nearshoring-endring",
-        details: `Inkl. kumulativ prisvekst på endringen`,
+        details: net > 0
+          ? "Inkl. kumulativ prisvekst fra FC 2026-basis"
+          : "Konstant besparelse mot FC 2026-basis",
         yearly: netYearly,
         comment: (r as any).comment ?? (r as any).comment_increase ?? (r as any).comment_decrease,
       });
