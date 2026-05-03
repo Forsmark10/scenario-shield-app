@@ -118,7 +118,6 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const masterBase = masterLine
     ? (masterLine.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0)
     : 0;
-  const masterAtN = result.lines.find((l) => l.line_id === masterLine?.id)?.amounts[N] ?? 0;
   const masterBaselineGrowth = masterBase * cumSalary;
 
   // ─────── Lønnsvekst: kun eksisterende Internal FTE fra FC 2026 ───────
@@ -211,24 +210,10 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   ];
 
   // ─────── FTE-endring ───────
-  const internalChangeMaster = masterAtN - masterBaselineGrowth;
-  let driverChange = 0;
-  for (const cl of inputs.cost_lines) {
-    if (cl.category !== "Internal FTE" || cl.is_fte_master) continue;
-    if (cl.fte_driver_pct != null) {
-      driverChange += (masterAtN - masterBaselineGrowth) * cl.fte_driver_pct;
-    }
-  }
-  const internalTotal = internalChangeMaster + driverChange;
-
-  const extChangesLine = result.lines.find((l) => l.line_id === "virtual:ext_fte_changes");
   const extConvLine = result.lines.find((l) => l.line_id === "virtual:ext_fte_conversions");
-  const nsLine = result.lines.find((l) => l.line_id === "virtual:nearshoring");
   const i2nIntRedLine = result.lines.find((l) => l.line_id === "virtual:i2ns_internal_reduction");
   const i2nNsAddLine = result.lines.find((l) => l.line_id === "virtual:i2ns_nearshoring_addition");
-  const extChangesAmt = extChangesLine?.amounts[N] ?? 0;
   const extConvAmt = extConvLine?.amounts[N] ?? 0;
-  const nsAmt = nsLine?.amounts[N] ?? 0;
   const i2nIntRedAmt = i2nIntRedLine?.amounts[N] ?? 0; // negative (besparelse)
   const i2nNsAddAmt = i2nNsAddLine?.amounts[N] ?? 0;   // positive (kost)
   const i2nNet = i2nIntRedAmt + i2nNsAddAmt;
