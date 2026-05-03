@@ -52,6 +52,8 @@ export function useAllScenarios(reloadKey = 0): UseAllScenariosState {
           intRes,
           extRes,
           nsBaseRes,
+          i2nRes,
+          ooRes,
         ] = await Promise.all([
           supabase.from("scenarios").select("id, name, sort_order").eq("is_active", true).order("sort_order"),
           supabase.from("cost_lines").select("*"),
