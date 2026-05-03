@@ -219,9 +219,14 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   const extChangesLine = result.lines.find((l) => l.line_id === "virtual:ext_fte_changes");
   const extConvLine = result.lines.find((l) => l.line_id === "virtual:ext_fte_conversions");
   const nsLine = result.lines.find((l) => l.line_id === "virtual:nearshoring");
+  const i2nIntRedLine = result.lines.find((l) => l.line_id === "virtual:i2ns_internal_reduction");
+  const i2nNsAddLine = result.lines.find((l) => l.line_id === "virtual:i2ns_nearshoring_addition");
   const extChangesAmt = extChangesLine?.amounts[N] ?? 0;
   const extConvAmt = extConvLine?.amounts[N] ?? 0;
   const nsAmt = nsLine?.amounts[N] ?? 0;
+  const i2nIntRedAmt = i2nIntRedLine?.amounts[N] ?? 0; // negative (besparelse)
+  const i2nNsAddAmt = i2nNsAddLine?.amounts[N] ?? 0;   // positive (kost)
+  const i2nNet = i2nIntRedAmt + i2nNsAddAmt;
 
   let intInc = 0;
   let intDec = 0;
