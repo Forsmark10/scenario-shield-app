@@ -740,14 +740,21 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
 
   const rows = rawRows.map((r) => ({
     ...r,
-    yearly: r.group === "CAPEX" ? r.yearly : toYearlyDelta(r.yearly),
+    // CAPEX-rader viser faktiske verdier, MEN utfasing er kumulativ og skal vise delta i "per år"-modus
+    yearly: r.group === "CAPEX" && r.key !== "capex:depr_phaseout" ? r.yearly : toYearlyDelta(r.yearly),
   }));
-  const groupSubtotals = Object.fromEntries(
-    Object.entries(rawGroupSubtotals).map(([k, v]) => [
-      k,
-      k === "CAPEX" ? v : toYearlyDelta(v as Record<number, number>),
-    ])
-  );
+  // Re-beregn subtotaler fra de (muligens transformerte) radene slik at CAPEX subtotal
+  // inkluderer utfasingens delta korrekt i "per år"-modus.
+  const groupSubtotals: Record<string, Record<number, number>> = {};
+  for (const r of rows) {
+    if (!groupSubtotals[r.group]) {
+      groupSubtotals[r.group] = {};
+      for (const Y of FC_YEARS) groupSubtotals[r.group][Y] = 0;
+    }
+    for (const Y of FC_YEARS) {
+      groupSubtotals[r.group][Y] += r.yearly[Y] ?? 0;
+    }
+  }
   const sumYearly = toYearlyDelta(rawSumYearly);
   const totalDiff = toYearlyDelta(rawTotalDiff);
 
@@ -904,7 +911,7 @@ function GroupBlock({
           {GROUP_LABEL[group]}
           {isCapex && perspective === "yearly" && (
             <span className="normal-case text-[10px] font-normal text-muted-foreground ml-2">
-              (viser faktiske verdier per år, ikke delta)
+              (viser faktiske verdier per år)
             </span>
           )}
         </td>
