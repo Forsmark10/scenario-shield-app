@@ -65,6 +65,12 @@ function describe(section: string, row: any, variant?: string): string {
     }
     case "capex_plan":
       return `${row.year} · ${row.capex_type}${row.description ? " · " + row.description : ""} (${row.amount} tNOK)`;
+    case "internal_to_nearshoring_conversions":
+      return `${row.year} · ${row.internal_level} (×${row.count})`;
+    case "one_off_effects":
+      return `${row.year} · ${row.category} · ${row.description ?? "—"} (${row.amount_tnok} tNOK)`;
+    case "depreciation_phaseout":
+      return `${row.year} · ${row.type} (${row.amount_tnok} tNOK)`;
     default:
       return JSON.stringify(row);
   }
