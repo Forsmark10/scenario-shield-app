@@ -2282,21 +2282,21 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
         <div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Detaljert (navngitte investeringer)
+              Prosjektinvesteringer (navngitte)
             </h3>
             <Button variant="outline" size="sm" onClick={addDetail}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Legg til investering
             </Button>
           </div>
           {detailedRows.length === 0 ? (
-            <p className="text-xs text-muted-foreground py-3">Ingen detaljerte investeringer.</p>
+            <p className="text-xs text-muted-foreground py-3">Ingen prosjektinvesteringer.</p>
           ) : (
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left font-medium px-2 py-2 w-[130px]">Type</th>
-                  <th className="text-left font-medium px-2 py-2">Navn</th>
-                  <th className="text-left font-medium px-2 py-2 w-[80px]">År</th>
+                  <th className="text-left font-medium px-2 py-2 max-w-[220px]">Navn</th>
+                  <th className="text-left font-medium px-2 py-2 w-[120px]">Anskaffelsesår</th>
+                  <th className="text-left font-medium px-2 py-2 w-[150px]">Avskrivningsstart</th>
                   <th className="text-right font-medium px-2 py-2 w-[140px]">Beløp (tNOK)</th>
                   <th className="w-[40px]"></th>
                 </tr>
@@ -2304,34 +2304,42 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
               <tbody>
                 {detailedRows.map((r) => (
                   <tr key={r.id} className="border-b">
-                    <td className="px-1 py-1">
+                    <td className="px-1 py-1 max-w-[220px]">
                       <CellWithComment
                         comment={r.comment}
                         updatedAt={r.comment_updated_at}
                         updatedBy={r.comment_updated_by}
                         onSaveComment={(next) => updateDetailComment(r.id, next)}
-                        label={`Capex: ${r.description ?? r.capex_type}`}
+                        label={`Capex: ${r.description ?? "Prosjekt"}`}
                       >
-                        <Select value={r.capex_type} onValueChange={(v) => updateDetailField(r.id, "capex_type", v)}>
-                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                          <SelectContent>{types.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                        </Select>
+                        <Input
+                          defaultValue={r.description ?? ""}
+                          onBlur={(e) => {
+                            if (e.target.value !== r.description) updateDetailField(r.id, "description", e.target.value);
+                          }}
+                          className="h-8 text-xs w-[200px]"
+                        />
                       </CellWithComment>
-                    </td>
-                    <td className="px-1 py-1">
-                      <Input
-                        defaultValue={r.description ?? ""}
-                        onBlur={(e) => {
-                          if (e.target.value !== r.description) updateDetailField(r.id, "description", e.target.value);
-                        }}
-                        className="h-8 text-xs"
-                      />
                     </td>
                     <td className="px-1 py-1">
                       <Select value={String(r.year)} onValueChange={(v) => updateDetailField(r.id, "year", Number(v))}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="px-1 py-1">
+                      <Select
+                        value={r.depreciation_start_year == null ? "none" : String(r.depreciation_start_year)}
+                        onValueChange={(v) =>
+                          updateDetailField(r.id, "depreciation_start_year", v === "none" ? null : Number(v))
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                          <SelectItem value="none">Ikke i perioden</SelectItem>
                         </SelectContent>
                       </Select>
                     </td>
