@@ -267,7 +267,11 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
         sortKey: 2,
         name: "Prisvekst",
         type: "Global driver",
-        details: `${(Number(last?.price_increase_pct ?? 0) * 100).toFixed(1)} % per år på lokale ikke-FTE-kostnader`,
+        details: `${formatYearlyRate(
+          base.global_assumptions
+            .filter((g) => FC_YEARS.includes(g.year as any))
+            .map((g) => ({ year: g.year, pct: Number(g.price_increase_pct) || 0 })),
+        )} på lokale ikke-FTE-kostnader`,
         yearly,
       });
     }
