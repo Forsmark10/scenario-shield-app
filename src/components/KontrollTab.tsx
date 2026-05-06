@@ -319,7 +319,11 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
         sortKey: 1,
         name: "Sentral prisvekst",
         type: "Sentral driver",
-        details: `${(Number(last?.central_price_increase_pct ?? 0) * 100).toFixed(1)} % per år (EUR-basis)`,
+        details: `${formatYearlyRate(
+          cAssumps
+            .filter((c) => FC_YEARS.includes(c.year as any))
+            .map((c) => ({ year: c.year, pct: Number(c.central_price_increase_pct) || 0 })),
+        )} (EUR-basis)`,
         yearly,
       });
     }
