@@ -2191,7 +2191,16 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
   };
 
   const addDetail = async () => {
-    // Seed with a single 2027 row so the group has identity
+    // Generate a unique description so each new row appears as its own group
+    const existingNames = new Set(
+      rows.filter((r) => r.capex_type === "Prosjekt" && r.description).map((r) => r.description),
+    );
+    let i = 1;
+    let description = "Ny investering";
+    while (existingNames.has(description)) {
+      i += 1;
+      description = `Ny investering ${i}`;
+    }
     const { data: inserted, error } = await supabase
       .from("capex_plan")
       .insert({
@@ -2200,11 +2209,14 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
         year: 2027,
         depreciation_start_year: null,
         amount: 0,
-        description: "Ny investering",
+        description,
       } as any)
       .select()
       .single();
-    if (error) throw error;
+    if (error) {
+      sonnerToast.error(`Kunne ikke legge til: ${error.message}`);
+      return;
+    }
     patch({ type: "upsert", table: "capexPlan", row: inserted });
   };
 
