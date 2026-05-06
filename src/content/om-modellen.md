@@ -87,6 +87,9 @@ Planlagte investeringer per år i Hardware, Software eller Prosjekt. Avskrivning
 - Software: 5 år
 - Prosjekt: 5 år
 
+### Utfasing eksisterende avskrivninger
+Reduksjon i avskrivninger fra historiske investeringer (gjort før FC 2026) som naturlig fases ut over forecast-perioden. Verdiene legges inn manuelt per type (Hardware/Software/Prosjekt) og år som negative beløp i tNOK. **Verdien er kumulativ:** en utfasing satt for 2027 gjelder også 2028–2031. Effekten inngår i Avskrivning-søylen i waterfallen og som egen rad i Kontroll-tabben.
+
 ---
 
 ## Hvordan lese waterfallen
