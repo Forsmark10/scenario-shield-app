@@ -540,6 +540,7 @@ export default function Assumptions() {
                           nearshoringAdds: (prev.nearshoringAdds as any[]).filter((r) => r.scenario_id !== sid),
                           i2nConversions: (prev.i2nConversions as any[]).filter((r) => r.scenario_id !== sid),
                           oneOffs: (prev.oneOffs as any[]).filter((r) => r.scenario_id !== sid),
+                          deprPhaseout: (prev.deprPhaseout as any[]).filter((r) => r.scenario_id !== sid),
                         };
                       });
                       console.log("[Reset] Lokal state nullstilt – starter refresh()");
