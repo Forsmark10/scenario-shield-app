@@ -254,11 +254,11 @@ function buildAssumptionsSheet(bundle: ScenarioBundle): XLSX.WorkSheet {
 
   // 10. Capex-plan
   section("Capex-plan");
-  aoa.push(["År", "Type", "Beløp (tNOK)", "Beskrivelse"]);
+  aoa.push(["År", "Type", "Beløp (tNOK)", "Beskrivelse", "Avskrivningsstart"]);
   [...i.capex_plan]
     .sort((a, b) => a.year - b.year)
     .forEach((c) =>
-      aoa.push([c.year, c.capex_type, c.amount, c.description ?? ""]),
+      aoa.push([c.year, c.capex_type, c.amount, c.description ?? "", c.depreciation_start_year ?? ""]),
     );
 
   // 11. Avskrivningsregler

@@ -76,6 +76,7 @@ export type Database = {
           comment_updated_at: string | null
           comment_updated_by: string | null
           created_at: string
+          depreciation_start_year: number | null
           description: string | null
           id: string
           scenario_id: string
@@ -89,6 +90,7 @@ export type Database = {
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
+          depreciation_start_year?: number | null
           description?: string | null
           id?: string
           scenario_id: string
@@ -102,6 +104,7 @@ export type Database = {
           comment_updated_at?: string | null
           comment_updated_by?: string | null
           created_at?: string
+          depreciation_start_year?: number | null
           description?: string | null
           id?: string
           scenario_id?: string
