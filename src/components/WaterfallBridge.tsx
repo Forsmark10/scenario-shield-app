@@ -536,25 +536,20 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
   let deprBridge = 0;
   const deprDetails: BridgeBreakdown["details"] = [];
   if (view === "PL") {
-    let existingDelta = 0;
+    let existingTotal = 0;
     let newDepr = 0;
     for (const cl of inputs.cost_lines.filter((c) => c.category === "Depreciation")) {
       const base = (cl.fc_2026_monthly ?? []).reduce((s, x) => s + Number(x || 0), 0);
       const line = result.lines.find((l) => l.line_id === cl.id);
       const amt = line?.amounts[N] ?? 0;
-      let existing = base;
-      const offset = N - 2026;
-      if (cl.is_existing_depreciation_phaseout) {
-        if (offset === 1) existing = base * (2 / 3);
-        else if (offset === 2) existing = base * (1 / 3);
-        else existing = 0;
-      }
-      existingDelta += existing - base;
-      newDepr += amt - existing;
+      // Eksisterende avskrivninger er nå flat (lik base) – all utfasing styres fra assumptions
+      existingTotal += base;
+      newDepr += amt - base;
     }
-    deprBridge = existingDelta + newDepr;
-    deprDetails.push({ label: "Eksisterende utfasing", value: existingDelta });
-    deprDetails.push({ label: "Nye avskrivninger", value: newDepr });
+    deprBridge = newDepr;
+    if (newDepr !== 0) {
+      deprDetails.push({ label: "Nye avskrivninger", value: newDepr });
+    }
     // Brukerdefinert utfasing av eksisterende avskrivninger (virtuelle linjer)
     const phaseoutDelta = result.lines
       .filter((l) => l.line_id.startsWith("virtual:depr_phaseout:"))
