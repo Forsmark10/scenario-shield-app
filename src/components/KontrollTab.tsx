@@ -503,15 +503,37 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
         });
       }
       if (amt !== 0) {
+        const isInternalFTE = r.category === "Internal FTE";
         const yearly: Record<number, number> = {};
-        for (const Y of FC_YEARS) yearly[Y] = Y >= r.year ? amt / 1000 : 0;
+        for (const Y of FC_YEARS) {
+          if (Y < r.year) {
+            yearly[Y] = 0;
+            continue;
+          }
+          if (amt > 0) {
+            // Positive tNOK (økninger) vokser med lønns-/prisvekst fra tiltaksåret
+            const growthAssumptions = base.global_assumptions.filter(
+              (g) => g.year >= r.year && g.year <= Y
+            );
+            const growthFactor = growthAssumptions.reduce(
+              (acc, g) => acc * (1 + Number(isInternalFTE ? g.salary_increase_pct : g.price_increase_pct ?? 0)),
+              1,
+            );
+            yearly[Y] = (amt * growthFactor) / 1000;
+          } else {
+            // Negative tNOK (besparelser) er konstante
+            yearly[Y] = amt / 1000;
+          }
+        }
         rows.push({
           key: `cat:${r.category}:${r.year}:amt`,
           group: "CATEGORY",
           sortKey: 10000 + r.year,
           name: `${amt > 0 ? "+" : ""}${formatNumberNO(amt, 0)} tNOK ${r.category} ${r.year}`,
           type: "Kategori-justering tNOK",
-          details: `Fast beløp, permanent fra ${r.year}`,
+          details: amt > 0
+            ? `Permanent fra ${r.year}. Vokser med ${isInternalFTE ? "lønnsvekst" : "prisvekst"}.`
+            : `Konstant besparelse, permanent fra ${r.year}. Vokser ikke.`,
           yearly,
           comment: (r as any).comment_amount ?? (r as any).comment,
         });
