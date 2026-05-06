@@ -708,7 +708,8 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
   // ---------- VIRTUAL: Kategori-justering (absolutt beløp tNOK) ----------
   // Per kategori: kumulativ sum av adjustment_amount_tnok fom 2027 tom N.
   // Beløpet er PERMANENT: satt i ett år gjelder det samme år og alle påfølgende.
-  // Vokser IKKE med prisvekst (matcher hvordan konkrete tiltak ofte er kjent som fast beløp).
+  // POSITIVE beløp (økninger) vokser med lønnsvekst (Internal FTE) eller prisvekst (andre).
+  // NEGATIVE beløp (besparelser) er konstante – baseline er frosset.
   const scenarioAdj = category_adjustments.filter((a) => a.scenario_id === scenario_id);
   const adjCategories = Array.from(
     new Set(
@@ -733,6 +734,7 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       monthly_2027: [],
       breakdown_source: {},
     };
+    const growthRateFn = cat === "Internal FTE" ? salaryRate : priceRate;
     for (const N of YEARS) {
       let amt = 0;
       const parts: string[] = [];
@@ -740,8 +742,17 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
         const row = scenarioAdj.find((a) => a.category === cat && a.year === Y);
         const v = Number(row?.adjustment_amount_tnok ?? 0);
         if (v !== 0) {
-          amt += v;
-          parts.push(`Y${Y}: ${v} tNOK (permanent fra ${Y})`);
+          // Positive (økninger) vokser med lønns-/prisvekst fra tiltaksåret. Negative (besparelser) er konstante.
+          const growthFactor = v > 0
+            ? cumulativeFactor(scenario_id, Y, N, growthRateFn)
+            : 1;
+          const adjusted = v * growthFactor;
+          amt += adjusted;
+          parts.push(
+            v > 0
+              ? `Y${Y}: ${v} tNOK × vekst(${Y}→${N})=${round2(growthFactor)} = ${round2(adjusted)} tNOK`
+              : `Y${Y}: ${v} tNOK (permanent, konstant)`
+          );
         }
       }
       adjLine.amounts[N] = amt;
