@@ -2343,6 +2343,126 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
   );
 }
 
+// ---------------------- 8b. Utfasing eksisterende avskrivninger ----------------------
+function SectionDeprPhaseout({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
+  const types = ["Hardware", "Software", "Prosjekt"] as const;
+  const rows = data.deprPhaseout.filter((r) => r.scenario_id === scenario.id);
+
+  const cellFor = (type: string, year: number) =>
+    rows.find((r) => r.type === type && r.year === year);
+
+  const upsertCell = async (type: string, year: number, value: number) => {
+    const existing = cellFor(type, year);
+    if (existing) {
+      if (value === 0 && !existing.comment) {
+        patch({ type: "delete", table: "deprPhaseout", id: existing.id });
+        const { error } = await supabase.from("depreciation_phaseout").delete().eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        patch({ type: "update", table: "deprPhaseout", id: existing.id, changes: { amount_tnok: value } });
+        const { error } = await supabase.from("depreciation_phaseout").update({ amount_tnok: value }).eq("id", existing.id);
+        if (error) throw error;
+      }
+    } else if (value !== 0) {
+      const { data: inserted, error } = await supabase
+        .from("depreciation_phaseout")
+        .insert({ scenario_id: scenario.id, type, year, amount_tnok: value })
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "deprPhaseout", row: inserted });
+    }
+  };
+
+  const upsertCellComment = async (type: string, year: number, comment: string | null) => {
+    const existing = cellFor(type, year);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({
+        type: "update",
+        table: "deprPhaseout",
+        id: existing.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("depreciation_phaseout")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("depreciation_phaseout")
+        .insert({ scenario_id: scenario.id, type, year, amount_tnok: 0, comment, comment_updated_at: ts } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "deprPhaseout", row: inserted });
+    }
+  };
+
+  const sumCol = (year: number) =>
+    types.reduce((a, t) => a + Number(cellFor(t, year)?.amount_tnok ?? 0), 0);
+
+  return (
+    <Section
+      title="Utfasing eksisterende avskrivninger"
+      description="Reduksjon i avskrivninger fra historiske investeringer som fases ut over perioden. Negative tall = reduksjon i avskrivningskostnad. En verdi i et gitt år gjelder også alle påfølgende år (kumulativ utfasing)."
+      tooltip="Beløp i tNOK. Verdien for et gitt år gjelder også alle påfølgende år."
+    >
+      <div>
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+          Aggregert per type og år (tNOK)
+        </h3>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left font-medium px-2 py-2 w-[130px]">Type</th>
+              {FC_YEARS.map((y) => (
+                <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {types.map((t) => (
+              <tr key={t} className="border-b">
+                <td className="px-2 py-1.5">{t}</td>
+                {FC_YEARS.map((y) => {
+                  const cell = cellFor(t, y);
+                  return (
+                    <td key={y} className="px-1 py-1">
+                      <CellWithComment
+                        comment={cell?.comment}
+                        updatedAt={cell?.comment_updated_at}
+                        updatedBy={cell?.comment_updated_by}
+                        onSaveComment={(next) => upsertCellComment(t, y, next)}
+                        label={`Utfasing ${t} ${y}`}
+                      >
+                        <NumCell
+                          value={Number(cell?.amount_tnok ?? 0)}
+                          step="100"
+                          onCommit={(v) => upsertCell(t, y, v)}
+                        />
+                      </CellWithComment>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            <tr className="font-semibold">
+              <td className="px-2 py-2">Sum</td>
+              {FC_YEARS.map((y) => (
+                <td key={y} className="text-right tabular-nums font-mono px-2 py-2">
+                  {sumCol(y).toLocaleString("nb-NO") || "—"}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Section>
+  );
+}
+
 // ---------------------- 6b. Internal → Nearshoring konvertering ----------------------
 function SectionInternalToNearshoring({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const rows = [...data.i2nConversions.filter((c) => c.scenario_id === scenario.id)].sort((a, b) => {
