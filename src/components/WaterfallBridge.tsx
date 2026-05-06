@@ -555,6 +555,14 @@ function computeBridges({ bundle, targetYear, view }: ComputeArgs): {
     deprBridge = existingDelta + newDepr;
     deprDetails.push({ label: "Eksisterende utfasing", value: existingDelta });
     deprDetails.push({ label: "Nye avskrivninger", value: newDepr });
+    // Brukerdefinert utfasing av eksisterende avskrivninger (virtuelle linjer)
+    const phaseoutDelta = result.lines
+      .filter((l) => l.line_id.startsWith("virtual:depr_phaseout:"))
+      .reduce((a, l) => a + (l.amounts[N] ?? 0), 0);
+    if (phaseoutDelta !== 0) {
+      deprDetails.push({ label: "Utfasing eksisterende avskrivninger", value: phaseoutDelta });
+      deprBridge += phaseoutDelta;
+    }
     // Kategori-justeringer for Depreciation
     const deprCatAdj = result.lines
       .filter((l) => l.line_id.startsWith("virtual:cat_adj_amount:") && l.category === "Depreciation")
