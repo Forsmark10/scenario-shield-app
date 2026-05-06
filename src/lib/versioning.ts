@@ -13,6 +13,7 @@ const SCOPED_TABLES = [
   "nearshoring_changes",
   "category_adjustments",
   "capex_plan",
+  "depreciation_phaseout",
   "internal_to_nearshoring_conversions",
   "one_off_effects",
 ] as const;
