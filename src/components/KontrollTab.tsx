@@ -637,14 +637,14 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
     if (view === "PL") {
       // Beregn total avskrivning i baseline (uten nye investeringer) vs. FC 2026
       const baselineDeprYearly: Record<number, number> = {};
-      const deprLines = base.cost_lines.filter((cl) => cl.is_depreciation);
-      const fc2026Depr = deprLines.reduce((s, cl) => s + Number(cl.base_2026 ?? 0), 0);
+      const deprLines = base.cost_lines.filter((cl) => (cl as any).is_depreciation);
+      const fc2026Depr = deprLines.reduce((s, cl) => s + Number((cl as any).base_2026 ?? 0), 0);
       // Engine uten nye capex gir oss baseline avskrivninger per år
       const emptyCapexInputs = { ...empty, cost_lines: base.cost_lines, capex_plan: [] };
       const emptyCapexResult = calculateForecast(emptyCapexInputs);
       const emptyCapexDeprLines = emptyCapexResult.lines.filter((l) => {
-        const cl = base.cost_lines.find((c) => c.line_id === l.line_id);
-        return cl?.is_depreciation;
+        const cl = base.cost_lines.find((c) => (c as any).line_id === l.line_id);
+        return (cl as any)?.is_depreciation;
       });
       for (const Y of FC_YEARS) {
         const yearDepr = emptyCapexDeprLines.reduce((s, l) => s + (l.amounts[Y] ?? 0), 0);
