@@ -80,6 +80,7 @@ export function useForecast(scenarioId: string | null): UseForecastState {
           category_adjustments: adj.data ?? [],
           capex_plan: (cap.data ?? []) as ForecastInputs["capex_plan"],
           depreciation_rules: (dr.data ?? []) as ForecastInputs["depreciation_rules"],
+          depreciation_phaseout: (dp.data ?? []) as ForecastInputs["depreciation_phaseout"],
           internal_fte_base_rates: (intRates.data ?? []) as ForecastInputs["internal_fte_base_rates"],
           external_fte_base_rates: (extRates.data ?? []) as ForecastInputs["external_fte_base_rates"],
           nearshoring_base:
