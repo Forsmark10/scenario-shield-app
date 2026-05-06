@@ -629,22 +629,31 @@ function Section({
   children,
   defaultOpen = true,
   tooltip,
+  variant = "default",
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
   tooltip?: string;
+  variant?: "default" | "historical";
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <Card>
+    <Card className={cn(
+      variant === "historical" && "border-slate-300 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-900/30"
+    )}>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
           <button className="w-full flex items-center justify-between px-5 py-4 text-left">
             <div>
               <div className="flex items-center gap-1.5">
                 <h2 className="text-sm font-semibold">{title}</h2>
+                {variant === "historical" && (
+                  <span className="text-[10px] font-normal text-muted-foreground bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                    Historisk
+                  </span>
+                )}
                 {tooltip && (
                   <span onClick={(e) => e.stopPropagation()}>
                     <InfoTip text={tooltip} />
@@ -2408,6 +2417,7 @@ function SectionDeprPhaseout({ data, scenario, patch }: { data: AllData; scenari
       title="Utfasing eksisterende avskrivninger"
       description="Reduksjon i avskrivninger fra historiske investeringer som fases ut over perioden. Negative tall = reduksjon i avskrivningskostnad. En verdi i et gitt år gjelder også alle påfølgende år (kumulativ utfasing)."
       tooltip="Beløp i tNOK. Verdien for et gitt år gjelder også alle påfølgende år."
+      variant="historical"
     >
       <div>
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
