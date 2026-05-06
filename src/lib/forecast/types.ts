@@ -187,6 +187,7 @@ export interface ForecastInputs {
   category_adjustments: CategoryAdjustment[];
   capex_plan: CapexPlan[];
   depreciation_rules: DepreciationRule[];
+  depreciation_phaseout?: DepreciationPhaseout[];
   internal_fte_base_rates: InternalFteBaseRate[];
   external_fte_base_rates: ExternalFteBaseRate[];
   nearshoring_base: NearshoringBase;
