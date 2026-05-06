@@ -768,7 +768,6 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
               {perspective === "cumulative"
                 ? "Kumulativ visning: total endring fra FC 2026-basis (samme perspektiv som waterfallen)."
                 : "Per år-visning: inkrementell endring per år (samme perspektiv som stolpediagrammet). Nye forutsetninger viser full effekt i startåret, deretter kun veksteffekten."}
-              {" "}NB: Naturlig utfasing av historiske avskrivninger (investeringer gjort før FC 2026) vises ikke her – kun nye forutsetninger. Utfasingseffekten vises i waterfallens Avskrivning-søyle.
             </p>
           </div>
           <div className="flex items-center gap-2">
