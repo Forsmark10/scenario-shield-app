@@ -50,6 +50,7 @@ async function buildFreshInputs(
     nearshoring_changes: (tables.nearshoring_changes ?? []) as ForecastInputs["nearshoring_changes"],
     category_adjustments: tables.category_adjustments ?? [],
     capex_plan: (tables.capex_plan ?? []) as ForecastInputs["capex_plan"],
+    depreciation_phaseout: (tables.depreciation_phaseout ?? []) as ForecastInputs["depreciation_phaseout"],
     internal_to_nearshoring_conversions: (tables.internal_to_nearshoring_conversions ?? []) as ForecastInputs["internal_to_nearshoring_conversions"],
     one_off_effects: (tables.one_off_effects ?? []) as ForecastInputs["one_off_effects"],
     depreciation_rules: (dr.data ?? []) as ForecastInputs["depreciation_rules"],
