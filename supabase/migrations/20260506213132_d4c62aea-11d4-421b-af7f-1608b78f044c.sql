@@ -1,0 +1,1 @@
+ALTER TABLE public.capex_plan ADD COLUMN IF NOT EXISTS depreciation_start_year integer;
