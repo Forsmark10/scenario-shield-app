@@ -578,6 +578,35 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
       });
     }
 
+    // Utfasing av eksisterende avskrivninger fra FC 2026-baseline (kun P&L-modus)
+    if (view === "PL") {
+      // Beregn total avskrivning i baseline (uten nye investeringer) vs. FC 2026
+      const baselineDeprYearly: Record<number, number> = {};
+      const deprLines = base.cost_lines.filter((cl) => cl.is_depreciation);
+      const fc2026Depr = deprLines.reduce((s, cl) => s + Number(cl.base_2026 ?? 0), 0);
+      // Engine uten nye capex gir oss baseline avskrivninger per år
+      const emptyCapexInputs = { ...empty, cost_lines: base.cost_lines, capex_plan: [] };
+      const emptyCapexResult = calculateForecast(emptyCapexInputs);
+      const emptyCapexDeprLines = emptyCapexResult.lines.filter((l) => {
+        const cl = base.cost_lines.find((c) => c.line_id === l.line_id);
+        return cl?.is_depreciation;
+      });
+      for (const Y of FC_YEARS) {
+        const yearDepr = emptyCapexDeprLines.reduce((s, l) => s + (l.amounts[Y] ?? 0), 0);
+        baselineDeprYearly[Y] = (yearDepr - fc2026Depr) / 1000; // delta fra FC 2026, i MNOK
+      }
+      rows.push({
+        key: "capex:baseline_depr",
+        group: "CAPEX",
+        sortKey: -1, // Vises først i CAPEX-gruppen
+        name: "Utfasing eksisterende avskrivninger",
+        type: "Historiske investeringer",
+        details: "Naturlig utfasing av avskrivninger fra investeringer gjort før FC 2026",
+        yearly: baselineDeprYearly,
+        comment: null,
+      });
+    }
+
     // Sortér innenfor grupper
     rows.sort((a, b) => {
       const ga = GROUP_ORDER.indexOf(a.group);
@@ -627,6 +656,7 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
   const { rows: rawRows, groupSubtotals: rawGroupSubtotals, sumYearly: rawSumYearly, totalDiff: rawTotalDiff } = calc;
 
   // Transform to yearly deltas if perspective is "yearly" (stolpediagram-logikk)
+  // CAPEX/avskrivninger unntas – de viser alltid faktiske verdier per år, ikke delta.
   const toYearlyDelta = (yearly: Record<number, number>): Record<number, number> => {
     if (perspective === "cumulative") return yearly;
     const result: Record<number, number> = {};
@@ -638,9 +668,15 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
     return result;
   };
 
-  const rows = rawRows.map((r) => ({ ...r, yearly: toYearlyDelta(r.yearly) }));
+  const rows = rawRows.map((r) => ({
+    ...r,
+    yearly: r.group === "CAPEX" ? r.yearly : toYearlyDelta(r.yearly),
+  }));
   const groupSubtotals = Object.fromEntries(
-    Object.entries(rawGroupSubtotals).map(([k, v]) => [k, toYearlyDelta(v as Record<number, number>)])
+    Object.entries(rawGroupSubtotals).map(([k, v]) => [
+      k,
+      k === "CAPEX" ? v : toYearlyDelta(v as Record<number, number>),
+    ])
   );
   const sumYearly = toYearlyDelta(rawSumYearly);
   const totalDiff = toYearlyDelta(rawTotalDiff);
@@ -726,6 +762,7 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
                     group={g}
                     rows={groupRows}
                     subtotal={groupSubtotals[g]}
+                    perspective={perspective}
                   />
                 );
               })}
@@ -778,11 +815,14 @@ function GroupBlock({
   group,
   rows,
   subtotal,
+  perspective,
 }: {
   group: GroupKey;
   rows: Row[];
   subtotal: Record<number, number>;
+  perspective: "cumulative" | "yearly";
 }) {
+  const isCapex = group === "CAPEX";
   return (
     <>
       <tr style={{ background: "#edf2f7" }}>
@@ -792,6 +832,11 @@ function GroupBlock({
           style={{ fontWeight: 700, fontSize: 12, letterSpacing: "0.03em", color: "#1e293b" }}
         >
           {GROUP_LABEL[group]}
+          {isCapex && perspective === "yearly" && (
+            <span className="normal-case text-[10px] font-normal text-muted-foreground ml-2">
+              (viser faktiske verdier per år, ikke delta)
+            </span>
+          )}
         </td>
         {FC_YEARS.map((y) => (
           <NumCell key={y} value={subtotal[y]} bold />
