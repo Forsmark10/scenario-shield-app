@@ -139,6 +139,7 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
   const { loading, scenarios, error } = useAllScenarios(reloadKey);
   const bundle = scenarios.find((s) => s.meta.id === scenarioId);
   const [view, setView] = useState<ViewMode>("PL");
+  const [perspective, setPerspective] = useState<"cumulative" | "yearly">("cumulative");
 
   const calc = useMemo(() => {
     if (!bundle) return null;
@@ -623,8 +624,28 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
     );
   }
 
-  const { rows, groupSubtotals, sumYearly, totalDiff } = calc;
-  const matchPct = totalDiff[2031] !== 0 ? (sumYearly[2031] / totalDiff[2031]) * 100 : 0;
+  const { rows: rawRows, groupSubtotals: rawGroupSubtotals, sumYearly: rawSumYearly, totalDiff: rawTotalDiff } = calc;
+
+  // Transform to yearly deltas if perspective is "yearly" (stolpediagram-logikk)
+  const toYearlyDelta = (yearly: Record<number, number>): Record<number, number> => {
+    if (perspective === "cumulative") return yearly;
+    const result: Record<number, number> = {};
+    for (let i = 0; i < FC_YEARS.length; i++) {
+      const Y = FC_YEARS[i];
+      const prev = i > 0 ? (yearly[FC_YEARS[i - 1]] ?? 0) : 0;
+      result[Y] = (yearly[Y] ?? 0) - prev;
+    }
+    return result;
+  };
+
+  const rows = rawRows.map((r) => ({ ...r, yearly: toYearlyDelta(r.yearly) }));
+  const groupSubtotals = Object.fromEntries(
+    Object.entries(rawGroupSubtotals).map(([k, v]) => [k, toYearlyDelta(v as Record<number, number>)])
+  );
+  const sumYearly = toYearlyDelta(rawSumYearly);
+  const totalDiff = toYearlyDelta(rawTotalDiff);
+
+  const matchPct = rawTotalDiff[2031] !== 0 ? (rawSumYearly[2031] / rawTotalDiff[2031]) * 100 : 0;
 
   return (
     <Card>
@@ -637,10 +658,11 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               Hver rad viser hva forutsetningen alene bidrar med på{" "}
-              {view === "PL" ? "P&L-totalen" : "Spend (kontant utgift)"}, beregnet samme måte som
-              waterfallen (total endring fra FC 2026-basis). Merk: Stolpediagrammet viser absolutt
-              kostnad per år, mens waterfallen og kontrollen viser akkumulert endring fra baseline.
-              NB: Naturlig utfasing av historiske avskrivninger (investeringer gjort før FC 2026) vises ikke her – kun nye forutsetninger. Utfasingseffekten vises i waterfallens Avskrivning-søyle.
+              {view === "PL" ? "P&L-totalen" : "Spend (kontant utgift)"}.{" "}
+              {perspective === "cumulative"
+                ? "Kumulativ visning: total endring fra FC 2026-basis (samme perspektiv som waterfallen)."
+                : "Per år-visning: inkrementell endring per år (samme perspektiv som stolpediagrammet). Nye forutsetninger viser full effekt i startåret, deretter kun veksteffekten."}
+              {" "}NB: Naturlig utfasing av historiske avskrivninger (investeringer gjort før FC 2026) vises ikke her – kun nye forutsetninger. Utfasingseffekten vises i waterfallens Avskrivning-søyle.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -648,6 +670,12 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
               <TabsList>
                 <TabsTrigger value="PL">P&amp;L</TabsTrigger>
                 <TabsTrigger value="Spend">Spend</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Tabs value={perspective} onValueChange={(v) => setPerspective(v as "cumulative" | "yearly")}>
+              <TabsList>
+                <TabsTrigger value="cumulative">Kumulativ</TabsTrigger>
+                <TabsTrigger value="yearly">Per år</TabsTrigger>
               </TabsList>
             </Tabs>
             <button
