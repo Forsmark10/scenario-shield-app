@@ -647,31 +647,34 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
 
     // Utfasing av eksisterende avskrivninger fra FC 2026-baseline (kun P&L-modus)
     if (view === "PL") {
-      // Beregn total avskrivning i baseline (uten nye investeringer) vs. FC 2026
       const baselineDeprYearly: Record<number, number> = {};
-      const deprLines = base.cost_lines.filter((cl) => (cl as any).is_depreciation);
-      const fc2026Depr = deprLines.reduce((s, cl) => s + Number((cl as any).base_2026 ?? 0), 0);
+      // FC 2026 depreciation = sum of fc_2026_monthly for depreciation cost lines
+      const deprLines = base.cost_lines.filter((cl) => cl.category === "Depreciation");
+      const fc2026Depr = deprLines.reduce(
+        (s, cl) => s + (cl.fc_2026_monthly ?? []).reduce((a, b) => a + Number(b || 0), 0),
+        0,
+      );
       // Engine uten nye capex gir oss baseline avskrivninger per år
-      const emptyCapexInputs = { ...empty, cost_lines: base.cost_lines, capex_plan: [] };
+      const emptyCapexInputs: ForecastInputs = { ...empty, cost_lines: base.cost_lines, capex_plan: [] };
       const emptyCapexResult = calculateForecast(emptyCapexInputs);
-      const emptyCapexDeprLines = emptyCapexResult.lines.filter((l) => {
-        const cl = base.cost_lines.find((c) => (c as any).line_id === l.line_id);
-        return (cl as any)?.is_depreciation;
-      });
+      const emptyCapexDeprLines = emptyCapexResult.lines.filter((l) => l.is_depreciation);
       for (const Y of FC_YEARS) {
         const yearDepr = emptyCapexDeprLines.reduce((s, l) => s + (l.amounts[Y] ?? 0), 0);
         baselineDeprYearly[Y] = (yearDepr - fc2026Depr) / 1000; // delta fra FC 2026, i MNOK
       }
-      rows.push({
-        key: "capex:baseline_depr",
-        group: "CAPEX",
-        sortKey: -1, // Vises først i CAPEX-gruppen
-        name: "Utfasing eksisterende avskrivninger",
-        type: "Historiske investeringer",
-        details: "Naturlig utfasing av avskrivninger fra investeringer gjort før FC 2026",
-        yearly: baselineDeprYearly,
-        comment: null,
-      });
+      const hasEffect = FC_YEARS.some((Y) => Math.abs(baselineDeprYearly[Y] ?? 0) > 0.001);
+      if (hasEffect) {
+        rows.push({
+          key: "capex:baseline_depr",
+          group: "CAPEX",
+          sortKey: -1, // Vises først i CAPEX-gruppen
+          name: "Utfasing eksisterende avskrivninger",
+          type: "Historiske investeringer",
+          details: "Naturlig utfasing av avskrivninger fra investeringer gjort før FC 2026 (negativ = redusert avskrivning vs. FC 2026)",
+          yearly: baselineDeprYearly,
+          comment: null,
+        });
+      }
     }
 
     // Sortér innenfor grupper
