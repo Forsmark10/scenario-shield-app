@@ -382,6 +382,45 @@ export type Database = {
         }
         Relationships: []
       }
+      depreciation_phaseout: {
+        Row: {
+          amount_tnok: number
+          comment: string | null
+          comment_updated_at: string | null
+          comment_updated_by: string | null
+          created_at: string
+          id: string
+          scenario_id: string
+          type: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          amount_tnok?: number
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
+          created_at?: string
+          id?: string
+          scenario_id: string
+          type: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          amount_tnok?: number
+          comment?: string | null
+          comment_updated_at?: string | null
+          comment_updated_by?: string | null
+          created_at?: string
+          id?: string
+          scenario_id?: string
+          type?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       depreciation_rules: {
         Row: {
           capex_type: string
