@@ -54,6 +54,7 @@ export function useAllScenarios(reloadKey = 0): UseAllScenariosState {
           nsBaseRes,
           i2nRes,
           ooRes,
+          dpRes,
         ] = await Promise.all([
           supabase.from("scenarios").select("id, name, sort_order").eq("is_active", true).order("sort_order"),
           supabase.from("cost_lines").select("*"),
@@ -72,6 +73,7 @@ export function useAllScenarios(reloadKey = 0): UseAllScenariosState {
           supabase.from("nearshoring_base").select("*").limit(1).maybeSingle(),
           supabase.from("internal_to_nearshoring_conversions").select("*"),
           supabase.from("one_off_effects").select("*"),
+          supabase.from("depreciation_phaseout").select("*"),
         ]);
 
         const errs = [
