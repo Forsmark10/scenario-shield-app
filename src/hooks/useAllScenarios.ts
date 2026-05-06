@@ -113,6 +113,7 @@ export function useAllScenarios(reloadKey = 0): UseAllScenariosState {
             capex_plan: (capRes.data ?? []).filter((r: any) => r.scenario_id === s.id) as ForecastInputs["capex_plan"],
             internal_to_nearshoring_conversions: (i2nRes.data ?? []).filter((r: any) => r.scenario_id === s.id) as any,
             one_off_effects: (ooRes.data ?? []).filter((r: any) => r.scenario_id === s.id) as any,
+            depreciation_phaseout: (dpRes.data ?? []).filter((r: any) => r.scenario_id === s.id) as any,
             depreciation_rules: (drRes.data ?? []) as ForecastInputs["depreciation_rules"],
             internal_fte_base_rates: (intRes.data ?? []) as ForecastInputs["internal_fte_base_rates"],
             external_fte_base_rates: (extRes.data ?? []) as ForecastInputs["external_fte_base_rates"],
