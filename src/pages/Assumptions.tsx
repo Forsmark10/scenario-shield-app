@@ -2191,6 +2191,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
   };
 
   const addDetail = async () => {
+    // Seed with a single 2027 row so the group has identity
     const { data: inserted, error } = await supabase
       .from("capex_plan")
       .insert({
@@ -2207,13 +2208,75 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
     patch({ type: "upsert", table: "capexPlan", row: inserted });
   };
 
-  const removeDetail = async (id: string) => {
-    patch({ type: "delete", table: "capexPlan", id });
-    const { error } = await supabase.from("capex_plan").delete().eq("id", id);
+  // Project investments grouped by description
+  const projectGroups = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    rows
+      .filter((r) => r.capex_type === "Prosjekt" && r.description)
+      .forEach((r) => {
+        const key = r.description as string;
+        const arr = groups.get(key) ?? [];
+        arr.push(r);
+        groups.set(key, arr);
+      });
+    return Array.from(groups.entries()).map(([description, grpRows]) => ({
+      description,
+      rows: grpRows,
+      depreciation_start_year: grpRows[0]?.depreciation_start_year ?? null,
+    }));
+  }, [rows]);
+
+  const upsertProjectAmount = async (description: string, year: number, value: number) => {
+    const group = rows.filter((r) => r.capex_type === "Prosjekt" && r.description === description);
+    const existing = group.find((r) => r.year === year);
+    if (existing) {
+      if (value === 0 && !existing.comment) {
+        patch({ type: "delete", table: "capexPlan", id: existing.id });
+        const { error } = await supabase.from("capex_plan").delete().eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        patch({ type: "update", table: "capexPlan", id: existing.id, changes: { amount: value } });
+        const { error } = await supabase.from("capex_plan").update({ amount: value }).eq("id", existing.id);
+        if (error) throw error;
+      }
+    } else if (value !== 0) {
+      const depStart = group[0]?.depreciation_start_year ?? null;
+      const { data: inserted, error } = await supabase
+        .from("capex_plan")
+        .insert({
+          scenario_id: scenario.id,
+          capex_type: "Prosjekt",
+          year,
+          depreciation_start_year: depStart,
+          amount: value,
+          description,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "capexPlan", row: inserted });
+    }
+  };
+
+  const updateProjectGroupField = async (description: string, field: string, value: any) => {
+    const group = rows.filter((r) => r.capex_type === "Prosjekt" && r.description === description);
+    for (const r of group) {
+      patch({ type: "update", table: "capexPlan", id: r.id, changes: { [field]: value } });
+    }
+    const ids = group.map((r) => r.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("capex_plan").update({ [field]: value } as any).in("id", ids);
     if (error) throw error;
   };
 
-  const detailedRows = rows.filter((r) => r.description);
+  const removeProjectGroup = async (description: string) => {
+    const group = rows.filter((r) => r.capex_type === "Prosjekt" && r.description === description);
+    for (const r of group) patch({ type: "delete", table: "capexPlan", id: r.id });
+    const ids = group.map((r) => r.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("capex_plan").delete().in("id", ids);
+    if (error) throw error;
+  };
 
   const depInfo = data.depRules
     .map((r) => `${r.capex_type}: ${r.depreciation_years} år`)
