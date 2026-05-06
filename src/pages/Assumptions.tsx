@@ -2417,6 +2417,7 @@ function SectionDeprPhaseout({ data, scenario, patch }: { data: AllData; scenari
       title="Utfasing eksisterende avskrivninger"
       description="Reduksjon i avskrivninger fra historiske investeringer som fases ut over perioden. Negative tall = reduksjon i avskrivningskostnad. En verdi i et gitt år gjelder også alle påfølgende år (kumulativ utfasing)."
       tooltip="Beløp i tNOK. Verdien for et gitt år gjelder også alle påfølgende år."
+      variant="historical"
     >
       <div>
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
