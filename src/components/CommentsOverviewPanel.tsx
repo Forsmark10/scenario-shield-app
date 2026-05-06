@@ -26,8 +26,11 @@ const SECTION_LABEL: Record<string, string> = {
   external_fte_changes: "Eksterne FTE",
   conversions: "Konverteringer",
   nearshoring_changes: "Nearshoring",
+  internal_to_nearshoring_conversions: "Intern→Nearshoring konv.",
   category_adjustments: "Kategori-justeringer",
+  one_off_effects: "Engangseffekter",
   capex_plan: "Capex-plan",
+  depreciation_phaseout: "Utfasing avskrivninger",
 };
 
 function describe(section: string, row: any, variant?: string): string {
