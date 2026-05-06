@@ -466,17 +466,18 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
         if (cl.is_existing_depreciation_alfa) {
           amount = base;
           bd = `ALFA flat = ${round2(base)}`;
-        } else if (cl.is_existing_depreciation_phaseout) {
-          if (yearOffset === 1) {
-            amount = base * (2 / 3);
-            bd = `Phaseout år 1: ${round2(base)} × 2/3 = ${round2(amount)}`;
-          } else if (yearOffset === 2) {
-            amount = base * (1 / 3);
-            bd = `Phaseout år 2: ${round2(base)} × 1/3 = ${round2(amount)}`;
-          } else {
-            amount = 0;
-            bd = `Phaseout år ${yearOffset}: 0`;
-          }
+        } else if (cl.category === "Depreciation") {
+        // ===== DEPRECIATION (existing) =====
+        if (cl.is_existing_depreciation_alfa) {
+          amount = base;
+          bd = `ALFA flat = ${round2(base)}`;
+        } else {
+          amount = base;
+          bd = `Eksisterende avskrivning (flat) = ${round2(base)}`;
+        }
+
+        // Aggreger nye avskrivninger fra capex_plan basert på prosjekt-mapping
+        // ... (resten forblir uendret)
         } else {
           amount = base;
           bd = `Eksisterende avskrivning (flat) = ${round2(base)}`;
