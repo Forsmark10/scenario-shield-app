@@ -242,7 +242,11 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
         sortKey: 1,
         name: "Lønnsvekst",
         type: "Global driver",
-        details: `${(Number(last?.salary_increase_pct ?? 0) * 100).toFixed(1)} % per år på eksisterende interne FTE fra FC 2026`,
+        details: `${formatYearlyRate(
+          base.global_assumptions
+            .filter((g) => FC_YEARS.includes(g.year as any))
+            .map((g) => ({ year: g.year, pct: Number(g.salary_increase_pct) || 0 })),
+        )} på eksisterende interne FTE fra FC 2026`,
         yearly,
       });
     }
