@@ -108,6 +108,15 @@ export interface CapexPlan {
   description: string | null;
 }
 
+export interface DepreciationPhaseout {
+  id?: string;
+  scenario_id: string;
+  type: "Hardware" | "Software" | "Prosjekt";
+  year: number;
+  amount_tnok: number;
+  comment?: string | null;
+}
+
 export interface DepreciationRule {
   capex_type: "Hardware" | "Software" | "Prosjekt";
   depreciation_years: number;
