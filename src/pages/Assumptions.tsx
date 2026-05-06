@@ -99,7 +99,8 @@ type TableKey =
   | "catAdj"
   | "capexPlan"
   | "i2nConversions"
-  | "oneOffs";
+  | "oneOffs"
+  | "deprPhaseout";
 
 type PatchAction =
   | { type: "upsert"; table: TableKey; row: any; matchBy?: (r: any) => boolean }
