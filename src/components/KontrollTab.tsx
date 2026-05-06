@@ -919,34 +919,37 @@ function GroupBlock({
           <NumCell key={y} value={subtotal[y]} bold />
         ))}
       </tr>
-      {rows.map((r, idx) => (
-        <tr
-          key={r.key}
-          style={{ background: idx % 2 === 1 ? "#f8fafc" : "#ffffff" }}
-          className="hover:bg-muted/40"
-        >
-          <td className="py-1.5 pr-3" style={{ paddingLeft: 20 }}>
-            <span className="inline-flex items-center gap-1.5">
-              {r.name}
-              {r.comment && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <MessageSquare className="h-3 w-3 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-xs whitespace-pre-wrap">{r.comment}</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </span>
-          </td>
-          <td className="px-3 py-1.5 text-muted-foreground whitespace-normal break-words">{r.type}</td>
-          <td className="px-3 py-1.5 text-muted-foreground whitespace-normal break-words">{r.details}</td>
-          {FC_YEARS.map((y) => (
-            <NumCell key={y} value={r.yearly[y]} />
-          ))}
-        </tr>
-      ))}
+      {rows.map((r, idx) => {
+        const isPhaseout = r.key === "capex:depr_phaseout";
+        return (
+          <tr
+            key={r.key}
+            style={{ background: isPhaseout ? "#f1f5f9" : (idx % 2 === 1 ? "#f8fafc" : "#ffffff") }}
+            className={cn("hover:bg-muted/40", isPhaseout && "italic")}
+          >
+            <td className="py-1.5 pr-3" style={{ paddingLeft: 20 }}>
+              <span className="inline-flex items-center gap-1.5">
+                {r.name}
+                {r.comment && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <MessageSquare className="h-3 w-3 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-xs whitespace-pre-wrap">{r.comment}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </span>
+            </td>
+            <td className="px-3 py-1.5 text-muted-foreground whitespace-normal break-words">{r.type}</td>
+            <td className="px-3 py-1.5 text-muted-foreground whitespace-normal break-words">{r.details}</td>
+            {FC_YEARS.map((y) => (
+              <NumCell key={y} value={r.yearly[y]} />
+            ))}
+          </tr>
+        );
+      })}
     </>
   );
 }
