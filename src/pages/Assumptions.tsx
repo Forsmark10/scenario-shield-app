@@ -1957,8 +1957,7 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
   return (
     <Section
       title="Kategori-justeringer"
-      description="To kombinerbare justeringer per kategori og år: prosent (multiplikativt på toppen av prisvekst, permanent reforhandling) og absolutt beløp i tNOK (additivt, fast beløp som ikke vokser med prisvekst). Begge er permanente fra året de settes."
-      tooltip="Prosent: -10% i 2027 gjelder 2027-2031 og multipliseres. Beløp: -500 tNOK i 2027 reduserer kategori-totalen med 500 tNOK hvert år fra 2027. Begge kan settes samtidig."
+      description="To kombinerbare justeringer per kategori og år: prosent (multiplikativt på toppen av prisvekst, permanent reforhandling) og absolutt beløp i tNOK (additivt, permanent fra året de settes). Positive tNOK-beløp (økninger) vokser med lønnsvekst (Internal FTE) eller prisvekst (andre kategorier). Negative tNOK-beløp (besparelser) er konstante."
     >
       <div className="overflow-x-auto">
         <table className="w-full text-xs border-separate border-spacing-0">
