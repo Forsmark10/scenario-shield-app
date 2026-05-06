@@ -103,6 +103,7 @@ export interface OneOffEffect {
 export interface CapexPlan {
   scenario_id: string;
   year: number;
+  depreciation_start_year: number | null;
   capex_type: "Hardware" | "Software" | "Prosjekt";
   amount: number;
   description: string | null;
