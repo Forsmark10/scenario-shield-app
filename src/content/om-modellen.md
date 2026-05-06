@@ -82,10 +82,10 @@ Begge er permanente fra året de settes.
 Engangskostnader eller -besparelser som kun gjelder ett spesifikt år. F.eks. en ekstrakostnad for et migreringsprosjekt i 2028. Vokser ikke med prisvekst.
 
 ### Capex (investeringer)
-Planlagte investeringer per år i Hardware, Software eller Prosjekt. Avskrivningstiden er:
-- Hardware: 3 år
-- Software: 5 år
-- Prosjekt: 5 år
+Planlagte investeringer per år. **Hardware** og **Software** håndteres som aggregerte buckets per år (udokumenterte investeringer). **Prosjekt** håndteres kun som navngitte investeringer i seksjonen "Prosjektinvesteringer", med eget anskaffelsesår og avskrivningsstart-år. Avskrivningsstart kan settes til "Ikke i perioden" for prosjekter som ikke begynner å avskrives før 2032 – da genereres ingen avskrivning i forecast-perioden. Avskrivningstider:
+- Hardware: 3 år (start = anskaffelsesår + 1 som default)
+- Software: 5 år (start = anskaffelsesår + 1 som default)
+- Prosjekt: 5 år (start = brukerdefinert avskrivningsstart-år)
 
 ### Utfasing eksisterende avskrivninger
 Reduksjon i avskrivninger fra historiske investeringer (gjort før FC 2026) som naturlig fases ut over forecast-perioden. Verdiene legges inn manuelt per type (Hardware/Software/Prosjekt) og år som negative beløp i tNOK. **Verdien er kumulativ:** en utfasing satt for 2027 gjelder også 2028–2031. Effekten inngår i Avskrivning-søylen i waterfallen og som egen rad i Kontroll-tabben.
