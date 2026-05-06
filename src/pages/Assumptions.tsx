@@ -2351,71 +2351,77 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
               <Plus className="h-3.5 w-3.5 mr-1" /> Legg til investering
             </Button>
           </div>
-          {detailedRows.length === 0 ? (
+          {projectGroups.length === 0 ? (
             <p className="text-xs text-muted-foreground py-3">Ingen prosjektinvesteringer.</p>
           ) : (
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left font-medium px-2 py-2 max-w-[220px]">Navn</th>
-                  <th className="text-left font-medium px-2 py-2 w-[120px]">Anskaffelsesår</th>
+                  <th className="text-left font-medium px-2 py-2 w-[200px]">Navn</th>
                   <th className="text-left font-medium px-2 py-2 w-[150px]">Avskrivningsstart</th>
-                  <th className="text-right font-medium px-2 py-2 w-[140px]">Beløp (tNOK)</th>
+                  {FC_YEARS.map((y) => (
+                    <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+                  ))}
                   <th className="w-[40px]"></th>
                 </tr>
               </thead>
               <tbody>
-                {detailedRows.map((r) => (
-                  <tr key={r.id} className="border-b">
-                    <td className="px-1 py-1 max-w-[220px]">
-                      <CellWithComment
-                        comment={r.comment}
-                        updatedAt={r.comment_updated_at}
-                        updatedBy={r.comment_updated_by}
-                        onSaveComment={(next) => updateDetailComment(r.id, next)}
-                        label={`Capex: ${r.description ?? "Prosjekt"}`}
-                      >
-                        <Input
-                          defaultValue={r.description ?? ""}
-                          onBlur={(e) => {
-                            if (e.target.value !== r.description) updateDetailField(r.id, "description", e.target.value);
-                          }}
-                          className="h-8 text-xs w-[200px]"
-                        />
-                      </CellWithComment>
-                    </td>
-                    <td className="px-1 py-1">
-                      <Select value={String(r.year)} onValueChange={(v) => updateDetailField(r.id, "year", Number(v))}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-1 py-1">
-                      <Select
-                        value={r.depreciation_start_year == null ? "none" : String(r.depreciation_start_year)}
-                        onValueChange={(v) =>
-                          updateDetailField(r.id, "depreciation_start_year", v === "none" ? null : Number(v))
-                        }
-                      >
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                          <SelectItem value="none">Ikke i perioden</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-1 py-1">
-                      <NumCell value={Number(r.amount)} step="100" onCommit={(v) => updateDetailField(r.id, "amount", v)} />
-                    </td>
-                    <td className="px-1 py-1 text-center">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeDetail(r.id)}>
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {projectGroups.map((g) => {
+                  const anchor = g.rows[0];
+                  return (
+                    <tr key={g.description} className="border-b">
+                      <td className="px-1 py-1">
+                        <CellWithComment
+                          comment={anchor?.comment}
+                          updatedAt={anchor?.comment_updated_at}
+                          updatedBy={anchor?.comment_updated_by}
+                          onSaveComment={(next) => updateDetailComment(anchor.id, next)}
+                          label={`Capex: ${g.description}`}
+                        >
+                          <Input
+                            defaultValue={g.description}
+                            onBlur={(e) => {
+                              const v = e.target.value.trim();
+                              if (v && v !== g.description) updateProjectGroupField(g.description, "description", v);
+                            }}
+                            className="h-8 text-xs w-[200px]"
+                          />
+                        </CellWithComment>
+                      </td>
+                      <td className="px-1 py-1">
+                        <Select
+                          value={g.depreciation_start_year == null ? "none" : String(g.depreciation_start_year)}
+                          onValueChange={(v) =>
+                            updateProjectGroupField(g.description, "depreciation_start_year", v === "none" ? null : Number(v))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                            <SelectItem value="none">Ikke i perioden</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      {FC_YEARS.map((y) => {
+                        const cell = g.rows.find((r: any) => r.year === y);
+                        return (
+                          <td key={y} className="px-1 py-1">
+                            <NumCell
+                              value={Number(cell?.amount ?? 0)}
+                              step="100"
+                              onCommit={(v) => upsertProjectAmount(g.description, y, v)}
+                            />
+                          </td>
+                        );
+                      })}
+                      <td className="px-1 py-1 text-center">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeProjectGroup(g.description)}>
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
