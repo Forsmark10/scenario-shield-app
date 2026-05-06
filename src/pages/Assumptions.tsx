@@ -471,6 +471,8 @@ export default function Assumptions() {
                           supabase.from("internal_to_nearshoring_conversions").delete().eq("scenario_id", sid)],
                         ["one_off_effects", () =>
                           supabase.from("one_off_effects").delete().eq("scenario_id", sid)],
+                        ["depreciation_phaseout", () =>
+                          supabase.from("depreciation_phaseout").delete().eq("scenario_id", sid)],
                       ];
                       for (const [label, fn] of deletes) {
                         const { error } = await fn();
