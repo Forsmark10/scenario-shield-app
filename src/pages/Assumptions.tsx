@@ -81,6 +81,7 @@ interface AllData {
   depRules: any[];
   i2nConversions: any[];
   oneOffs: any[];
+  deprPhaseout: any[];
   categories: string[];
 }
 
