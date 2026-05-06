@@ -214,6 +214,7 @@ export default function Assumptions() {
     capexPlan: "capex_plan",
     i2nConversions: "internal_to_nearshoring_conversions",
     oneOffs: "one_off_effects",
+    deprPhaseout: "depreciation_phaseout",
   };
 
   // Bygg en AssumptionsSnapshot fra LOKAL state for et gitt scenario.
