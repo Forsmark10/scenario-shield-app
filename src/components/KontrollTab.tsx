@@ -149,6 +149,7 @@ function emptyDriverInputs(base: ForecastInputs): ForecastInputs {
       adjustment_amount_tnok: 0,
     })),
     capex_plan: [],
+    depreciation_phaseout: [],
     internal_to_nearshoring_conversions: [],
     one_off_effects: [],
   };
@@ -218,6 +219,7 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
         nearshoring_changes: empty.nearshoring_changes.map((r) => ({ ...r })),
         category_adjustments: empty.category_adjustments.map((r) => ({ ...r })),
         capex_plan: [],
+        depreciation_phaseout: [],
         internal_to_nearshoring_conversions: [],
         one_off_effects: [],
       });
@@ -645,35 +647,33 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
       });
     }
 
-    // Utfasing av eksisterende avskrivninger fra FC 2026-baseline (kun P&L-modus)
+    // Utfasing av eksisterende avskrivninger – fra brukerdefinert tabell (kumulativ)
     if (view === "PL") {
-      const baselineDeprYearly: Record<number, number> = {};
-      // FC 2026 depreciation = sum of fc_2026_monthly for depreciation cost lines
-      const deprLines = base.cost_lines.filter((cl) => cl.category === "Depreciation");
-      const fc2026Depr = deprLines.reduce(
-        (s, cl) => s + (cl.fc_2026_monthly ?? []).reduce((a, b) => a + Number(b || 0), 0),
-        0,
+      const phaseouts = (base.depreciation_phaseout ?? []).filter(
+        (r: any) => r.scenario_id === bundle.meta.id,
       );
-      // Engine uten nye capex gir oss baseline avskrivninger per år
-      const emptyCapexInputs: ForecastInputs = { ...empty, cost_lines: base.cost_lines, capex_plan: [] };
-      const emptyCapexResult = calculateForecast(emptyCapexInputs);
-      const emptyCapexDeprLines = emptyCapexResult.lines.filter((l) => l.is_depreciation);
-      for (const Y of FC_YEARS) {
-        const yearDepr = emptyCapexDeprLines.reduce((s, l) => s + (l.amounts[Y] ?? 0), 0);
-        baselineDeprYearly[Y] = (yearDepr - fc2026Depr) / 1000; // delta fra FC 2026, i MNOK
-      }
-      const hasEffect = FC_YEARS.some((Y) => Math.abs(baselineDeprYearly[Y] ?? 0) > 0.001);
-      if (hasEffect) {
-        rows.push({
-          key: "capex:baseline_depr",
-          group: "CAPEX",
-          sortKey: -1, // Vises først i CAPEX-gruppen
-          name: "Utfasing eksisterende avskrivninger",
-          type: "Historiske investeringer",
-          details: "Naturlig utfasing av avskrivninger fra investeringer gjort før FC 2026 (negativ = redusert avskrivning vs. FC 2026)",
-          yearly: baselineDeprYearly,
-          comment: null,
-        });
+      if (phaseouts.length) {
+        const phaseYearly: Record<number, number> = {};
+        for (const Y of FC_YEARS) {
+          // Kumulativ: alle utfasinger med year <= Y
+          const cum = phaseouts
+            .filter((r: any) => r.year <= Y)
+            .reduce((s: number, r: any) => s + Number(r.amount_tnok || 0), 0);
+          phaseYearly[Y] = cum / 1000; // til MNOK
+        }
+        const hasEffect = FC_YEARS.some((Y) => Math.abs(phaseYearly[Y] ?? 0) > 0.001);
+        if (hasEffect) {
+          rows.push({
+            key: "capex:depr_phaseout",
+            group: "CAPEX",
+            sortKey: -1,
+            name: "Utfasing eksisterende avskrivninger",
+            type: "Historiske investeringer",
+            details: "Brukerdefinert utfasing av avskrivninger fra investeringer gjort før FC 2026 (kumulativ)",
+            yearly: phaseYearly,
+            comment: null,
+          });
+        }
       }
     }
 

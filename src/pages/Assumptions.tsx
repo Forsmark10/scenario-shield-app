@@ -81,6 +81,7 @@ interface AllData {
   depRules: any[];
   i2nConversions: any[];
   oneOffs: any[];
+  deprPhaseout: any[];
   categories: string[];
 }
 
@@ -98,7 +99,8 @@ type TableKey =
   | "catAdj"
   | "capexPlan"
   | "i2nConversions"
-  | "oneOffs";
+  | "oneOffs"
+  | "deprPhaseout";
 
 type PatchAction =
   | { type: "upsert"; table: TableKey; row: any; matchBy?: (r: any) => boolean }
@@ -132,7 +134,7 @@ export default function Assumptions() {
     (async () => {
       setLoading(true);
       const [
-        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, ncRes, caRes, capRes, drRes, clRes, i2nRes, ooRes,
+        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, ncRes, caRes, capRes, drRes, clRes, i2nRes, ooRes, dpRes,
       ] = await Promise.all([
         supabase.from("scenarios").select("*").eq("is_active", true).order("sort_order"),
         supabase.from("global_assumptions").select("*"),
@@ -151,6 +153,7 @@ export default function Assumptions() {
         supabase.from("cost_lines").select("category"),
         supabase.from("internal_to_nearshoring_conversions").select("*"),
         supabase.from("one_off_effects").select("*"),
+        supabase.from("depreciation_phaseout").select("*"),
       ]);
       if (cancelled) return;
       const cats = Array.from(new Set((clRes.data ?? []).map((r: any) => r.category))).sort() as string[];
@@ -171,6 +174,7 @@ export default function Assumptions() {
         depRules: drRes.data ?? [],
         i2nConversions: i2nRes.data ?? [],
         oneOffs: ooRes.data ?? [],
+        deprPhaseout: dpRes.data ?? [],
         categories: cats,
       };
       setData(next);
@@ -210,6 +214,7 @@ export default function Assumptions() {
     capexPlan: "capex_plan",
     i2nConversions: "internal_to_nearshoring_conversions",
     oneOffs: "one_off_effects",
+    deprPhaseout: "depreciation_phaseout",
   };
 
   // Bygg en AssumptionsSnapshot fra LOKAL state for et gitt scenario.
@@ -466,6 +471,8 @@ export default function Assumptions() {
                           supabase.from("internal_to_nearshoring_conversions").delete().eq("scenario_id", sid)],
                         ["one_off_effects", () =>
                           supabase.from("one_off_effects").delete().eq("scenario_id", sid)],
+                        ["depreciation_phaseout", () =>
+                          supabase.from("depreciation_phaseout").delete().eq("scenario_id", sid)],
                       ];
                       for (const [label, fn] of deletes) {
                         const { error } = await fn();
@@ -533,6 +540,7 @@ export default function Assumptions() {
                           nearshoringAdds: (prev.nearshoringAdds as any[]).filter((r) => r.scenario_id !== sid),
                           i2nConversions: (prev.i2nConversions as any[]).filter((r) => r.scenario_id !== sid),
                           oneOffs: (prev.oneOffs as any[]).filter((r) => r.scenario_id !== sid),
+                          deprPhaseout: (prev.deprPhaseout as any[]).filter((r) => r.scenario_id !== sid),
                         };
                       });
                       console.log("[Reset] Lokal state nullstilt – starter refresh()");
@@ -579,6 +587,7 @@ export default function Assumptions() {
             <SectionCategoryAdj data={data} scenario={s} patch={patch} />
             <SectionOneOff data={data} scenario={s} patch={patch} />
             <SectionCapex data={data} scenario={s} patch={patch} />
+            <SectionDeprPhaseout data={data} scenario={s} patch={patch} />
 
             <KontrollTab scenarioId={s.id} />
 
@@ -2329,6 +2338,126 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
             </table>
           )}
         </div>
+      </div>
+    </Section>
+  );
+}
+
+// ---------------------- 8b. Utfasing eksisterende avskrivninger ----------------------
+function SectionDeprPhaseout({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
+  const types = ["Hardware", "Software", "Prosjekt"] as const;
+  const rows = data.deprPhaseout.filter((r) => r.scenario_id === scenario.id);
+
+  const cellFor = (type: string, year: number) =>
+    rows.find((r) => r.type === type && r.year === year);
+
+  const upsertCell = async (type: string, year: number, value: number) => {
+    const existing = cellFor(type, year);
+    if (existing) {
+      if (value === 0 && !existing.comment) {
+        patch({ type: "delete", table: "deprPhaseout", id: existing.id });
+        const { error } = await supabase.from("depreciation_phaseout").delete().eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        patch({ type: "update", table: "deprPhaseout", id: existing.id, changes: { amount_tnok: value } });
+        const { error } = await supabase.from("depreciation_phaseout").update({ amount_tnok: value }).eq("id", existing.id);
+        if (error) throw error;
+      }
+    } else if (value !== 0) {
+      const { data: inserted, error } = await supabase
+        .from("depreciation_phaseout")
+        .insert({ scenario_id: scenario.id, type, year, amount_tnok: value })
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "deprPhaseout", row: inserted });
+    }
+  };
+
+  const upsertCellComment = async (type: string, year: number, comment: string | null) => {
+    const existing = cellFor(type, year);
+    const ts = new Date().toISOString();
+    if (existing) {
+      patch({
+        type: "update",
+        table: "deprPhaseout",
+        id: existing.id,
+        changes: { comment, comment_updated_at: ts },
+      });
+      const { error } = await supabase
+        .from("depreciation_phaseout")
+        .update({ comment, comment_updated_at: ts } as any)
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { data: inserted, error } = await supabase
+        .from("depreciation_phaseout")
+        .insert({ scenario_id: scenario.id, type, year, amount_tnok: 0, comment, comment_updated_at: ts } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "deprPhaseout", row: inserted });
+    }
+  };
+
+  const sumCol = (year: number) =>
+    types.reduce((a, t) => a + Number(cellFor(t, year)?.amount_tnok ?? 0), 0);
+
+  return (
+    <Section
+      title="Utfasing eksisterende avskrivninger"
+      description="Reduksjon i avskrivninger fra historiske investeringer som fases ut over perioden. Negative tall = reduksjon i avskrivningskostnad. En verdi i et gitt år gjelder også alle påfølgende år (kumulativ utfasing)."
+      tooltip="Beløp i tNOK. Verdien for et gitt år gjelder også alle påfølgende år."
+    >
+      <div>
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+          Aggregert per type og år (tNOK)
+        </h3>
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left font-medium px-2 py-2 w-[130px]">Type</th>
+              {FC_YEARS.map((y) => (
+                <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {types.map((t) => (
+              <tr key={t} className="border-b">
+                <td className="px-2 py-1.5">{t}</td>
+                {FC_YEARS.map((y) => {
+                  const cell = cellFor(t, y);
+                  return (
+                    <td key={y} className="px-1 py-1">
+                      <CellWithComment
+                        comment={cell?.comment}
+                        updatedAt={cell?.comment_updated_at}
+                        updatedBy={cell?.comment_updated_by}
+                        onSaveComment={(next) => upsertCellComment(t, y, next)}
+                        label={`Utfasing ${t} ${y}`}
+                      >
+                        <NumCell
+                          value={Number(cell?.amount_tnok ?? 0)}
+                          step="100"
+                          onCommit={(v) => upsertCell(t, y, v)}
+                        />
+                      </CellWithComment>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            <tr className="font-semibold">
+              <td className="px-2 py-2">Sum</td>
+              {FC_YEARS.map((y) => (
+                <td key={y} className="text-right tabular-nums font-mono px-2 py-2">
+                  {sumCol(y).toLocaleString("nb-NO") || "—"}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
       </div>
     </Section>
   );

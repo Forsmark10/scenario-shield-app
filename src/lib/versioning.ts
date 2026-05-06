@@ -13,6 +13,7 @@ const SCOPED_TABLES = [
   "nearshoring_changes",
   "category_adjustments",
   "capex_plan",
+  "depreciation_phaseout",
   "internal_to_nearshoring_conversions",
   "one_off_effects",
 ] as const;
@@ -54,6 +55,7 @@ export function diffSummary(
     nearshoring_changes: "Nearshoring",
     category_adjustments: "Kategori-justeringer",
     capex_plan: "Capex-plan",
+    depreciation_phaseout: "Utfasing avskrivninger",
     internal_to_nearshoring_conversions: "Intern→Nearshoring konv.",
     one_off_effects: "Engangseffekter",
   };

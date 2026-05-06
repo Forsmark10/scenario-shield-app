@@ -108,6 +108,15 @@ export interface CapexPlan {
   description: string | null;
 }
 
+export interface DepreciationPhaseout {
+  id?: string;
+  scenario_id: string;
+  type: "Hardware" | "Software" | "Prosjekt";
+  year: number;
+  amount_tnok: number;
+  comment?: string | null;
+}
+
 export interface DepreciationRule {
   capex_type: "Hardware" | "Software" | "Prosjekt";
   depreciation_years: number;
@@ -178,6 +187,7 @@ export interface ForecastInputs {
   category_adjustments: CategoryAdjustment[];
   capex_plan: CapexPlan[];
   depreciation_rules: DepreciationRule[];
+  depreciation_phaseout?: DepreciationPhaseout[];
   internal_fte_base_rates: InternalFteBaseRate[];
   external_fte_base_rates: ExternalFteBaseRate[];
   nearshoring_base: NearshoringBase;
