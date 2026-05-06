@@ -921,6 +921,44 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
     lines.push(ooLine);
   }
 
+  // ---------- VIRTUAL: Utfasing av eksisterende avskrivninger ----------
+  // Kumulativ: en utfasing satt for år Y gjelder også alle påfølgende år.
+  // Beløp er typisk negative (reduksjon i avskrivningskostnad).
+  const phaseouts = (inputs.depreciation_phaseout ?? []).filter(
+    (r) => r.scenario_id === scenario_id,
+  );
+  if (phaseouts.length) {
+    const phaseTypes = ["Hardware", "Software", "Prosjekt"] as const;
+    for (const t of phaseTypes) {
+      const tRows = phaseouts.filter((r) => r.type === t);
+      if (!tRows.length) continue;
+      const phLine: ForecastLine = {
+        line_id: `virtual:depr_phaseout:${t}`,
+        source: "virtual",
+        category: "Depreciation",
+        project: "Utfasing",
+        account: null,
+        account_name: `Utfasing avskrivninger ${t}`,
+        cost_type: "Local",
+        is_capex: false,
+        is_depreciation: true,
+        base_2026: 0,
+        amounts: {},
+        monthly_2027: [],
+        breakdown_source: {},
+      };
+      for (const N of YEARS) {
+        const cum = tRows
+          .filter((r) => r.year <= N)
+          .reduce((s, r) => s + Number(r.amount_tnok || 0), 0);
+        phLine.amounts[N] = cum;
+        phLine.breakdown_source[N] = `Kumulativ utfasing ${t} t.o.m. ${N}: ${round2(cum)} tNOK`;
+      }
+      phLine.monthly_2027 = Array(12).fill((phLine.amounts[2027] ?? 0) / 12);
+      lines.push(phLine);
+    }
+  }
+
   // ---------- TOTALS ----------
   const totals: ForecastTotals = {
     by_year: {},
