@@ -497,13 +497,15 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
             const extras: string[] = [];
             let extra = 0;
             for (const cap of scenarioCapex.filter((c) => c.capex_type === ctForLine)) {
-              const startY = cap.year + 1;
-              const endY = cap.year + rule.depreciation_years;
+              // Prosjekt krever depreciation_start_year (null = ingen avskrivning i perioden)
+              if (ctForLine === "Prosjekt" && cap.depreciation_start_year == null) continue;
+              const startY = cap.depreciation_start_year ?? cap.year + 1;
+              const endY = startY + rule.depreciation_years - 1;
               if (N >= startY && N <= endY) {
                 const annual = cap.amount / rule.depreciation_years;
                 extra += annual;
                 extras.push(
-                  `+ Capex Y${cap.year} ${cap.amount}/${rule.depreciation_years} = ${round2(annual)}`
+                  `+ Capex Y${cap.year} ${cap.amount}/${rule.depreciation_years} (start ${startY}) = ${round2(annual)}`
                 );
               }
             }
