@@ -635,13 +635,18 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
         i.capex_plan = [{ ...r }];
         return i;
       });
+      const isProject = r.capex_type === "Prosjekt";
+      const dsy = (r as any).depreciation_start_year;
+      const projDetails = isProject
+        ? `Anskaffelse ${r.year} · Avskr. start ${dsy ?? "ikke i perioden"}`
+        : (r.description ?? "—");
       rows.push({
         key: `capex:${r.year}:${r.capex_type}:${(r as any).id ?? Math.random()}`,
         group: "CAPEX",
         sortKey: (capexTypeOrder[r.capex_type] ?? 9) * 10000 + r.year,
-        name: `Capex ${r.capex_type} ${r.year} (${formatNumberNO(Number(r.amount) / 1000, 1)} MNOK)`,
+        name: `Capex ${r.capex_type} ${r.year}${isProject && r.description ? ` – ${r.description}` : ""} (${formatNumberNO(Number(r.amount) / 1000, 1)} MNOK)`,
         type: view === "PL" ? "Avskrivning over levetid" : "Direkte utgift",
-        details: r.description ?? "—",
+        details: projDetails,
         yearly,
         comment: (r as any).comment,
       });
