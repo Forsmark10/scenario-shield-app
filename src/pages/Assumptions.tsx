@@ -134,7 +134,7 @@ export default function Assumptions() {
     (async () => {
       setLoading(true);
       const [
-        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, ncRes, caRes, capRes, drRes, clRes, i2nRes, ooRes,
+        sRes, gRes, cRes, irRes, erRes, icRes, ecRes, convRes, nbRes, naRes, ncRes, caRes, capRes, drRes, clRes, i2nRes, ooRes, dpRes,
       ] = await Promise.all([
         supabase.from("scenarios").select("*").eq("is_active", true).order("sort_order"),
         supabase.from("global_assumptions").select("*"),
@@ -153,6 +153,7 @@ export default function Assumptions() {
         supabase.from("cost_lines").select("category"),
         supabase.from("internal_to_nearshoring_conversions").select("*"),
         supabase.from("one_off_effects").select("*"),
+        supabase.from("depreciation_phaseout").select("*"),
       ]);
       if (cancelled) return;
       const cats = Array.from(new Set((clRes.data ?? []).map((r: any) => r.category))).sort() as string[];
@@ -173,6 +174,7 @@ export default function Assumptions() {
         depRules: drRes.data ?? [],
         i2nConversions: i2nRes.data ?? [],
         oneOffs: ooRes.data ?? [],
+        deprPhaseout: dpRes.data ?? [],
         categories: cats,
       };
       setData(next);
