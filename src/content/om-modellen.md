@@ -10,7 +10,7 @@ Kort fortalt: Du starter med dagens kostnader (FC 2026) og ser hvordan de endrer
 
 Appen gir deg tre versjoner av fremtiden:
 
-- **Steady State** – Hva skjer hvis vi fortsetter som i dag?
+- **Steady State** – Hva skjer hvis vi fortsetter som i dag? Ingen nye tiltak, bare normal lønns- og prisvekst.
 - **Moderate Saving** – Hva om vi gjennomfører moderate tiltak? Noen FTE-reduksjoner, reforhandling av avtaler, og smartere bruk av ressurser.
 - **Aggressive Saving** – Hva om vi tar alle grep? Betydelige kutt i bemanning, store reforhandlinger og minimale investeringer.
 
@@ -73,8 +73,8 @@ Du kan legge til eller fjerne ansatte på tre nivåer (Low, Medium, High) for:
 
 ### Kategori-justeringer
 For hver kostnadskategori (IT Costs, Consultancy, Operations osv.) kan du legge inn:
-- **Prosentjustering** – F.eks. −5 % permanent prisreduksjon gjennom reforhandling
-- **Beløpsjustering (tNOK)** – F.eks. +3 000 tNOK for et nytt prosjekt
+- **Prosentjustering** – F.eks. −5 % permanent prisreduksjon gjennom reforhandling. Negative justeringer (besparelser) er konstante. Positive justeringer (økninger) vokser med prisvekst.
+- **Beløpsjustering (tNOK)** – F.eks. +3 000 tNOK for et nytt prosjekt. Positive beløp vokser med lønnsvekst (for Internal FTE) eller prisvekst (for alle andre kategorier). Negative beløp (besparelser) er konstante.
 
 Begge er permanente fra året de settes.
 
@@ -151,11 +151,16 @@ I tillegg lagres auto-versjoner automatisk ved endringer som kan gjenopprettes v
 
 ### Økninger vokser, besparelser er konstante
 
-Når du legger til en ny ansatt, øker kostnaden hvert år med lønnsveksten – fordi personen får lønnsøkning. Men når du fjerner en ansatt, er besparelsen konstant – fordi du sammenligner mot utgangspunktet (FC 2026) som ikke endrer seg.
+Dette prinsippet gjelder gjennomgående i hele modellen – for FTE-endringer, konverteringer og kategori-justeringer:
+
+- **Alle kostnadsøkninger vokser** med lønnsvekst (for personalkostnader) eller prisvekst (for andre kostnader) i påfølgende år. En økning på 6 000 tNOK i Consultancy i 2027 vil koste mer i 2031 fordi prisene stiger.
+- **Alle besparelser er konstante** – de vokser ikke, fordi du sammenligner mot utgangspunktet (FC 2026) som ikke endrer seg.
 
 **Eksempel:** Du fjerner 1 Medium intern FTE i 2029 (årslønn 1 000 tNOK + sosiale avgifter). Besparelsen er den samme i 2029, 2030 og 2031 – den vokser ikke.
 
 **Eksempel:** Du ansetter 1 Medium intern FTE i 2027. Kostnaden i 2027 er 1 040 tNOK (1 000 × 1,04). I 2028 er den 1 082 tNOK (1 000 × 1,04²). Den vokser fordi personen får lønnsøkning.
+
+**Eksempel:** Du legger inn +6 000 tNOK i Consultancy i 2027 med 3 % prisvekst. I 2028 er effekten 6 180 tNOK (6 000 × 1,03). I 2029 er den 6 365 tNOK (6 000 × 1,03²). Tilsvarende vokser en Internal FTE tNOK-justering med lønnsvekst.
 
 ### Konverteringer har krympende besparelse
 
@@ -163,39 +168,4 @@ Når du konverterer en ekstern konsulent til en intern ansatt, sparer du konsule
 
 ### Stolpediagram vs. waterfall
 
-- **Stolpediagrammet** viser den totale kostnaden per år. Hvis du legger til en person i 2027, ser du hele kostnaden i 2027-søylen. I 2028 ser du bare den lille økningen (lønnsveksten).
-- **Waterfallen** viser total endring fra FC 2026. Den nye personen viser hele sin årskostnad i alle år – fordi den ikke fantes i utgangspunktet.
-
----
-
-## AI-funksjoner
-
-### AI-oppsummering
-Trykk «Generer på nytt» i Executive Summary for å få en kort, datadrevet oppsummering av scenarioet. Den trekker inn faktiske tall, FTE-endringer og kommentarer du har lagt inn.
-
-### AI-assistert forutsetning
-Skriv et mål i vanlig språk under Assumptions, f.eks.:
-- *«Total kostnad i 2031 skal være lik FC 2026»*
-- *«Kutt 15 % av kostnadene innen 2031»*
-
-AI-en foreslår konkrete endringer som kan oppnå målet. Du velger selv hvilke forslag du vil bruke – ingenting endres uten din bekreftelse.
-
----
-
-## Teknisk detalj: Modellteknisk differanse
-
-Waterfallen har en liten innebygd differanse på ca. 4 MNOK som er skjult. Den skyldes at FC 2026 bruker faktiske regnskapstall, mens modellen fra FC 2027 beregner med standardiserte prosentsatser for sosiale avgifter (arbeidsgiveravgift 14,1 %, feriepenger 12 %, AGA på feriepenger 1,69 %, pensjon 5 %). Denne forenklingen treffer ikke nøyaktig, og differansen er en teknisk artefakt – ikke en reell kostnadsendring.
-
----
-
-## Teknisk oversikt
-
-| Element | Detalj |
-|---|---|
-| Scenarioer | 3 (Steady State, Moderate Saving, Aggressive Saving) |
-| Tidshorisont | AC 2025 → BU 2026 → FC 2026 (baseline) → FC 2027–2031 |
-| Interne FTE-rater | Low 650 / Medium 1 000 / High 1 300 tNOK/år |
-| Eksterne FTE-rater | Low 240 / Medium 270 / High 300 tNOK/mnd × 11 mnd |
-| Nearshoring | 75 000 EUR/år |
-| Sosiale avgifter | AGA 14,1 %, Feriepenger 12 %, AGA på feriepenger 1,69 %, Pensjon 5 % |
-| Avskrivningstider | Hardware 3 år, Software 5 år, Prosjekt 5 år |
+- **Stolpediagrammet** viser den totale kostnaden per år. Hvis
