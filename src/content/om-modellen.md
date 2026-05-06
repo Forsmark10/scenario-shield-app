@@ -124,10 +124,16 @@ Begge er riktige – de viser bare ulike perspektiver. P&L er standard for rappo
 
 Nederst på Assumptions-siden finner du **Kontroll**-tabben. Den viser den isolerte effekten av *hver enkelt forutsetning* du har lagt inn – altså hva akkurat den ene endringen bidrar med.
 
+Kontroll-tabben har tre toggles:
+- **P&L / Spend** – Velg om du vil se effekten i P&L-perspektiv (avskrivninger) eller Spend-perspektiv (kontant utgift).
+- **Kumulativ / Per år** – Kumulativ viser total endring fra FC 2026 (samme perspektiv som waterfallen). Per år viser den inkrementelle endringen per år (samme perspektiv som stolpediagrammet). I per år-visningen viser en ny forutsetning full effekt i startåret, og deretter kun veksteffekten (lønns- eller prisvekst) i påfølgende år.
+- **Oppdater** – Henter ferske data etter at du har endret forutsetninger.
+
 Dette er nyttig for å:
 - Verifisere at en endring gir den effekten du forventer
 - Forstå hvilke tiltak som har størst effekt
 - Sjekke at modellen oppfører seg logisk
+- Sammenligne kumulativ og per år-effekt for å forstå forskjellen mellom waterfall og stolpediagram
 
 **Merk:** Naturlig utfasing av historiske avskrivninger vises ikke her – kun nye forutsetninger du har lagt inn. Utfasingseffekten vises i waterfallens Avskrivning-søyle.
 
@@ -168,4 +174,39 @@ Når du konverterer en ekstern konsulent til en intern ansatt, sparer du konsule
 
 ### Stolpediagram vs. waterfall
 
-- **Stolpediagrammet** viser den totale kostnaden per år. Hvis
+- **Stolpediagrammet** viser den totale kostnaden per år. Hvis du legger til en person i 2027, ser du hele kostnaden i 2027-søylen. I 2028 ser du bare den lille økningen (lønnsveksten).
+- **Waterfallen** viser total endring fra FC 2026. Den nye personen viser hele sin årskostnad i alle år – fordi den ikke fantes i utgangspunktet.
+
+---
+
+## AI-funksjoner
+
+### AI-oppsummering
+Trykk «Generer på nytt» i Executive Summary for å få en kort, datadrevet oppsummering av scenarioet. Den trekker inn faktiske tall, FTE-endringer og kommentarer du har lagt inn.
+
+### AI-assistert forutsetning
+Skriv et mål i vanlig språk under Assumptions, f.eks.:
+- *«Total kostnad i 2031 skal være lik FC 2026»*
+- *«Kutt 15 % av kostnadene innen 2031»*
+
+AI-en foreslår konkrete endringer som kan oppnå målet. Du velger selv hvilke forslag du vil bruke – ingenting endres uten din bekreftelse.
+
+---
+
+## Teknisk detalj: Modellteknisk differanse
+
+Waterfallen har en liten innebygd differanse på ca. 4 MNOK som er skjult. Den skyldes at FC 2026 bruker faktiske regnskapstall, mens modellen fra FC 2027 beregner med standardiserte prosentsatser for sosiale avgifter (arbeidsgiveravgift 14,1 %, feriepenger 12 %, AGA på feriepenger 1,69 %, pensjon 5 %). Denne forenklingen treffer ikke nøyaktig, og differansen er en teknisk artefakt – ikke en reell kostnadsendring.
+
+---
+
+## Teknisk oversikt
+
+| Element | Detalj |
+|---|---|
+| Scenarioer | 3 (Steady State, Moderate Saving, Aggressive Saving) |
+| Tidshorisont | AC 2025 → BU 2026 → FC 2026 (baseline) → FC 2027–2031 |
+| Interne FTE-rater | Low 650 / Medium 1 000 / High 1 300 tNOK/år |
+| Eksterne FTE-rater | Low 240 / Medium 270 / High 300 tNOK/mnd × 11 mnd |
+| Nearshoring | 75 000 EUR/år |
+| Sosiale avgifter | AGA 14,1 %, Feriepenger 12 %, AGA på feriepenger 1,69 %, Pensjon 5 % |
+| Avskrivningstider | Hardware 3 år, Software 5 år, Prosjekt 5 år |
