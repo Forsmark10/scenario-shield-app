@@ -43,6 +43,7 @@ export function useForecast(scenarioId: string | null): UseForecastState {
           intRates,
           extRates,
           nsBase,
+          dp,
         ] = await Promise.all([
           supabase.from("cost_lines").select("*"),
           supabase.from("global_assumptions").select("*").eq("scenario_id", scenarioId),
@@ -58,9 +59,10 @@ export function useForecast(scenarioId: string | null): UseForecastState {
           supabase.from("internal_fte_base_rates").select("*"),
           supabase.from("external_fte_base_rates").select("*"),
           supabase.from("nearshoring_base").select("*").limit(1).maybeSingle(),
+          supabase.from("depreciation_phaseout").select("*").eq("scenario_id", scenarioId),
         ]);
 
-        const errs = [cl, ga, ca, ic, ec, conv, ns, nc, adj, cap, dr, intRates, extRates, nsBase]
+        const errs = [cl, ga, ca, ic, ec, conv, ns, nc, adj, cap, dr, intRates, extRates, nsBase, dp]
           .map((r) => r.error)
           .filter(Boolean);
         if (errs.length) throw new Error(errs.map((e) => e!.message).join("; "));
