@@ -2195,11 +2195,12 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
       .from("capex_plan")
       .insert({
         scenario_id: scenario.id,
-        capex_type: "Hardware",
+        capex_type: "Prosjekt",
         year: 2027,
+        depreciation_start_year: null,
         amount: 0,
         description: "Ny investering",
-      })
+      } as any)
       .select()
       .single();
     if (error) throw error;
