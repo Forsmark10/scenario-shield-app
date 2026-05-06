@@ -587,6 +587,7 @@ export default function Assumptions() {
             <SectionCategoryAdj data={data} scenario={s} patch={patch} />
             <SectionOneOff data={data} scenario={s} patch={patch} />
             <SectionCapex data={data} scenario={s} patch={patch} />
+            <SectionDeprPhaseout data={data} scenario={s} patch={patch} />
 
             <KontrollTab scenarioId={s.id} />
 
