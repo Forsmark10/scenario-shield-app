@@ -22,6 +22,61 @@ type ViewMode = "PL" | "Spend";
 const FC_YEARS = [2027, 2028, 2029, 2030, 2031] as const;
 const CENTRAL_BASE_FX = 11.3;
 
+/** Format a percentage with Norwegian comma + 1 decimal, e.g. 0.04 → "4,0 %". */
+function fmtPct(pct: number): string {
+  return `${(pct * 100).toFixed(1).replace(".", ",")} %`;
+}
+
+/**
+ * Summarize a yearly rate series as a short, readable string.
+ * - All equal → "3,0 % per år"
+ * - One outlier → "4,0 % i 2027, deretter 3,0 % per år" or "5,0 % per år, men 7,0 % i 2029"
+ * - Otherwise → "2027: 4,0 %, 2028–2030: 3,0 %, 2031: 2,5 %"
+ */
+function formatYearlyRate(values: Array<{ year: number; pct: number }>): string {
+  const series = [...values].sort((a, b) => a.year - b.year);
+  if (series.length === 0) return "0,0 % per år";
+
+  const unique = Array.from(new Set(series.map((v) => v.pct.toFixed(4))));
+  if (unique.length === 1) return `${fmtPct(series[0].pct)} per år`;
+
+  if (unique.length === 2) {
+    const counts = new Map<string, number>();
+    for (const v of series) counts.set(v.pct.toFixed(4), (counts.get(v.pct.toFixed(4)) ?? 0) + 1);
+    const [majorityKey, minorityKey] =
+      (counts.get(unique[0]) ?? 0) >= (counts.get(unique[1]) ?? 0)
+        ? [unique[0], unique[1]]
+        : [unique[1], unique[0]];
+    const majority = Number(majorityKey);
+    const minority = Number(minorityKey);
+    const minorityYears = series.filter((v) => v.pct.toFixed(4) === minorityKey).map((v) => v.year);
+    const majorityYears = series.filter((v) => v.pct.toFixed(4) === majorityKey).map((v) => v.year);
+
+    if (minorityYears.length === 1) {
+      const isFirst = minorityYears[0] === series[0].year;
+      const allLater = majorityYears.every((y) => y > minorityYears[0]);
+      if (isFirst && allLater) {
+        return `${fmtPct(minority)} i ${minorityYears[0]}, deretter ${fmtPct(majority)} per år`;
+      }
+      return `${fmtPct(majority)} per år, men ${fmtPct(minority)} i ${minorityYears[0]}`;
+    }
+  }
+
+  // Fallback: group consecutive equal years
+  const groups: Array<{ from: number; to: number; pct: number }> = [];
+  for (const v of series) {
+    const last = groups[groups.length - 1];
+    if (last && last.pct.toFixed(4) === v.pct.toFixed(4) && last.to === v.year - 1) {
+      last.to = v.year;
+    } else {
+      groups.push({ from: v.year, to: v.year, pct: v.pct });
+    }
+  }
+  return groups
+    .map((g) => `${g.from === g.to ? g.from : `${g.from}–${g.to}`}: ${fmtPct(g.pct)}`)
+    .join(", ");
+}
+
 type GroupKey =
   | "GLOBAL"
   | "CENTRAL"
@@ -187,7 +242,11 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
         sortKey: 1,
         name: "Lønnsvekst",
         type: "Global driver",
-        details: `${(Number(last?.salary_increase_pct ?? 0) * 100).toFixed(1)} % per år på eksisterende interne FTE fra FC 2026`,
+        details: `${formatYearlyRate(
+          base.global_assumptions
+            .filter((g) => FC_YEARS.includes(g.year as any))
+            .map((g) => ({ year: g.year, pct: Number(g.salary_increase_pct) || 0 })),
+        )} på eksisterende interne FTE fra FC 2026`,
         yearly,
       });
     }
@@ -208,7 +267,11 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
         sortKey: 2,
         name: "Prisvekst",
         type: "Global driver",
-        details: `${(Number(last?.price_increase_pct ?? 0) * 100).toFixed(1)} % per år på lokale ikke-FTE-kostnader`,
+        details: `${formatYearlyRate(
+          base.global_assumptions
+            .filter((g) => FC_YEARS.includes(g.year as any))
+            .map((g) => ({ year: g.year, pct: Number(g.price_increase_pct) || 0 })),
+        )} på lokale ikke-FTE-kostnader`,
         yearly,
       });
     }
@@ -256,7 +319,11 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
         sortKey: 1,
         name: "Sentral prisvekst",
         type: "Sentral driver",
-        details: `${(Number(last?.central_price_increase_pct ?? 0) * 100).toFixed(1)} % per år (EUR-basis)`,
+        details: `${formatYearlyRate(
+          cAssumps
+            .filter((c) => FC_YEARS.includes(c.year as any))
+            .map((c) => ({ year: c.year, pct: Number(c.central_price_increase_pct) || 0 })),
+        )} (EUR-basis)`,
         yearly,
       });
     }
@@ -582,14 +649,14 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
     if (view === "PL") {
       // Beregn total avskrivning i baseline (uten nye investeringer) vs. FC 2026
       const baselineDeprYearly: Record<number, number> = {};
-      const deprLines = base.cost_lines.filter((cl) => cl.is_depreciation);
-      const fc2026Depr = deprLines.reduce((s, cl) => s + Number(cl.base_2026 ?? 0), 0);
+      const deprLines = base.cost_lines.filter((cl) => (cl as any).is_depreciation);
+      const fc2026Depr = deprLines.reduce((s, cl) => s + Number((cl as any).base_2026 ?? 0), 0);
       // Engine uten nye capex gir oss baseline avskrivninger per år
       const emptyCapexInputs = { ...empty, cost_lines: base.cost_lines, capex_plan: [] };
       const emptyCapexResult = calculateForecast(emptyCapexInputs);
       const emptyCapexDeprLines = emptyCapexResult.lines.filter((l) => {
-        const cl = base.cost_lines.find((c) => c.line_id === l.line_id);
-        return cl?.is_depreciation;
+        const cl = base.cost_lines.find((c) => (c as any).line_id === l.line_id);
+        return (cl as any)?.is_depreciation;
       });
       for (const Y of FC_YEARS) {
         const yearDepr = emptyCapexDeprLines.reduce((s, l) => s + (l.amounts[Y] ?? 0), 0);
