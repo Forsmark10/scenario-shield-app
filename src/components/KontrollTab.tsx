@@ -149,6 +149,7 @@ function emptyDriverInputs(base: ForecastInputs): ForecastInputs {
       adjustment_amount_tnok: 0,
     })),
     capex_plan: [],
+    depreciation_phaseout: [],
     internal_to_nearshoring_conversions: [],
     one_off_effects: [],
   };
