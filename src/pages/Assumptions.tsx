@@ -2268,10 +2268,10 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
                 </tr>
               ))}
               <tr className="font-semibold">
-                <td className="px-2 py-2">Sum (alle rader)</td>
+                <td className="px-2 py-2">Sum</td>
                 {FC_YEARS.map((y) => (
                   <td key={y} className="text-right tabular-nums font-mono px-2 py-2">
-                    {types.reduce((a, t) => a + aggSum(t, y), 0).toLocaleString("nb-NO") || "—"}
+                    {allTypes.reduce((a, t) => a + aggSum(t, y), 0).toLocaleString("nb-NO") || "—"}
                   </td>
                 ))}
               </tr>
