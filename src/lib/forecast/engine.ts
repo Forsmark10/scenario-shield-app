@@ -734,7 +734,9 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
       monthly_2027: [],
       breakdown_source: {},
     };
-    const growthRateFn = cat === "Internal FTE" ? salaryRate : priceRate;
+    const growthRateFn = cat === "Internal FTE"
+      ? (Y: number) => Number(global_assumptions.find((g) => g.year === Y)?.salary_increase_pct ?? 0)
+      : (Y: number) => Number(global_assumptions.find((g) => g.year === Y)?.price_increase_pct ?? 0);
     for (const N of YEARS) {
       let amt = 0;
       const parts: string[] = [];
