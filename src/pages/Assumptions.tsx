@@ -2191,6 +2191,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
   };
 
   const addDetail = async () => {
+    // Seed with a single 2027 row so the group has identity
     const { data: inserted, error } = await supabase
       .from("capex_plan")
       .insert({
@@ -2207,13 +2208,75 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
     patch({ type: "upsert", table: "capexPlan", row: inserted });
   };
 
-  const removeDetail = async (id: string) => {
-    patch({ type: "delete", table: "capexPlan", id });
-    const { error } = await supabase.from("capex_plan").delete().eq("id", id);
+  // Project investments grouped by description
+  const projectGroups = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    rows
+      .filter((r) => r.capex_type === "Prosjekt" && r.description)
+      .forEach((r) => {
+        const key = r.description as string;
+        const arr = groups.get(key) ?? [];
+        arr.push(r);
+        groups.set(key, arr);
+      });
+    return Array.from(groups.entries()).map(([description, grpRows]) => ({
+      description,
+      rows: grpRows,
+      depreciation_start_year: grpRows[0]?.depreciation_start_year ?? null,
+    }));
+  }, [rows]);
+
+  const upsertProjectAmount = async (description: string, year: number, value: number) => {
+    const group = rows.filter((r) => r.capex_type === "Prosjekt" && r.description === description);
+    const existing = group.find((r) => r.year === year);
+    if (existing) {
+      if (value === 0 && !existing.comment) {
+        patch({ type: "delete", table: "capexPlan", id: existing.id });
+        const { error } = await supabase.from("capex_plan").delete().eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        patch({ type: "update", table: "capexPlan", id: existing.id, changes: { amount: value } });
+        const { error } = await supabase.from("capex_plan").update({ amount: value }).eq("id", existing.id);
+        if (error) throw error;
+      }
+    } else if (value !== 0) {
+      const depStart = group[0]?.depreciation_start_year ?? null;
+      const { data: inserted, error } = await supabase
+        .from("capex_plan")
+        .insert({
+          scenario_id: scenario.id,
+          capex_type: "Prosjekt",
+          year,
+          depreciation_start_year: depStart,
+          amount: value,
+          description,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      patch({ type: "upsert", table: "capexPlan", row: inserted });
+    }
+  };
+
+  const updateProjectGroupField = async (description: string, field: string, value: any) => {
+    const group = rows.filter((r) => r.capex_type === "Prosjekt" && r.description === description);
+    for (const r of group) {
+      patch({ type: "update", table: "capexPlan", id: r.id, changes: { [field]: value } });
+    }
+    const ids = group.map((r) => r.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("capex_plan").update({ [field]: value } as any).in("id", ids);
     if (error) throw error;
   };
 
-  const detailedRows = rows.filter((r) => r.description);
+  const removeProjectGroup = async (description: string) => {
+    const group = rows.filter((r) => r.capex_type === "Prosjekt" && r.description === description);
+    for (const r of group) patch({ type: "delete", table: "capexPlan", id: r.id });
+    const ids = group.map((r) => r.id);
+    if (ids.length === 0) return;
+    const { error } = await supabase.from("capex_plan").delete().in("id", ids);
+    if (error) throw error;
+  };
 
   const depInfo = data.depRules
     .map((r) => `${r.capex_type}: ${r.depreciation_years} år`)
@@ -2288,71 +2351,77 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
               <Plus className="h-3.5 w-3.5 mr-1" /> Legg til investering
             </Button>
           </div>
-          {detailedRows.length === 0 ? (
+          {projectGroups.length === 0 ? (
             <p className="text-xs text-muted-foreground py-3">Ingen prosjektinvesteringer.</p>
           ) : (
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left font-medium px-2 py-2 max-w-[220px]">Navn</th>
-                  <th className="text-left font-medium px-2 py-2 w-[120px]">Anskaffelsesår</th>
+                  <th className="text-left font-medium px-2 py-2 w-[200px]">Navn</th>
                   <th className="text-left font-medium px-2 py-2 w-[150px]">Avskrivningsstart</th>
-                  <th className="text-right font-medium px-2 py-2 w-[140px]">Beløp (tNOK)</th>
+                  {FC_YEARS.map((y) => (
+                    <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
+                  ))}
                   <th className="w-[40px]"></th>
                 </tr>
               </thead>
               <tbody>
-                {detailedRows.map((r) => (
-                  <tr key={r.id} className="border-b">
-                    <td className="px-1 py-1 max-w-[220px]">
-                      <CellWithComment
-                        comment={r.comment}
-                        updatedAt={r.comment_updated_at}
-                        updatedBy={r.comment_updated_by}
-                        onSaveComment={(next) => updateDetailComment(r.id, next)}
-                        label={`Capex: ${r.description ?? "Prosjekt"}`}
-                      >
-                        <Input
-                          defaultValue={r.description ?? ""}
-                          onBlur={(e) => {
-                            if (e.target.value !== r.description) updateDetailField(r.id, "description", e.target.value);
-                          }}
-                          className="h-8 text-xs w-[200px]"
-                        />
-                      </CellWithComment>
-                    </td>
-                    <td className="px-1 py-1">
-                      <Select value={String(r.year)} onValueChange={(v) => updateDetailField(r.id, "year", Number(v))}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-1 py-1">
-                      <Select
-                        value={r.depreciation_start_year == null ? "none" : String(r.depreciation_start_year)}
-                        onValueChange={(v) =>
-                          updateDetailField(r.id, "depreciation_start_year", v === "none" ? null : Number(v))
-                        }
-                      >
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                          <SelectItem value="none">Ikke i perioden</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-1 py-1">
-                      <NumCell value={Number(r.amount)} step="100" onCommit={(v) => updateDetailField(r.id, "amount", v)} />
-                    </td>
-                    <td className="px-1 py-1 text-center">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeDetail(r.id)}>
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {projectGroups.map((g) => {
+                  const anchor = g.rows[0];
+                  return (
+                    <tr key={g.description} className="border-b">
+                      <td className="px-1 py-1">
+                        <CellWithComment
+                          comment={anchor?.comment}
+                          updatedAt={anchor?.comment_updated_at}
+                          updatedBy={anchor?.comment_updated_by}
+                          onSaveComment={(next) => updateDetailComment(anchor.id, next)}
+                          label={`Capex: ${g.description}`}
+                        >
+                          <Input
+                            defaultValue={g.description}
+                            onBlur={(e) => {
+                              const v = e.target.value.trim();
+                              if (v && v !== g.description) updateProjectGroupField(g.description, "description", v);
+                            }}
+                            className="h-8 text-xs w-[200px]"
+                          />
+                        </CellWithComment>
+                      </td>
+                      <td className="px-1 py-1">
+                        <Select
+                          value={g.depreciation_start_year == null ? "none" : String(g.depreciation_start_year)}
+                          onValueChange={(v) =>
+                            updateProjectGroupField(g.description, "depreciation_start_year", v === "none" ? null : Number(v))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {FC_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                            <SelectItem value="none">Ikke i perioden</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      {FC_YEARS.map((y) => {
+                        const cell = g.rows.find((r: any) => r.year === y);
+                        return (
+                          <td key={y} className="px-1 py-1">
+                            <NumCell
+                              value={Number(cell?.amount ?? 0)}
+                              step="100"
+                              onCommit={(v) => upsertProjectAmount(g.description, y, v)}
+                            />
+                          </td>
+                        );
+                      })}
+                      <td className="px-1 py-1 text-center">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeProjectGroup(g.description)}>
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
