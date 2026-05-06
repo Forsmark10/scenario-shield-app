@@ -219,6 +219,7 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
         nearshoring_changes: empty.nearshoring_changes.map((r) => ({ ...r })),
         category_adjustments: empty.category_adjustments.map((r) => ({ ...r })),
         capex_plan: [],
+        depreciation_phaseout: [],
         internal_to_nearshoring_conversions: [],
         one_off_effects: [],
       });
