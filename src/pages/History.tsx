@@ -583,8 +583,8 @@ function CompareSnapshotDialog({
         <DialogHeader>
           <DialogTitle>Sammenlign med nåværende</DialogTitle>
           <DialogDescription>
-            «{snapshot?.name}» vs nåværende verdier (i tNOK). Røde tall viser at nåværende er
-            lavere; grønne at den er høyere.
+            «{snapshot?.name}» vs nåværende verdier (i tNOK). Grønne tall viser at nåværende er
+            lavere (besparelse); røde at den er høyere.
           </DialogDescription>
         </DialogHeader>
         {group && group.rows.length > 1 && (
@@ -646,8 +646,8 @@ function DiffCell({ snap, cur }: { snap: number; cur: number }) {
       className={cn(
         "px-2 py-1.5 text-right tabular-nums",
         Math.abs(delta) < 0.5 && "text-muted-foreground",
-        delta >= 0.5 && "text-[hsl(var(--positive))]",
-        delta <= -0.5 && "text-destructive",
+        delta >= 0.5 && "text-destructive",
+        delta <= -0.5 && "text-[hsl(var(--positive))]",
       )}
       title={`Snapshot: ${formatNumberNO(snap, 0)} · Nåværende: ${formatNumberNO(cur, 0)}`}
     >
