@@ -2083,7 +2083,8 @@ function SectionCategoryAdj({ data, scenario, patch }: { data: AllData; scenario
 
 // ---------------------- 8. Capex plan ----------------------
 function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
-  const types = ["Hardware", "Software", "Prosjekt"] as const;
+  const types = ["Hardware", "Software"] as const;
+  const allTypes = ["Hardware", "Software", "Prosjekt"] as const;
   const rows = data.capexPlan.filter((c) => c.scenario_id === scenario.id);
 
   // Aggregated view: sum per type+year
