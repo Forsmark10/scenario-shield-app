@@ -338,16 +338,24 @@ export default function Assumptions() {
         </p>
       </div>
 
-      <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
-        <div className="sticky top-0 z-20 -mx-6 px-6 py-3 bg-background border-b flex items-center justify-between gap-4 flex-wrap">
-          <TabsList>
-            {data.scenarios.map((s) => (
-              <TabsTrigger key={s.id} value={s.id} className="text-sm">
-                {s.name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <div className="flex items-center gap-2 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 px-6 py-3 bg-background border-b shadow-sm flex items-center justify-between gap-4 flex-wrap">
+        <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+          {data.scenarios.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setActiveScenario(s.id)}
+              className={cn(
+                "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                activeScenario === s.id
+                  ? "bg-background text-foreground shadow-sm"
+                  : "hover:bg-background/50"
+              )}
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
             size="sm"
