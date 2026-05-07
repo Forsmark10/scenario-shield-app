@@ -2419,6 +2419,25 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
                           </SelectContent>
                         </Select>
                       </td>
+                      <td className="px-1 py-1">
+                        {g.depreciation_start_year == null ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <Select
+                            value={String(g.depreciation_years ?? 5)}
+                            onValueChange={(v) =>
+                              updateProjectGroupField(g.description, "depreciation_years", Number(v))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+                                <SelectItem key={n} value={String(n)}>{n} år</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </td>
                       {FC_YEARS.map((y) => {
                         const cell = g.rows.find((r: any) => r.year === y);
                         return (
