@@ -575,9 +575,9 @@ export default function Assumptions() {
             </AlertDialogContent>
           </AlertDialog>
           </div>
-        </div>
+      </div>
 
-
+      <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
         {data.scenarios.map((s) => (
           <TabsContent key={s.id} value={s.id} className="mt-4 space-y-4">
             <GoalSeekPanel
