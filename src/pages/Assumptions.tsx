@@ -2236,6 +2236,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
       description,
       rows: grpRows,
       depreciation_start_year: grpRows[0]?.depreciation_start_year ?? null,
+      depreciation_years: grpRows[0]?.depreciation_years ?? 5,
     }));
   }, [rows]);
 
