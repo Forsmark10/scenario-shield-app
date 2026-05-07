@@ -2511,71 +2511,98 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
 // ---------------------- 8b. Utfasing eksisterende avskrivninger ----------------------
 function SectionDeprPhaseout({ data, scenario, patch }: { data: AllData; scenario: Scenario; patch: Patch }) {
   const types = ["Hardware", "Software", "Prosjekt"] as const;
-  const rows = data.deprPhaseout.filter((r) => r.scenario_id === scenario.id);
+  const STEADY_NAME = "Steady State";
+  const steady = data.scenarios.find((s) => s.name === STEADY_NAME);
+  const isSteady = scenario.name === STEADY_NAME;
+  const sourceScenarioId = steady?.id ?? scenario.id;
+  const rows = data.deprPhaseout.filter((r) => r.scenario_id === sourceScenarioId);
+  const locked = !isSteady;
 
   const cellFor = (type: string, year: number) =>
     rows.find((r) => r.type === type && r.year === year);
 
+  // Sync a (type, year, value) cell across ALL scenarios. Source of truth = Steady State.
   const upsertCell = async (type: string, year: number, value: number) => {
-    const existing = cellFor(type, year);
-    if (existing) {
-      if (value === 0 && !existing.comment) {
-        patch({ type: "delete", table: "deprPhaseout", id: existing.id });
-        const { error } = await supabase.from("depreciation_phaseout").delete().eq("id", existing.id);
+    if (locked) return;
+    for (const sc of data.scenarios) {
+      const existing = data.deprPhaseout.find(
+        (r) => r.scenario_id === sc.id && r.type === type && r.year === year,
+      );
+      if (existing) {
+        if (value === 0 && !existing.comment) {
+          patch({ type: "delete", table: "deprPhaseout", id: existing.id });
+          const { error } = await supabase.from("depreciation_phaseout").delete().eq("id", existing.id);
+          if (error) throw error;
+        } else {
+          patch({ type: "update", table: "deprPhaseout", id: existing.id, changes: { amount_tnok: value } });
+          const { error } = await supabase.from("depreciation_phaseout").update({ amount_tnok: value }).eq("id", existing.id);
+          if (error) throw error;
+        }
+      } else if (value !== 0) {
+        const { data: inserted, error } = await supabase
+          .from("depreciation_phaseout")
+          .insert({ scenario_id: sc.id, type, year, amount_tnok: value })
+          .select()
+          .single();
         if (error) throw error;
-      } else {
-        patch({ type: "update", table: "deprPhaseout", id: existing.id, changes: { amount_tnok: value } });
-        const { error } = await supabase.from("depreciation_phaseout").update({ amount_tnok: value }).eq("id", existing.id);
-        if (error) throw error;
+        patch({ type: "upsert", table: "deprPhaseout", row: inserted });
       }
-    } else if (value !== 0) {
-      const { data: inserted, error } = await supabase
-        .from("depreciation_phaseout")
-        .insert({ scenario_id: scenario.id, type, year, amount_tnok: value })
-        .select()
-        .single();
-      if (error) throw error;
-      patch({ type: "upsert", table: "deprPhaseout", row: inserted });
     }
   };
 
   const upsertCellComment = async (type: string, year: number, comment: string | null) => {
-    const existing = cellFor(type, year);
+    if (locked) return;
     const ts = new Date().toISOString();
-    if (existing) {
-      patch({
-        type: "update",
-        table: "deprPhaseout",
-        id: existing.id,
-        changes: { comment, comment_updated_at: ts },
-      });
-      const { error } = await supabase
-        .from("depreciation_phaseout")
-        .update({ comment, comment_updated_at: ts } as any)
-        .eq("id", existing.id);
-      if (error) throw error;
-    } else {
-      const { data: inserted, error } = await supabase
-        .from("depreciation_phaseout")
-        .insert({ scenario_id: scenario.id, type, year, amount_tnok: 0, comment, comment_updated_at: ts } as any)
-        .select()
-        .single();
-      if (error) throw error;
-      patch({ type: "upsert", table: "deprPhaseout", row: inserted });
+    for (const sc of data.scenarios) {
+      const existing = data.deprPhaseout.find(
+        (r) => r.scenario_id === sc.id && r.type === type && r.year === year,
+      );
+      if (existing) {
+        patch({
+          type: "update",
+          table: "deprPhaseout",
+          id: existing.id,
+          changes: { comment, comment_updated_at: ts },
+        });
+        const { error } = await supabase
+          .from("depreciation_phaseout")
+          .update({ comment, comment_updated_at: ts } as any)
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { data: inserted, error } = await supabase
+          .from("depreciation_phaseout")
+          .insert({ scenario_id: sc.id, type, year, amount_tnok: 0, comment, comment_updated_at: ts } as any)
+          .select()
+          .single();
+        if (error) throw error;
+        patch({ type: "upsert", table: "deprPhaseout", row: inserted });
+      }
     }
   };
 
   const sumCol = (year: number) =>
     types.reduce((a, t) => a + Number(cellFor(t, year)?.amount_tnok ?? 0), 0);
 
+  const titleNode = (
+    <span className="inline-flex items-center gap-1.5">
+      Utfasing eksisterende avskrivninger
+      {locked && <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-label="Låst" />}
+    </span>
+  );
+
   return (
     <Section
-      title="Utfasing eksisterende avskrivninger"
-      description="Reduksjon i avskrivninger fra historiske investeringer som fases ut over perioden. Negative tall = reduksjon i avskrivningskostnad. En verdi i et gitt år gjelder også alle påfølgende år (kumulativ utfasing)."
+      title={titleNode}
+      description={
+        locked
+          ? "Reduksjon i avskrivninger fra historiske investeringer som fases ut over perioden. Negative tall = reduksjon i avskrivningskostnad. Styres fra scenario Steady State. Endre verdiene der for å oppdatere alle scenarioer."
+          : "Reduksjon i avskrivninger fra historiske investeringer som fases ut over perioden. Negative tall = reduksjon i avskrivningskostnad. En verdi i et gitt år gjelder også alle påfølgende år (kumulativ utfasing). Endringer her synkroniseres automatisk til alle scenarioer."
+      }
       tooltip="Beløp i tNOK. Verdien for et gitt år gjelder også alle påfølgende år."
       variant="historical"
     >
-      <div>
+      <div className={cn(locked && "opacity-60")}>
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
           Aggregert per type og år (tNOK)
         </h3>
@@ -2606,6 +2633,7 @@ function SectionDeprPhaseout({ data, scenario, patch }: { data: AllData; scenari
                         <NumCell
                           value={Number(cell?.amount_tnok ?? 0)}
                           step="100"
+                          disabled={locked}
                           onCommit={(v) => upsertCell(t, y, v)}
                         />
                       </CellWithComment>
