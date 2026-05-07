@@ -339,7 +339,7 @@ export default function Assumptions() {
       </div>
 
       <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
-        <div className="sticky top-14 z-20 -mx-6 px-6 py-3 bg-background border-b flex items-center justify-between gap-4 flex-wrap">
+        <div className="sticky top-0 z-20 -mx-6 px-6 py-3 bg-background border-b flex items-center justify-between gap-4 flex-wrap">
           <TabsList>
             {data.scenarios.map((s) => (
               <TabsTrigger key={s.id} value={s.id} className="text-sm">
