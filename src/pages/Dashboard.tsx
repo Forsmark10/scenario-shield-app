@@ -664,6 +664,8 @@ function ScenarioSection({
                   stroke="none"
                   fill={`url(#yoy-grad-${bundle.meta.id})`}
                   isAnimationActive={false}
+                  tooltipType="none"
+                  legendType="none"
                 />
                 <Line
                   type="monotone"
