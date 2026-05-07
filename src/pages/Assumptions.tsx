@@ -683,6 +683,7 @@ function NumCell({
   max,
   className,
   errorHint,
+  disabled,
 }: {
   value: number;
   onCommit: (v: number) => Promise<void> | void;
@@ -693,6 +694,7 @@ function NumCell({
   className?: string;
   /** Vist under feltet hvis brukeren skriver en verdi utenfor min/max. */
   errorHint?: string;
+  disabled?: boolean;
 }) {
   const [local, setLocal] = useState(String(value ?? 0));
   const [saving, setSaving] = useState(false);
