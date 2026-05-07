@@ -500,12 +500,16 @@ export function calculateForecast(inputs: ForecastInputs): ForecastResult {
               // Prosjekt krever depreciation_start_year (null = ingen avskrivning i perioden)
               if (ctForLine === "Prosjekt" && cap.depreciation_start_year == null) continue;
               const startY = cap.depreciation_start_year ?? cap.year + 1;
-              const endY = startY + rule.depreciation_years - 1;
+              const depYears =
+                ctForLine === "Prosjekt"
+                  ? ((cap as any).depreciation_years ?? 5)
+                  : rule.depreciation_years;
+              const endY = startY + depYears - 1;
               if (N >= startY && N <= endY) {
-                const annual = cap.amount / rule.depreciation_years;
+                const annual = cap.amount / depYears;
                 extra += annual;
                 extras.push(
-                  `+ Capex Y${cap.year} ${cap.amount}/${rule.depreciation_years} (start ${startY}) = ${round2(annual)}`
+                  `+ Capex Y${cap.year} ${cap.amount}/${depYears} (start ${startY}) = ${round2(annual)}`
                 );
               }
             }
