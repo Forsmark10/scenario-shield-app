@@ -331,14 +331,23 @@ export default function Assumptions() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Assumptions</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Globale drivere, FTE-endringer og capex-plan per scenario. Endringer lagres automatisk.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Assumptions</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Globale drivere, FTE-endringer og capex-plan per scenario. Endringer lagres automatisk.
+        </p>
+      </div>
+
+      <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
+        <div className="sticky top-0 z-30 -mx-6 px-6 py-3 bg-background border-b flex items-center justify-between gap-4 flex-wrap">
+          <TabsList>
+            {data.scenarios.map((s) => (
+              <TabsTrigger key={s.id} value={s.id} className="text-sm">
+                {s.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
             size="sm"
@@ -557,17 +566,9 @@ export default function Assumptions() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          </div>
         </div>
-      </div>
 
-      <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
-        <TabsList>
-          {data.scenarios.map((s) => (
-            <TabsTrigger key={s.id} value={s.id} className="text-sm">
-              {s.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
 
         {data.scenarios.map((s) => (
           <TabsContent key={s.id} value={s.id} className="mt-4 space-y-4">
