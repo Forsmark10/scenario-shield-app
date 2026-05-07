@@ -338,7 +338,7 @@ export default function Assumptions() {
         </p>
       </div>
 
-      <div className="sticky top-0 z-20 -mx-6 px-6 py-3 bg-background border-b shadow-sm flex items-center justify-between gap-4 flex-wrap">
+      <div className="sticky top-14 z-20 -mx-6 px-6 py-3 bg-background border-b shadow-sm flex items-center justify-between gap-4 flex-wrap">
         <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
           {data.scenarios.map((s) => (
             <button
