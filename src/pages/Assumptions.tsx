@@ -2255,6 +2255,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
       }
     } else if (value !== 0) {
       const depStart = group[0]?.depreciation_start_year ?? null;
+      const depYears = group[0]?.depreciation_years ?? 5;
       const { data: inserted, error } = await supabase
         .from("capex_plan")
         .insert({
@@ -2262,6 +2263,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
           capex_type: "Prosjekt",
           year,
           depreciation_start_year: depStart,
+          depreciation_years: depYears,
           amount: value,
           description,
         } as any)
