@@ -254,11 +254,11 @@ function buildAssumptionsSheet(bundle: ScenarioBundle): XLSX.WorkSheet {
 
   // 10. Capex-plan
   section("Capex-plan");
-  aoa.push(["År", "Type", "Beløp (tNOK)", "Beskrivelse", "Avskrivningsstart"]);
+  aoa.push(["År", "Type", "Beløp (tNOK)", "Beskrivelse", "Avskrivningsstart", "Avskr. tid (år)"]);
   [...i.capex_plan]
     .sort((a, b) => a.year - b.year)
     .forEach((c) =>
-      aoa.push([c.year, c.capex_type, c.amount, c.description ?? "", c.depreciation_start_year ?? ""]),
+      aoa.push([c.year, c.capex_type, c.amount, c.description ?? "", c.depreciation_start_year ?? "", (c as any).depreciation_years ?? ""]),
     );
 
   // 11. Avskrivningsregler
@@ -267,7 +267,7 @@ function buildAssumptionsSheet(bundle: ScenarioBundle): XLSX.WorkSheet {
   i.depreciation_rules.forEach((d) => aoa.push([d.capex_type, d.depreciation_years]));
 
   const ws = aoaToSheet(aoa);
-  setColWidths(ws, [10, 24, 16, 16, 16]);
+  setColWidths(ws, [10, 24, 16, 16, 16, 14]);
 
   // Bold på seksjonsoverskrifter (rader hvor kun kolonne A har verdi og det er tekst)
   for (let r = 0; r < aoa.length; r++) {

@@ -2208,6 +2208,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
         capex_type: "Prosjekt",
         year: 2027,
         depreciation_start_year: null,
+        depreciation_years: 5,
         amount: 0,
         description,
       } as any)
@@ -2235,6 +2236,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
       description,
       rows: grpRows,
       depreciation_start_year: grpRows[0]?.depreciation_start_year ?? null,
+      depreciation_years: grpRows[0]?.depreciation_years ?? 5,
     }));
   }, [rows]);
 
@@ -2253,6 +2255,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
       }
     } else if (value !== 0) {
       const depStart = group[0]?.depreciation_start_year ?? null;
+      const depYears = group[0]?.depreciation_years ?? 5;
       const { data: inserted, error } = await supabase
         .from("capex_plan")
         .insert({
@@ -2260,6 +2263,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
           capex_type: "Prosjekt",
           year,
           depreciation_start_year: depStart,
+          depreciation_years: depYears,
           amount: value,
           description,
         } as any)
@@ -2371,6 +2375,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
                 <tr className="border-b">
                   <th className="text-left font-medium px-2 py-2 w-[200px]">Navn</th>
                   <th className="text-left font-medium px-2 py-2 w-[150px]">Avskrivningsstart</th>
+                  <th className="text-left font-medium px-2 py-2 w-[100px]">Avskr. tid</th>
                   {FC_YEARS.map((y) => (
                     <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
                   ))}
@@ -2413,6 +2418,25 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
                             <SelectItem value="none">Ikke i perioden</SelectItem>
                           </SelectContent>
                         </Select>
+                      </td>
+                      <td className="px-1 py-1">
+                        {g.depreciation_start_year == null ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : (
+                          <Select
+                            value={String(g.depreciation_years ?? 5)}
+                            onValueChange={(v) =>
+                              updateProjectGroupField(g.description, "depreciation_years", Number(v))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+                                <SelectItem key={n} value={String(n)}>{n} år</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                       </td>
                       {FC_YEARS.map((y) => {
                         const cell = g.rows.find((r: any) => r.year === y);

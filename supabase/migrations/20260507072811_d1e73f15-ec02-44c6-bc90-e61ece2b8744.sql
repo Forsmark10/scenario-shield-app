@@ -1,0 +1,1 @@
+ALTER TABLE public.capex_plan ADD COLUMN depreciation_years integer;
