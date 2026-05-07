@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, History, MessageSquare, Plus, RotateCcw, Trash2, Undo2 } from "lucide-react";
+import { ChevronDown, History, Lock, MessageSquare, Plus, RotateCcw, Trash2, Undo2 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
