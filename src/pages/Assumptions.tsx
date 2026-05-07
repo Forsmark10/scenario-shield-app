@@ -2208,6 +2208,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
         capex_type: "Prosjekt",
         year: 2027,
         depreciation_start_year: null,
+        depreciation_years: 5,
         amount: 0,
         description,
       } as any)
