@@ -629,26 +629,58 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
 
     // ───────── CAPEX ─────────
     const capexTypeOrder: Record<string, number> = { Hardware: 0, Software: 1, Prosjekt: 2 };
-    for (const r of base.capex_plan) {
+
+    // Hardware/Software: en rad per capex_plan-rad (uendret).
+    for (const r of base.capex_plan.filter((c) => c.capex_type !== "Prosjekt")) {
       if (!Number(r.amount)) continue;
       const yearly = isolate((i) => {
         i.capex_plan = [{ ...r }];
         return i;
       });
-      const isProject = r.capex_type === "Prosjekt";
-      const dsy = (r as any).depreciation_start_year;
-      const projDetails = isProject
-        ? `Anskaffelse ${r.year} · Avskr. start ${dsy ?? "ikke i perioden"}`
-        : (r.description ?? "—");
       rows.push({
         key: `capex:${r.year}:${r.capex_type}:${(r as any).id ?? Math.random()}`,
         group: "CAPEX",
         sortKey: (capexTypeOrder[r.capex_type] ?? 9) * 10000 + r.year,
-        name: `Capex ${r.capex_type} ${r.year}${isProject && r.description ? ` – ${r.description}` : ""} (${formatNumberNO(Number(r.amount) / 1000, 1)} MNOK)`,
+        name: `Capex ${r.capex_type} ${r.year} (${formatNumberNO(Number(r.amount) / 1000, 1)} MNOK)`,
         type: view === "PL" ? "Avskrivning over levetid" : "Direkte utgift",
-        details: projDetails,
+        details: r.description ?? "—",
         yearly,
         comment: (r as any).comment,
+      });
+    }
+
+    // Prosjekt: grupper alle capex_plan-rader med samme description.
+    const projectGroups = new Map<string, any[]>();
+    for (const r of base.capex_plan.filter((c) => c.capex_type === "Prosjekt" && c.description)) {
+      const arr = projectGroups.get(r.description as string) ?? [];
+      arr.push(r);
+      projectGroups.set(r.description as string, arr);
+    }
+    for (const [description, grpRows] of projectGroups) {
+      const total = grpRows.reduce((s, r) => s + Number(r.amount || 0), 0);
+      if (!total) continue;
+      const yearly = isolate((i) => {
+        i.capex_plan = grpRows.map((r) => ({ ...r }));
+        return i;
+      });
+      const dsy = (grpRows[0] as any).depreciation_start_year;
+      const dyears = (grpRows[0] as any).depreciation_years ?? 5;
+      const acquisitions = grpRows
+        .filter((r) => Number(r.amount))
+        .sort((a, b) => a.year - b.year)
+        .map((r) => `${formatNumberNO(Number(r.amount) / 1000, 1)} (${r.year})`)
+        .join(", ");
+      const startTxt = dsy == null ? "ikke i perioden" : String(dsy);
+      const earliestYear = Math.min(...grpRows.map((r) => r.year));
+      rows.push({
+        key: `capex:prosjekt:${description}`,
+        group: "CAPEX",
+        sortKey: (capexTypeOrder.Prosjekt ?? 9) * 10000 + earliestYear,
+        name: `${description} (${formatNumberNO(total / 1000, 1)} MNOK)`,
+        type: view === "PL" ? "Avskrivning over levetid" : "Direkte utgift",
+        details: `Avskr. start ${startTxt} · ${dyears} år · Anskaffelse: ${acquisitions} MNOK`,
+        yearly,
+        comment: (grpRows[0] as any).comment,
       });
     }
 
