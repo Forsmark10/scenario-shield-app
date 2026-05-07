@@ -39,6 +39,10 @@ Sammenligner de tre scenarioene side om side i en tabell. Du kan veksle mellom:
 ### Assumptions
 Her legger du inn forutsetningene som driver modellen. Alt du endrer her påvirker Dashboard og Scenarioer automatisk. Mer om dette under «Hva kan du justere?» nedenfor.
 
+### Assumptions – navigering
+
+Scenario-tabsene (Steady State / Moderate Saving / Aggressive Saving) og handlingsknappene er festet øverst når du scroller, slik at du alltid kan bytte scenario uten å scrolle tilbake.
+
 ### Om modellen
 Denne siden – forklarer hvordan alt henger sammen.
 
@@ -82,13 +86,18 @@ Begge er permanente fra året de settes.
 Engangskostnader eller -besparelser som kun gjelder ett spesifikt år. F.eks. en ekstrakostnad for et migreringsprosjekt i 2028. Vokser ikke med prisvekst.
 
 ### Capex (investeringer)
-Planlagte investeringer per år. **Hardware** og **Software** håndteres som aggregerte buckets per år (udokumenterte investeringer). **Prosjekt** håndteres kun som navngitte investeringer i seksjonen "Prosjektinvesteringer", med eget anskaffelsesår og avskrivningsstart-år. Avskrivningsstart kan settes til "Ikke i perioden" for prosjekter som ikke begynner å avskrives før 2032 – da genereres ingen avskrivning i forecast-perioden. Avskrivningstider:
-- Hardware: 3 år (start = anskaffelsesår + 1 som default)
-- Software: 5 år (start = anskaffelsesår + 1 som default)
-- Prosjekt: 5 år (start = brukerdefinert avskrivningsstart-år)
+
+Planlagte investeringer fordelt på to typer buckets og navngitte prosjekter:
+
+**Hardware og Software** – Aggregerte buckets per år for udokumenterte investeringer. Avskrives automatisk fra anskaffelsesår + 1 (Hardware: 3 år, Software: 5 år).
+
+**Prosjektinvesteringer (navngitte)** – Spesifikke prosjekter med navn og anskaffelsesbeløp per år (2027–2031). Hvert prosjekt har egen avskrivningsstart (hvilket år avskrivningen begynner) og avskrivningstid (antall år, 1–10). Avskrivningsstart kan settes til "Ikke i perioden" – da synes investeringen i Spend/Capex, men genererer ingen avskrivning i forecast-perioden.
 
 ### Utfasing eksisterende avskrivninger
-Reduksjon i avskrivninger fra historiske investeringer (gjort før FC 2026) som naturlig fases ut over forecast-perioden. Verdiene legges inn manuelt per type (Hardware/Software/Prosjekt) og år som negative beløp i tNOK. **Verdien er kumulativ:** en utfasing satt for 2027 gjelder også 2028–2031. Effekten inngår i Avskrivning-søylen i waterfallen og som egen rad i Kontroll-tabben.
+
+Reduksjon i avskrivninger fra historiske investeringer (gjort før FC 2026) som naturlig fases ut over forecast-perioden. Verdiene legges inn manuelt per type (Hardware/Software/Prosjekt) og år som negative beløp i tNOK. Verdien er kumulativ: en utfasing satt for 2027 gjelder også 2028–2031.
+
+Viktig: Utfasingen styres kun fra scenarioet Steady State og synkroniseres automatisk til de andre scenarioene. I Moderate Saving og Aggressive Saving vises seksjonen som låst. Effekten inngår i Avskrivning-søylen i waterfallen og som egen rad i Kontroll-tabben.
 
 ---
 
@@ -125,11 +134,19 @@ Begge er riktige – de viser bare ulike perspektiver. P&L er standard for rappo
 
 ## Kontroll-tabben
 
-Nederst på Assumptions-siden finner du **Kontroll**-tabben. Den viser den isolerte effekten av *hver enkelt forutsetning* du har lagt inn – altså hva akkurat den ene endringen bidrar med.
+Nederst på Assumptions-siden finner du Kontroll-tabben. Den viser den isolerte effekten av hver enkelt forutsetning du har lagt inn – altså hva akkurat den ene endringen bidrar med.
+
+Under CAPEX vises:
+
+- **Utfasing eksisterende avskrivninger** – Markert med historisk styling (slate-bakgrunn). Viser den kumulative utfasingens effekt.
+- **Capex Hardware** – Én samlet rad med alle Hardware-investeringer og deres avskrivningseffekt.
+- **Capex Software** – Én samlet rad med alle Software-investeringer.
+- **Navngitte prosjekter** – Én rad per prosjekt med anskaffelsesbeløp, avskrivningsstart og avskrivningstid i detaljer-kolonnen.
 
 Kontroll-tabben har tre toggles:
+
 - **P&L / Spend** – Velg om du vil se effekten i P&L-perspektiv (avskrivninger) eller Spend-perspektiv (kontant utgift).
-- **Kumulativ / Per år** – Kumulativ viser total endring fra FC 2026 (samme perspektiv som waterfallen). Per år viser den inkrementelle endringen per år (samme perspektiv som stolpediagrammet). I per år-visningen viser en ny forutsetning full effekt i startåret, og deretter kun veksteffekten (lønns- eller prisvekst) i påfølgende år.
+- **Kumulativ / Per år** – Kumulativ viser total endring fra FC 2026 (samme perspektiv som waterfallen). Per år viser den inkrementelle endringen per år. Merk: I per år-modus viser utfasing av eksisterende avskrivninger endringen mellom år (delta), mens øvrige CAPEX-rader viser faktiske verdier.
 - **Oppdater** – Henter ferske data etter at du har endret forutsetninger.
 
 Dette er nyttig for å:
@@ -137,8 +154,6 @@ Dette er nyttig for å:
 - Forstå hvilke tiltak som har størst effekt
 - Sjekke at modellen oppfører seg logisk
 - Sammenligne kumulativ og per år-effekt for å forstå forskjellen mellom waterfall og stolpediagram
-
-**Merk:** Naturlig utfasing av historiske avskrivninger vises ikke her – kun nye forutsetninger du har lagt inn. Utfasingseffekten vises i waterfallens Avskrivning-søyle.
 
 ---
 
@@ -212,4 +227,4 @@ Waterfallen har en liten innebygd differanse på ca. 4 MNOK som er skjult. Den s
 | Eksterne FTE-rater | Low 240 / Medium 270 / High 300 tNOK/mnd × 11 mnd |
 | Nearshoring | 75 000 EUR/år |
 | Sosiale avgifter | AGA 14,1 %, Feriepenger 12 %, AGA på feriepenger 1,69 %, Pensjon 5 % |
-| Avskrivningstider | Hardware 3 år, Software 5 år, Prosjekt 5 år |
+| Avskrivningstider | Hardware 3 år, Software 5 år, Prosjekt 1–10 år (brukerdefinert, default 5) |
