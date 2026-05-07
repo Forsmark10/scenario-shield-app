@@ -2256,21 +2256,59 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
     } else if (value !== 0) {
       const depStart = group[0]?.depreciation_start_year ?? null;
       const depYears = group[0]?.depreciation_years ?? 5;
-      const { data: inserted, error } = await supabase
+      // Duplicate guard: re-check DB before inserting to avoid race-condition ghost rows
+      const { data: dbExisting } = await supabase
         .from("capex_plan")
-        .insert({
-          scenario_id: scenario.id,
-          capex_type: "Prosjekt",
-          year,
-          depreciation_start_year: depStart,
-          depreciation_years: depYears,
-          amount: value,
-          description,
-        } as any)
-        .select()
-        .single();
-      if (error) throw error;
-      patch({ type: "upsert", table: "capexPlan", row: inserted });
+        .select("*")
+        .eq("scenario_id", scenario.id)
+        .eq("capex_type", "Prosjekt")
+        .eq("description", description)
+        .eq("year", year)
+        .maybeSingle();
+      if (dbExisting) {
+        const { error } = await supabase
+          .from("capex_plan")
+          .update({ amount: value })
+          .eq("id", (dbExisting as any).id);
+        if (error) throw error;
+        patch({ type: "upsert", table: "capexPlan", row: { ...(dbExisting as any), amount: value } });
+      } else {
+        const { data: inserted, error } = await supabase
+          .from("capex_plan")
+          .insert({
+            scenario_id: scenario.id,
+            capex_type: "Prosjekt",
+            year,
+            depreciation_start_year: depStart,
+            depreciation_years: depYears,
+            amount: value,
+            description,
+          } as any)
+          .select()
+          .single();
+        if (error) throw error;
+        patch({ type: "upsert", table: "capexPlan", row: inserted });
+      }
+    }
+    // Cleanup: remove zero-amount placeholder rows in same group (other years)
+    const stale = rows.filter(
+      (r) =>
+        r.capex_type === "Prosjekt" &&
+        r.description === description &&
+        r.year !== year &&
+        Number(r.amount) === 0 &&
+        !r.comment,
+    );
+    if (stale.length > 0) {
+      // Keep at least one row in the group
+      const remaining = rows.filter(
+        (r) => r.capex_type === "Prosjekt" && r.description === description,
+      ).length;
+      const toDelete = stale.slice(0, Math.max(0, remaining - 1 + (value !== 0 ? 1 : 0)));
+      for (const r of toDelete) {
+        patch({ type: "delete", table: "capexPlan", id: r.id });
+        await supabase.from("capex_plan").delete().eq("id", r.id);
+      }
     }
   };
 
