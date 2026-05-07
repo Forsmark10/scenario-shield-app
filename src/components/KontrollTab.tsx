@@ -630,24 +630,41 @@ function KontrollTabInner({ scenarioId, reloadKey, onRefresh }: { scenarioId: st
     // ───────── CAPEX ─────────
     const capexTypeOrder: Record<string, number> = { Hardware: 0, Software: 1, Prosjekt: 2 };
 
-    // Hardware/Software: en rad per capex_plan-rad (uendret).
+    // Hardware/Software: grupper alle capex_plan-rader med samme capex_type til én rad.
+    const hwSwGroups = new Map<string, any[]>();
     for (const r of base.capex_plan.filter((c) => c.capex_type !== "Prosjekt")) {
       if (!Number(r.amount)) continue;
+      const arr = hwSwGroups.get(r.capex_type) ?? [];
+      arr.push(r);
+      hwSwGroups.set(r.capex_type, arr);
+    }
+    for (const [capexType, grpRows] of hwSwGroups) {
+      const total = grpRows.reduce((s, r) => s + Number(r.amount || 0), 0);
+      if (!total) continue;
       const yearly = isolate((i) => {
-        i.capex_plan = [{ ...r }];
+        i.capex_plan = grpRows.map((r) => ({ ...r }));
         return i;
       });
+      const acquisitions = grpRows
+        .slice()
+        .sort((a, b) => a.year - b.year)
+        .map((r) => `${formatNumberNO(Number(r.amount) / 1000, 1)} (${r.year})`)
+        .join(", ");
+      const rule = base.depreciation_rules.find((d) => d.capex_type === capexType);
+      const dyears = rule?.depreciation_years ?? 5;
+      const earliestYear = Math.min(...grpRows.map((r) => r.year));
       rows.push({
-        key: `capex:${r.year}:${r.capex_type}:${(r as any).id ?? Math.random()}`,
+        key: `capex:${capexType}`,
         group: "CAPEX",
-        sortKey: (capexTypeOrder[r.capex_type] ?? 9) * 10000 + r.year,
-        name: `Capex ${r.capex_type} ${r.year} (${formatNumberNO(Number(r.amount) / 1000, 1)} MNOK)`,
+        sortKey: (capexTypeOrder[capexType] ?? 9) * 10000 + earliestYear,
+        name: `Capex ${capexType} (${formatNumberNO(total / 1000, 1)} MNOK)`,
         type: view === "PL" ? "Avskrivning over levetid" : "Direkte utgift",
-        details: r.description ?? "—",
+        details: `${acquisitions} MNOK · Avskr. tid ${dyears} år`,
         yearly,
-        comment: (r as any).comment,
+        comment: undefined,
       });
     }
+
 
     // Prosjekt: grupper alle capex_plan-rader med samme description.
     const projectGroups = new Map<string, any[]>();
