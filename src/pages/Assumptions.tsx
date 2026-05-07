@@ -756,6 +756,7 @@ function NumCell({
         step={step}
         min={min}
         max={max}
+        disabled={disabled}
         value={local}
         onFocus={() => {
           isFocusedRef.current = true;
