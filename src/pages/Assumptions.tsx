@@ -566,17 +566,9 @@ export default function Assumptions() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          </div>
         </div>
-      </div>
 
-      <Tabs value={activeScenario ?? ""} onValueChange={setActiveScenario}>
-        <TabsList>
-          {data.scenarios.map((s) => (
-            <TabsTrigger key={s.id} value={s.id} className="text-sm">
-              {s.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
 
         {data.scenarios.map((s) => (
           <TabsContent key={s.id} value={s.id} className="mt-4 space-y-4">
