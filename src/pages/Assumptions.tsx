@@ -2375,6 +2375,7 @@ function SectionCapex({ data, scenario, patch }: { data: AllData; scenario: Scen
                 <tr className="border-b">
                   <th className="text-left font-medium px-2 py-2 w-[200px]">Navn</th>
                   <th className="text-left font-medium px-2 py-2 w-[150px]">Avskrivningsstart</th>
+                  <th className="text-left font-medium px-2 py-2 w-[100px]">Avskr. tid</th>
                   {FC_YEARS.map((y) => (
                     <th key={y} className="text-right font-medium px-2 py-2">{y}</th>
                   ))}
