@@ -194,6 +194,9 @@ export type Database = {
           comment_amount: string | null
           comment_amount_updated_at: string | null
           comment_amount_updated_by: string | null
+          comment_price: string | null
+          comment_price_updated_at: string | null
+          comment_price_updated_by: string | null
           comment_rate: string | null
           comment_rate_updated_at: string | null
           comment_rate_updated_by: string | null
@@ -215,6 +218,9 @@ export type Database = {
           comment_amount?: string | null
           comment_amount_updated_at?: string | null
           comment_amount_updated_by?: string | null
+          comment_price?: string | null
+          comment_price_updated_at?: string | null
+          comment_price_updated_by?: string | null
           comment_rate?: string | null
           comment_rate_updated_at?: string | null
           comment_rate_updated_by?: string | null
@@ -236,6 +242,9 @@ export type Database = {
           comment_amount?: string | null
           comment_amount_updated_at?: string | null
           comment_amount_updated_by?: string | null
+          comment_price?: string | null
+          comment_price_updated_at?: string | null
+          comment_price_updated_by?: string | null
           comment_rate?: string | null
           comment_rate_updated_at?: string | null
           comment_rate_updated_by?: string | null
