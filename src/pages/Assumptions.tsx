@@ -761,12 +761,12 @@ function NumCell({
     <div className={cn("relative", className)}>
       <Input
         ref={inputRef}
-        type="number"
-        step={step}
-        min={min}
-        max={max}
+        type="text"
+        inputMode="decimal"
+        pattern="[0-9.,\-]*"
         disabled={disabled}
         value={local}
+
         onFocus={() => {
           isFocusedRef.current = true;
         }}
